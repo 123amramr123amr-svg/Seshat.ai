@@ -25,7 +25,8 @@ import numpy as np
 
 from tokenizer import normalize_question
 
-SKIP_CATS = ("math",)          # الحساب مالوش "أقرب سؤال" — 15 + 27 مش قريبة من 15 + 2
+# الحساب مالوش "أقرب سؤال" (15 + 27 مش قريبة من 15 + 2)، والرسم النموذج هو اللي بيرسمه
+SKIP_CATS = ("math", "draw")
 WORD_WEIGHT = 1.5              # الكلمة الكاملة أهم من مقطع منها
 NGRAM = 3
 RERANK = 15                    # عدد الأسئلة اللي بنراجع كلماتها المهمة

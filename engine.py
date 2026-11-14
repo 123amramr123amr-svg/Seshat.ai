@@ -14,6 +14,7 @@ seshat.chet — محرك الرد: بيحمّل النموذج المحفوظ و
 import math
 import os
 import re
+import sys
 import threading
 import time
 
@@ -24,6 +25,8 @@ from tokenizer import CharTokenizer, normalize_question, is_arabic
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_MODEL = os.path.join(HERE, "seshat_chet_model.npz")
+sys.path.insert(0, os.path.join(HERE, "data"))
+import drawings                                    # noqa: E402  (شكل الرسمة والتأكد منها)
 
 # لو ثقة النموذج في الرد أقل من الحد ده، بنعتبر إنه مش عارف الإجابة وبنقول كده
 # بصراحة بدل ما نطلّع كلام ملخبط.
@@ -70,6 +73,15 @@ MEMORY_AGREE = 0.30       # فوق كده بترد لو النموذج فهم ا
 MEMORY_SUGGEST = 0.35     # فوق كده (ومن غير اتفاق) بيسأل المستخدم "تقصد كذا؟"
 UNKNOWN_MARGIN = 0.15     # لو السؤال أقرب بكتير لموضوع برّه اللي اتعلمه → مش عارف
 MATH_LABEL = "حساب"       # نوع السؤال في سطر التفكير لما يكون مسألة حساب
+DRAW_LABELS = ("رسم |", "drawing |")      # سطر التفكير لما يكون المطلوب رسمة
+DRAW_WORDS = ("ارسم", "ارسملي", "ارسمي", "draw")
+DRAW_HELP_AR = ("لسه بعرف أرسم أشكال بسيطة بس: دايرة، حلقة، مربع، مستطيل، مثلث، معيّن، علامة زائد، "
+                "قلب، سهم، خط — بأي لون (أحمر، أخضر، أزرق، أصفر، برتقالي، بنفسجي، أسود، بمبي) — "
+                "وكمان: شمس، شجرة، بيت، علم مصر، وش مبتسم، هرم. جرب: ارسم قلب أحمر.")
+DRAW_HELP_EN = ("I can only draw simple shapes so far: circle, ring, square, rectangle, triangle, "
+                "diamond, plus, heart, arrow, line — in red, green, blue, yellow, orange, purple, "
+                "black or pink — and also: sun, tree, house, flag of Egypt, smiley face, pyramid. "
+                "Try: draw a red heart.")
 
 # سطر التفكير اللي النموذج بيكتبه لما يحس إن السؤال برّه اللي اتعلمه
 UNKNOWN_AR = "مش معروف | سؤال برّه اللي اتعلمته"
@@ -154,7 +166,7 @@ class BaseSeshat:
         source بيقول الرد جه منين:
           "memory"        سؤال قريب كفاية من سؤال متخزن
           "memory+model"  الذاكرة والنموذج اتفقوا على نفس السؤال
-          "model"         النموذج لوحده (الحساب، أو لما الذاكرة مش شغالة)
+          "model"         النموذج لوحده (الحساب والرسم، أو لما الذاكرة مش شغالة)
           "none"          مفيش رد — السؤال برّه اللي اتعلمه
         use_memory=False بيرجع رد النموذج لوحده (ده اللي evaluate.py بيقيسه).
         """
@@ -217,6 +229,20 @@ class BaseSeshat:
         model = self._model_reply(message, question, temperature, max_new_tokens, True)
         thinking = model["thinking"]
 
+        # 2.5) رسم: النموذج هو اللي بيرسم (بيكتب شبكة 12 × 12 رمز)، وإحنا بنتأكد إن
+        #      الرسمة سليمة وإنها الشكل واللون اللي اتطلبوا. لو لأ → بنقول كده بصراحة.
+        shape, color = drawings.what_was_asked(question)
+        wants_drawing = any(w in question.split() for w in DRAW_WORDS)
+        thinks_drawing = thinking.startswith(DRAW_LABELS)
+        if shape is not None and (thinks_drawing or wants_drawing):
+            return self._check_drawing(model, shape, color, arabic)
+        if wants_drawing or (thinks_drawing and (known is None or known.score < MEMORY_STRONG)):
+            return {"response": DRAW_HELP_AR if arabic else DRAW_HELP_EN,
+                    "thinking": "طلب رسمة لشكل لسه ماتعلمتوش" if arabic
+                    else "a drawing of a shape I have not learned",
+                    "confidence": 0.0, "fallback": True, "source": "none", "matched": "",
+                    "suggestion": ""}
+
         # 3) سؤال قريب جدًا من سؤال متخزن
         if known is not None and known.score >= MEMORY_STRONG and known.score > unknown_score:
             agreed = thinking == known.intent.think
@@ -236,6 +262,24 @@ class BaseSeshat:
             return answer(known, "memory+model", agreed=True)
 
         return dont_know()
+
+    def _check_drawing(self, model, shape, color, arabic):
+        """بيراجع الرسمة اللي النموذج كتبها: شبكة سليمة + نفس الشكل واللون المطلوبين"""
+        grid = drawings.parse_grid(model["response"])
+        thought = drawings.what_was_asked(model["thinking"].split("|", 1)[-1].strip())
+        ok = grid is not None and not model["fallback"] and thought[0] == shape
+        if ok and shape in drawings.SHAPES:           # الأشكال العادية بلون واحد
+            used = set("".join(grid)) - {drawings.EMPTY}
+            ok = used == {color or drawings.DEFAULT_COLOR}
+        if ok:
+            model.update(source="model", matched="", suggestion="")
+            return model
+        return {"response": ("حاولت أرسمها بس الرسمة طلعت مش مظبوطة، فمش هعرضها. جرب شكل أو لون تاني."
+                             if arabic else
+                             "I tried to draw it but the drawing came out wrong, so I won't show it. "
+                             "Try another shape or color."),
+                "thinking": model["thinking"], "confidence": model["confidence"],
+                "fallback": True, "source": "none", "matched": "", "suggestion": ""}
 
     def _model_reply(self, message, question, temperature, max_new_tokens, use_fallback):
         """رد النموذج لوحده: بيكتب سطر التفكير وبعدين الرد"""

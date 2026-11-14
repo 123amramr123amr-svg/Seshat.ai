@@ -133,6 +133,54 @@
     white-space: pre; tab-size: 4;
   }
 
+  /* رسمة seshat: شبكة مربعات ملونة */
+  .drawing { margin: 8px 0; display: inline-block; direction: ltr; }
+  .drawing canvas {
+    display: block; width: 216px; height: 216px;
+    border-radius: 10px; border: 1px solid var(--line);
+    image-rendering: pixelated;
+  }
+  .save {
+    display: inline-block; margin-top: 6px;
+    background: none; border: 1px solid var(--line); color: var(--muted);
+    border-radius: 6px; padding: 2px 10px; font: inherit; font-size: 12px;
+    cursor: pointer; text-decoration: none;
+  }
+  .save:hover { color: var(--gold); border-color: var(--gold); }
+
+  /* الصور والفيديو في الرسايل */
+  .media { display: block; max-width: 100%; max-height: 320px; border-radius: 10px; margin: 2px 0 8px; }
+  .bot .media { border: 1px solid var(--line); background: #000; }
+
+  /* المرفق اللي فوق خانة الكتابة */
+  .attach-bar {
+    max-width: 820px; margin: 0 auto 8px;
+    display: none; align-items: center; gap: 10px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 6px 10px;
+  }
+  .attach-bar.on { display: flex; }
+  .attach-bar img, .attach-bar video { width: 46px; height: 46px; object-fit: cover; border-radius: 8px; flex: none; background: #000; }
+  .attach-info { flex: 1; min-width: 0; font-size: 12.5px; color: var(--muted); }
+  .attach-info b { display: block; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .attach-x {
+    flex: none; width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid var(--line); background: none; color: var(--muted);
+    cursor: pointer; font-size: 15px; line-height: 1;
+  }
+  .attach-x:hover { color: var(--gold); border-color: var(--gold); }
+  .quick { max-width: 820px; margin: 0 auto 8px; display: none; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+  .quick.on { display: flex; }
+  .quick .chip { flex: none; padding: 4px 12px; font-size: 13px; }
+  #attach {
+    flex: none; width: 40px; height: 40px;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: none; color: var(--muted);
+    cursor: pointer; display: grid; place-items: center;
+  }
+  #attach:hover { color: var(--gold); border-color: var(--gold); }
+  #attach:disabled { opacity: .4; cursor: default; }
+
   .typing { display: inline-flex; gap: 5px; padding: 6px 2px; }
   .typing i {
     width: 7px; height: 7px; border-radius: 50%;
@@ -150,7 +198,7 @@
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 16px;
-    padding: 8px 8px 8px 12px;
+    padding: 8px;
   }
   .composer:focus-within { border-color: var(--gold); }
   textarea {
@@ -203,10 +251,12 @@
   <div class="wrap" id="chat">
     <div class="welcome" id="welcome">
       <h1>أهلاً، أنا seshat</h1>
-      <p>بتكلم عربي وإنجليزي، وبكتب أكواد. جرب واحدة من دول:</p>
+      <p>بتكلم عربي وإنجليزي، بكتب أكواد، برسم أشكال بسيطة، وبعدّل الصور اللي تبعتهالي. جرب واحدة من دول:</p>
       <div class="chips">
         <button class="chip">اسمك ايه</button>
         <button class="chip">مين طورك</button>
+        <button class="chip">ارسم قلب احمر</button>
+        <button class="chip">ارسم علم مصر</button>
         <button class="chip">اكتب كود بايثون يحسب المضروب</button>
         <button class="chip">مين بنى الهرم الاكبر</button>
         <button class="chip">يعني ايه book</button>
@@ -221,13 +271,37 @@
 </main>
 
 <footer>
+  <div class="attach-bar" id="attachBar">
+    <span id="attachThumb"></span>
+    <div class="attach-info"><b id="attachName"></b><span id="attachNote"></span></div>
+    <button class="attach-x" id="attachX" title="شيل المرفق" aria-label="شيل المرفق">×</button>
+  </div>
+  <div class="quick" id="quick">
+    <button class="chip">ايه ده؟</button>
+    <button class="chip">ابيض واسود</button>
+    <button class="chip">وضحها</button>
+    <button class="chip">غبشها</button>
+    <button class="chip">فتحها</button>
+    <button class="chip">زود التباين</button>
+    <button class="chip">اقلبها</button>
+    <button class="chip">لفها يمين</button>
+    <button class="chip">رسم رصاص</button>
+    <button class="chip">سيبيا</button>
+    <button class="chip">بكسلها</button>
+    <button class="chip">برواز دهبي</button>
+    <button class="chip">رجعها زي ما كانت</button>
+  </div>
   <div class="composer">
+    <button id="attach" title="ابعت صورة أو فيديو" aria-label="ابعت صورة أو فيديو">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M21 16l-5-5-8 9"/></svg>
+    </button>
+    <input type="file" id="file" accept="image/*,video/*" hidden>
     <textarea id="input" rows="1" dir="auto" placeholder="اكتب رسالتك هنا…  /  Type your message…" maxlength="300"></textarea>
     <button id="send" title="إرسال" aria-label="إرسال">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
     </button>
   </div>
-  <div class="hint">seshat بيدوّر على أقرب سؤال يعرفه ويرد عليه — ولو مش متأكد هيسألك تقصد إيه. تطوير: عمرو أحمد</div>
+  <div class="hint">seshat بيدوّر على أقرب سؤال يعرفه ويرد عليه — ولو مش متأكد هيسألك تقصد إيه. الصور بيوصفها من ألوانها وبيعدلها، ولسه مبيتعرفش على اللي فيها. تطوير: عمرو أحمد</div>
 </footer>
 
 <script>
@@ -257,6 +331,7 @@
         var lang = nl === -1 ? "" : part.slice(0, nl).trim();
         var code = nl === -1 ? part : part.slice(nl + 1);
         code = code.replace(/\n$/, "");
+        if (lang === "draw") { bubble.appendChild(drawGrid(code)); continue; }
         var box = el("div", "code");
         var head = el("div", "code-head");
         head.appendChild(el("span", "", lang || "code"));
@@ -288,6 +363,33 @@
     }
   }
 
+  // رسمة seshat: كل حرف في الشبكة = مربع بلون. بنرسمها على canvas عشان تتحفظ PNG.
+  var PALETTE = {{ palette|tojson }};
+  var GRID = {{ grid|tojson }};
+  function drawGrid(code) {
+    var rows = code.split("\n");
+    var cell = 24, size = GRID * cell;
+    var box = el("div", "drawing");
+    var cv = document.createElement("canvas");
+    cv.width = size; cv.height = size;
+    var g = cv.getContext("2d");
+    g.fillStyle = PALETTE["."]; g.fillRect(0, 0, size, size);
+    for (var y = 0; y < rows.length && y < GRID; y++) {
+      for (var x = 0; x < rows[y].length && x < GRID; x++) {
+        var color = PALETTE[rows[y].charAt(x)];
+        if (color) { g.fillStyle = color; g.fillRect(x * cell, y * cell, cell, cell); }
+      }
+    }
+    box.appendChild(cv);
+    if (rows.length >= GRID) {                    // الرسمة كملت → زرار حفظ
+      var a = el("a", "save", "حفظ PNG");
+      a.download = "seshat-drawing.png";
+      a.href = cv.toDataURL("image/png");
+      box.appendChild(a);
+    }
+    return box;
+  }
+
   function addMessage(role, text) {
     var w = document.getElementById("welcome");
     if (w) w.remove();
@@ -315,14 +417,169 @@
     })();
   }
 
+  // ============================================================
+  // المرفقات: صورة أو فيديو
+  // ============================================================
+  var MAX_SIDE = 512;          // بنصغّر الصورة قبل ما تتبعت
+  var FRAME_SIDE = 160;        // حجم لقطة الفيديو
+  var FRAMES = 12;             // عدد اللقطات اللي بناخدها من الفيديو
+  var attachBtn = document.getElementById("attach");
+  var fileInput = document.getElementById("file");
+  var attachBar = document.getElementById("attachBar");
+  var quick = document.getElementById("quick");
+  // المرفق الحالي. للصورة: original (أول نسخة) و current (آخر تعديل) — التعديلات بتتراكم.
+  var attached = null;
+
+  function toBase64(bytes) {
+    var out = "", step = 0x8000;
+    for (var i = 0; i < bytes.length; i += step) {
+      out += String.fromCharCode.apply(null, bytes.subarray(i, i + step));
+    }
+    return btoa(out);
+  }
+
+  // بياخد أي مصدر (صورة / فيديو / canvas) ويرجعه بكسلات RGBA مصغّرة
+  function grab(source, sw, sh, maxSide) {
+    var scale = Math.min(1, maxSide / Math.max(sw, sh));
+    var w = Math.max(1, Math.round(sw * scale)), h = Math.max(1, Math.round(sh * scale));
+    var cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    var g = cv.getContext("2d", { willReadFrequently: true });
+    g.drawImage(source, 0, 0, w, h);
+    return { w: w, h: h, data: toBase64(g.getImageData(0, 0, w, h).data), canvas: cv };
+  }
+
+  function loadImage(url) {
+    return new Promise(function (ok, fail) {
+      var img = new Image();
+      img.onload = function () { ok(img); };
+      img.onerror = function () { fail(new Error("image")); };
+      img.src = url;
+    });
+  }
+
+  function showAttachment() {
+    var thumb = document.getElementById("attachThumb");
+    thumb.textContent = "";
+    if (!attached) {
+      attachBar.classList.remove("on"); quick.classList.remove("on");
+      return;
+    }
+    var note = document.getElementById("attachNote");
+    document.getElementById("attachName").textContent = attached.name;
+    if (attached.kind === "image") {
+      var img = el("img"); img.src = attached.preview; img.alt = "";
+      thumb.appendChild(img);
+      note.textContent = attached.ow + " × " + attached.oh + " — اكتب عايز إيه، أو اختار من تحت";
+      quick.classList.add("on");
+    } else {
+      var v = el("video"); v.src = attached.url; v.muted = true;
+      thumb.appendChild(v);
+      note.textContent = attached.duration.toFixed(1) + " ثانية — " + attached.frames.length + " لقطة — دوس إرسال وأنا أوصفه";
+      quick.classList.remove("on");
+    }
+    attachBar.classList.add("on");
+  }
+
+  function readImage(file) {
+    var url = URL.createObjectURL(file);
+    return loadImage(url).then(function (img) {
+      var ow = img.naturalWidth, oh = img.naturalHeight;
+      var px = grab(img, ow, oh, MAX_SIDE);
+      URL.revokeObjectURL(url);
+      var preview = px.canvas.toDataURL("image/jpeg", 0.85);
+      var pixels = { w: px.w, h: px.h, data: px.data, ow: ow, oh: oh };
+      attached = { kind: "image", name: file.name, ow: ow, oh: oh, preview: preview,
+                   original: pixels, originalPreview: preview, current: pixels, fresh: true };
+    });
+  }
+
+  function readVideo(file) {
+    var url = URL.createObjectURL(file);
+    var v = document.createElement("video");
+    v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url;
+    function wait(name, ms) {
+      return new Promise(function (ok, fail) {
+        var t = setTimeout(function () { fail(new Error(name)); }, ms);
+        v.addEventListener(name, function () { clearTimeout(t); ok(); }, { once: true });
+        v.addEventListener("error", function () { clearTimeout(t); fail(new Error("video")); }, { once: true });
+      });
+    }
+    return wait("loadeddata", 15000).then(function () {
+      var duration = isFinite(v.duration) ? v.duration : 0;
+      var frames = [], i = 0;
+      function next() {
+        if (i >= FRAMES) return null;
+        var at = duration ? duration * (i + 0.5) / FRAMES : 0;
+        i++;
+        var seeked = wait("seeked", 5000);
+        v.currentTime = at;
+        return seeked.then(function () {
+          var px = grab(v, v.videoWidth, v.videoHeight, FRAME_SIDE);
+          frames.push({ w: px.w, h: px.h, data: px.data });
+        }, function () {}).then(function () { return duration ? next() : null; });
+      }
+      return Promise.resolve(next()).then(function () {
+        if (!frames.length) throw new Error("frames");
+        attached = { kind: "video", name: file.name, url: url, duration: duration,
+                     w: v.videoWidth, h: v.videoHeight, frames: frames, fresh: true };
+      });
+    });
+  }
+
+  attachBtn.addEventListener("click", function () { if (!busy) fileInput.click(); });
+  document.getElementById("attachX").addEventListener("click", function () {
+    attached = null; showAttachment();
+  });
+  fileInput.addEventListener("change", function () {
+    var file = fileInput.files && fileInput.files[0];
+    fileInput.value = "";
+    if (!file) return;
+    var isVideo = file.type.indexOf("video/") === 0;
+    var isImage = file.type.indexOf("image/") === 0;
+    if (!isVideo && !isImage) { warn("الملف ده مش صورة ولا فيديو."); return; }
+    if (file.size > 200 * 1024 * 1024) { warn("الملف أكبر من 200 ميجا."); return; }
+    attachBtn.disabled = true;
+    (isVideo ? readVideo(file) : readImage(file)).then(function () {
+      showAttachment(); input.focus();
+    }, function () {
+      warn(isVideo ? "المتصفح معرفش يفتح الفيديو ده. جرب فيديو mp4." : "المتصفح معرفش يفتح الصورة دي.");
+    }).then(function () { attachBtn.disabled = false; });
+  });
+  quick.querySelectorAll(".chip").forEach(function (c) {
+    c.addEventListener("click", function () { send(c.textContent); });
+  });
+
+  function warn(text) {
+    var b = addMessage("bot", text);
+    b.classList.add("fallback");
+  }
+
   function send(text) {
     text = (text || input.value).trim();
-    if (!text || busy) return;
+    var fresh = attached && attached.fresh;         // مرفق جديد لسه متبعتش
+    if ((!text && !fresh) || busy) return;
     busy = true;
     sendBtn.disabled = true;
+    attachBtn.disabled = true;
     input.value = "";
     autosize();
-    addMessage("user", text);
+
+    var body = { message: text };
+    var userBubble = addMessage("user", text || undefined);
+    if (attached && attached.kind === "image") {
+      body.image = attached.current;
+      if (fresh) {
+        var pic = el("img", "media"); pic.src = attached.preview; pic.alt = attached.name;
+        userBubble.insertBefore(pic, userBubble.firstChild);
+      }
+    } else if (attached && attached.kind === "video" && fresh) {
+      body.video = { duration: attached.duration, w: attached.w, h: attached.h, frames: attached.frames };
+      var vid = el("video", "media"); vid.src = attached.url; vid.controls = true; vid.muted = true;
+      userBubble.insertBefore(vid, userBubble.firstChild);
+    }
+    if (attached) attached.fresh = false;
+    if (attached && attached.kind === "video") { attached = null; showAttachment(); }
 
     var bubble = addMessage("bot");
     var dots = el("span", "typing");
@@ -330,12 +587,14 @@
     bubble.appendChild(dots);
     toBottom();
 
-    var finish = function () { busy = false; sendBtn.disabled = false; input.focus(); };
+    var finish = function () {
+      busy = false; sendBtn.disabled = false; attachBtn.disabled = false; input.focus();
+    };
 
     fetch("chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text })
+      body: JSON.stringify(body)
     })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (data) {
@@ -350,6 +609,14 @@
         }
         typeOut(bubble, data.response, function () {
           if (think) bubble.insertBefore(think, bubble.firstChild);
+          if (data.image) showEdited(bubble, data);
+          if (data.reset && attached && attached.kind === "image") {
+            attached.current = attached.original;
+            attached.preview = attached.originalPreview;
+            var back = el("img", "media"); back.src = attached.preview; back.alt = "";
+            bubble.appendChild(back);
+            showAttachment();
+          }
           if (data.suggestion) {
             // مش متأكد → زرار بالسؤال اللي يقصده، دوسة واحدة تبعته
             var hint = el("button", "chip suggest", data.suggestion);
@@ -359,9 +626,10 @@
           }
           if (!data.fallback) {
             var conf = Math.round((data.confidence || 0) * 100);
-            var from = { "memory": "memory", "memory+model": "memory + model", "model": "model" }[data.source];
+            var from = { "memory": "memory", "memory+model": "memory + model", "model": "model",
+                         "vision": "pixels" }[data.source];
             bubble.appendChild(el("div", "foot",
-              data.seconds + "s · " + (from ? from + " · " : "") + conf + "%"));
+              data.seconds + "s · " + (from ? from + (data.source === "vision" ? "" : " · " + conf + "%") : conf + "%")));
           }
           toBottom();
           finish();
@@ -374,6 +642,24 @@
       });
   }
 
+  // الصورة المتعدلة: بنعرضها، وبتبقى هي الصورة الحالية عشان التعديل اللي بعده يتبني عليها
+  function showEdited(bubble, data) {
+    var img = el("img", "media"); img.src = data.image; img.alt = "";
+    bubble.appendChild(img);
+    var a = el("a", "save", "حفظ الصورة");
+    a.href = data.image; a.download = "seshat-edit.png";
+    bubble.appendChild(a);
+    if (!attached || attached.kind !== "image") return;
+    var keep = attached;
+    loadImage(data.image).then(function (loaded) {
+      var px = grab(loaded, loaded.naturalWidth, loaded.naturalHeight, 720);
+      keep.current = { w: px.w, h: px.h, data: px.data, ow: px.w, oh: px.h };
+      keep.preview = data.image;
+      if (attached === keep) showAttachment();
+      toBottom();
+    }, function () {});
+  }
+
   function autosize() {
     input.style.height = "auto";
     input.style.height = Math.min(140, input.scrollHeight) + "px";
@@ -384,7 +670,7 @@
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   });
   sendBtn.addEventListener("click", function () { send(); });
-  document.querySelectorAll(".chip").forEach(function (c) {
+  document.querySelectorAll(".welcome .chip").forEach(function (c) {
     c.addEventListener("click", function () { send(c.textContent); });
   });
 

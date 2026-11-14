@@ -7,13 +7,16 @@
 """
 
 import os
+import time
 
 from flask import Flask, jsonify, render_template, request
 
-from engine import Seshat
+import vision
+from engine import Seshat, drawings, _trim_memory
 
 app = Flask(__name__)
 app.json.ensure_ascii = False           # عشان العربي يطلع عربي في الـ JSON
+app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024      # أكبر طلب: 8 ميجا (صورة أو لقطات فيديو)
 
 print("⏳ جاري تحميل النموذج...")
 seshat = Seshat()
@@ -22,7 +25,7 @@ print(f"✅ اتحمل النموذج — {seshat.num_params():,} معامل | �
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", palette=drawings.PALETTE, grid=drawings.N)
 
 
 @app.route("/info")
@@ -32,8 +35,31 @@ def info():
 
 @app.route("/chat", methods=["POST"])
 def chat():
+    """
+    الطلب: {"message": "...", "image": {w, h, data}, "video": {duration, w, h, frames: [...]}}
+    الصورة واللقطات بتيجي بكسلات خام RGBA (base64) — المتصفح هو اللي بيفك الملف ويصغّره.
+    """
     data = request.get_json(silent=True) or {}
     msg = str(data.get("message", "")).strip()
+    image, video = data.get("image"), data.get("video")
+    t0 = time.time()
+
+    if isinstance(video, dict) or isinstance(image, dict):
+        try:
+            out = (vision.handle_video(msg, video) if isinstance(video, dict)
+                   else vision.handle_image(msg, image))
+        except Exception as err:                    # ملف بايظ أو بيانات ناقصة
+            out = {"response": f"معرفتش أقرا الملف ده ({err}). جرب صورة أو فيديو تاني.",
+                   "thinking": "", "confidence": 0.0, "fallback": True, "source": "none",
+                   "matched": "", "suggestion": ""}
+        if out is not None:
+            out["seconds"] = round(time.time() - t0, 2)
+            response = jsonify(out)
+            del data, image, video, out
+            _trim_memory()                          # نرجّع رام البكسلات للنظام (حد الاستضافة 100 ميجا)
+            return response
+        # الكلام ملوش علاقة بالصورة (مثلاً "اسمك ايه") → رد الشات العادي
+
     if not msg:
         return jsonify({"response": "اكتب حاجة الأول 🙂", "thinking": "", "confidence": 1.0,
                         "seconds": 0, "fallback": False, "source": "none", "matched": "",
@@ -42,7 +68,18 @@ def chat():
         temperature = min(1.5, max(0.0, float(data.get("temperature", 0.0))))
     except (TypeError, ValueError):
         temperature = 0.0
-    return jsonify(seshat.reply(msg, temperature=temperature))
+    out = seshat.reply(msg, temperature=temperature)
+    if isinstance(image, dict) and out.get("fallback") and not out.get("suggestion"):
+        # معاه صورة وكلام مفهمناهوش → نقوله إيه اللي ينفع يتعمل في الصورة
+        out["response"] = vision.help_text(vision.is_arabic(msg))
+    return jsonify(out)
+
+
+@app.errorhandler(413)
+def too_large(_):
+    return jsonify({"response": "الملف كبير أوي. جرب صورة أصغر.", "thinking": "", "confidence": 0.0,
+                    "seconds": 0, "fallback": True, "source": "none", "matched": "",
+                    "suggestion": ""}), 200
 
 
 if __name__ == "__main__":

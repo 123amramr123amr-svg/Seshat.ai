@@ -39,6 +39,7 @@ CAT_WEIGHTS = {
     "translate": 0.5,
     "capital": 0.8,
     "math": 0.3,
+    "draw": 8.0,          # الرسومات طويلة ولازم تتكتب صح رمز رمز
     "unknown": 120.0,     # ردّين بس (عربي/إنجليزي) لكن وراهم مئات الأسئلة
 }
 
@@ -58,6 +59,7 @@ THINK_LABELS = {
     "translate": ("ترجمة", "translation"),
     "capital": ("عاصمة", "capital"),
     "math": ("حساب", "math"),
+    "draw": ("رسم", "drawing"),
 }
 
 
@@ -251,7 +253,18 @@ def make_math_intents():
 
 
 # ============================================================
-# 5) أسئلة برّه اللي اتعلمه
+# 5) الرسم — شبكة رموز 12 × 12
+# ============================================================
+def load_draw_intents(held_out=False):
+    """held_out=True: التركيبات اللي النموذج مبيتدربش عليها (للاختبار بس)"""
+    sys.path.insert(0, DATA_DIR)
+    import drawings
+    return [Intent(qs, answer, "draw", aug=False, typo=False)
+            for qs, answer in drawings.build(include_held_out=held_out)]
+
+
+# ============================================================
+# 6) أسئلة برّه اللي اتعلمه
 # ============================================================
 def make_unknown_intents():
     sys.path.insert(0, DATA_DIR)
@@ -287,7 +300,8 @@ def build_intents(holdout=True, verbose=True):
         if verbose:
             print(f"  {name:<22} {len(got):>5} رد")
     for label, loader in (("أكواد", load_code_intents), ("ترجمة وعواصم", load_wordlist_intents),
-                          ("حساب", make_math_intents), ("برّه اللي اتعلمه", make_unknown_intents)):
+                          ("حساب", make_math_intents), ("رسومات", load_draw_intents),
+                          ("برّه اللي اتعلمه", make_unknown_intents)):
         got = loader()
         intents += got
         if verbose:
