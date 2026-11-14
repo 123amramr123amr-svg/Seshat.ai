@@ -77,7 +77,8 @@ class QuestionMemory:
         if intents is None:
             from dataset import build_intents          # من غير torch
             intents = build_intents(verbose=False)
-        self.intents = [it for it in intents if it.cat not in SKIP_CATS]
+        self.intents = [it for it in intents
+                        if it.cat not in SKIP_CATS and getattr(it, "mem", True)]
 
         self.questions, owner, self.exact = [], [], {}
         for idx, it in enumerate(self.intents):

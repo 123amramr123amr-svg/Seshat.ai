@@ -10,3 +10,7 @@ venv/
 *.optimizer.pt
 seshat_chet_model.pt
 train_log.txt
+
+# إعدادات محلية + اللي النموذج اتعلمه بنفسه — بتاعت التشغيل مش بتاعت الكود
+data/config.local.json
+data/learned.json

@@ -13,6 +13,7 @@ from flask import Flask, jsonify, render_template, request
 
 import vision
 from engine import Seshat, drawings, _trim_memory
+from brain import Brain
 
 app = Flask(__name__)
 app.json.ensure_ascii = False           # عشان العربي يطلع عربي في الـ JSON
@@ -22,6 +23,13 @@ print("⏳ جاري تحميل النموذج...")
 seshat = Seshat()
 print(f"✅ اتحمل النموذج — {seshat.num_params():,} معامل | المحرك: {seshat.engine_name}")
 
+print("⏳ تجهيز المخ (البحث + التعلم الذاتي + الصور + الأدب)...")
+brain = Brain(seshat)
+st = brain.status()
+print(f"✅ المخ جاهز — بحث النت: {'شغال' if st['search'] else 'واقف'} | "
+      f"مخ خارجي: {st['api_model'] if st['api'] else 'مش مفعل'} | "
+      f"اتعلم {st['learned']} حاجة قبل كده")
+
 
 @app.route("/")
 def index():
@@ -30,7 +38,25 @@ def index():
 
 @app.route("/info")
 def info():
-    return jsonify(seshat.info())
+    out = seshat.info()
+    out["brain"] = brain.status()
+    return jsonify(out)
+
+
+@app.route("/config", methods=["GET", "POST"])
+def config_route():
+    """إعدادات المخ: مفتاح API اختياري + البحث. المفتاح بيتخزن في
+    data/config.local.json (مش بيترفع على جيت هاب) ومش بيتعرض أبدًا."""
+    if request.method == "GET":
+        out = brain.cfg.public()
+        out["learned"] = len(brain.learned.items)
+        return jsonify(out)
+    data = request.get_json(silent=True) or {}
+    brain.cfg.save(**{k: data[k] for k in ("api_key", "api_base", "api_model",
+                                           "search_enabled") if k in data})
+    out = brain.cfg.public()
+    out["learned"] = len(brain.learned.items)
+    return jsonify(out)
 
 
 @app.route("/chat", methods=["POST"])
@@ -54,6 +80,7 @@ def chat():
                    "matched": "", "suggestion": ""}
         if out is not None:
             out["seconds"] = round(time.time() - t0, 2)
+            out.setdefault("source_label", "صور" if out.get("source") == "vision" else "")
             response = jsonify(out)
             del data, image, video, out
             _trim_memory()                          # نرجّع رام البكسلات للنظام (حد الاستضافة 100 ميجا)
@@ -68,8 +95,19 @@ def chat():
         temperature = min(1.5, max(0.0, float(data.get("temperature", 0.0))))
     except (TypeError, ValueError):
         temperature = 0.0
-    out = seshat.reply(msg, temperature=temperature)
-    if isinstance(image, dict) and out.get("fallback") and not out.get("suggestion"):
+    try:
+        # المخ الجديد: أدب + حساب + رسم + تعلم + نموذج محلي + مخ خارجي + بحث
+        # SESHAT_LOCAL_ONLY=1 يرجّع سلوك النموذج المحلي القديم لوحده
+        if os.environ.get("SESHAT_LOCAL_ONLY", "0") != "1":
+            out = brain.reply(msg, temperature=temperature)
+        else:
+            out = seshat.reply(msg, temperature=temperature)
+    except Exception:                       # غلط غير متوقع → JSON واضح بدل صفحة HTML
+        app.logger.exception("حصلت مشكلة وقت الرد على: %r", msg[:200])
+        return jsonify({"response": "حصلت مشكلة جوه السيرفر. جرب تاني بعد شوية.",
+                        "thinking": "", "confidence": 0.0, "seconds": 0, "fallback": True,
+                        "source": "none", "matched": "", "suggestion": ""}), 500
+    if isinstance(image, dict) and out.get("source") == "none" and not out.get("suggestion"):
         # معاه صورة وكلام مفهمناهوش → نقوله إيه اللي ينفع يتعمل في الصورة
         out["response"] = vision.help_text(vision.is_arabic(msg))
     return jsonify(out)

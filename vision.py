@@ -221,7 +221,7 @@ def describe_video(frames, duration, width, height, arabic=True):
     for s in stats:
         for c, p in s["colors"]:
             share[c] = share.get(c, 0.0) + p / len(stats)
-    colors = sorted(share.items(), key=lambda x: -x[1])[:3]
+    colors = [c for c in sorted(share.items(), key=lambda x: -x[1])[:3] if c[1] >= 0.08]
     first = stats[0]["colors"][0][0] if stats[0]["colors"] else None
     last = stats[-1]["colors"][0][0] if stats[-1]["colors"] else None
     shape = "square" if abs(width - height) <= 0.05 * max(width, height) else \
@@ -613,7 +613,7 @@ def handle_image(message, image):
         if describe:
             text += "\n\n" + describe_image(px, arabic)
         return dict(base, response=text, thinking=think, source="vision",
-                    image=png_data_url(px), width=int(px.shape[1]), height=int(px.shape[0]))
+                    edited=png_data_url(px), width=int(px.shape[1]), height=int(px.shape[0]))
     if describe or not message.strip():
         with _LOCK:
             text = describe_image(px, arabic, image.get("ow"), image.get("oh"))

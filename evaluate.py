@@ -4,6 +4,7 @@
     python evaluate.py               نسبة الردود الصح بالحرف لكل نوع (النموذج لوحده)
     python evaluate.py --paraphrase  أسئلة بصيغ جديدة خالص: النموذج لوحده × النموذج + الذاكرة
     python evaluate.py --draw        الرسم: تركيبات اتدرب عليها × تركيبات (شكل + لون) عمره ما شافها
+    python evaluate.py --understand  فهم الأسئلة اللي برّه معلوماته، على مواضيع عمره ما شافها
     python evaluate.py --samples     يطبع ردود على أسئلة تجريبية
     python evaluate.py --limit 300   يقيس على عينة بس (أسرع)
 
@@ -130,6 +131,45 @@ def run_draw(seshat, show):
     print(f"الوقت: {time.time() - t0:.0f} ثانية")
 
 
+def run_understand(seshat, limit, show):
+    """
+    فهم الأسئلة اللي برّه معلوماته، على مواضيع النموذج عمره ما شافها (understanding.HELD_OUT_*).
+    بنقيس حاجتين:
+      • النموذج لوحده: كتب النوع والموضوع صح؟ وكتب الجملة كلها صح حرف بحرف؟
+      • المحرك كله (النموذج + مراجعة + قواعد): النوع والموضوع اللي طلعوا في الآخر صح؟
+    """
+    from engine import understanding as un
+    items = un.build(held_out=True)
+    rng = random.Random(7)
+    tests = [(q, kind, topic, arabic) for kind, topic, arabic, qs, _ in items
+             for q in (qs[0], qs[len(qs) // 2])]
+    if limit and len(tests) > limit:
+        tests = rng.sample(tests, limit)
+    n = think_ok = text_ok = final_ok = 0
+    by = {}
+    t0 = time.time()
+    for q, kind, topic, arabic in tests:
+        q = normalize_question(q)
+        alone = seshat.reply(q, use_fallback=False, use_memory=False)
+        full = seshat.reply(q)
+        n += 1
+        t_ok = alone["thinking"] == un.think(kind, topic, arabic)
+        x_ok = alone["response"] == un.compose(kind, topic, arabic)
+        f_ok = (full.get("kind"), full.get("topic")) == (kind, topic)
+        think_ok += t_ok
+        text_ok += t_ok and x_ok
+        final_ok += f_ok
+        by[full.get("understood_by", "-")] = by.get(full.get("understood_by", "-"), 0) + 1
+        if show and not (t_ok and x_ok):
+            print(f"  ✗ {q!r}\n      🧠 {alone['thinking']!r}\n      ج {alone['response'][:110]!r}")
+    print(f"  أسئلة بمواضيع جديدة: {n}")
+    print(f"  النموذج لوحده — النوع والموضوع صح: {think_ok}/{n} = {think_ok / n * 100:.1f}%")
+    print(f"  النموذج لوحده — الجملة كلها صح حرف بحرف: {text_ok}/{n} = {text_ok / n * 100:.1f}%")
+    print(f"  المحرك كله — النوع والموضوع صح: {final_ok}/{n} = {final_ok / n * 100:.1f}%")
+    print(f"  الفهم جه منين: {by}")
+    print(f"الوقت: {time.time() - t0:.0f} ثانية")
+
+
 def run_accuracy(seshat, limit, seed):
     from dataset import build_intents
 
@@ -137,9 +177,9 @@ def run_accuracy(seshat, limit, seed):
     rng = random.Random(seed)
     seen = [(rng.choice(it.questions), it, "اتدرب عليها") for it in intents
             if it.questions and it.cat != "unknown"]
-    for it in intents:                       # الأسئلة اللي برّه التدريب ليها ردّين بس، فبناخد منها عينة
-        if it.cat == "unknown":
-            seen += [(q, it, "اتدرب عليها") for q in rng.sample(it.questions, 60)]
+    unknown = [it for it in intents if it.cat == "unknown"]      # كتير → بناخد منهم عينة
+    seen += [(rng.choice(it.questions), it, "اتدرب عليها")
+             for it in rng.sample(unknown, min(150, len(unknown)))]
     unseen = [(q, it, "صيغ جديدة") for it in intents for q in it.holdout]
     if limit and len(seen) > limit:
         seen = rng.sample(seen, limit)
@@ -177,6 +217,7 @@ def main():
     p.add_argument("--samples", action="store_true")
     p.add_argument("--paraphrase", action="store_true")
     p.add_argument("--draw", action="store_true")
+    p.add_argument("--understand", action="store_true")
     p.add_argument("--model", default=None, help="ملف نموذج تاني غير الافتراضي")
     p.add_argument("--show", action="store_true", help="مع --paraphrase أو --draw: اطبع اللي غلط فيه")
     p.add_argument("--limit", type=int, default=0)
@@ -192,6 +233,8 @@ def main():
         run_paraphrase(seshat, args.show)
     elif args.draw:
         run_draw(seshat, args.show)
+    elif args.understand:
+        run_understand(seshat, args.limit, args.show)
     else:
         run_accuracy(seshat, args.limit, args.seed)
 
