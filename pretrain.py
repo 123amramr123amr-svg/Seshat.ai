@@ -25,9 +25,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def parse_args():
     p = argparse.ArgumentParser(description="Khufu 1.0 Arabic/English language pretraining")
     p.add_argument("--corpus-dir", default=os.path.join(HERE, "data", "corpus"))
-    p.add_argument("--out", default=os.path.join(HERE, "seshat_chet_model.npz"))
+    p.add_argument("--out", default=os.path.join(HERE, "khufu_1_0_ctx1024.npz"))
     p.add_argument("--size", choices=list(PRESETS), default="tiny")
-    p.add_argument("--block-size", type=int, default=512,
+    p.add_argument("--block-size", type=int, default=1024,
                    help="Context length in characters for the current character tokenizer")
     p.add_argument("--steps", type=int, default=3000)
     p.add_argument("--batch-size", type=int, default=4)
