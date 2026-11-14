@@ -863,6 +863,18 @@
     });
   });
 
+  fetch("models").then(function (r) { return r.json(); }).then(function (data) {
+    var picker = document.getElementById("model-picker");
+    picker.innerHTML = "";
+    (data.models || []).forEach(function (model) {
+      var option = document.createElement("option");
+      option.value = model.id;
+      option.textContent = model.name + (model.status === "active" ? " · نشط" : " · قريبًا");
+      option.disabled = model.status !== "active";
+      picker.appendChild(option);
+    });
+    picker.value = data.default || "khufu-1.0";
+  }).catch(function () {});
   input.focus();
 </script>
 </body>
