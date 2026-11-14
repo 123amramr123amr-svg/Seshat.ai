@@ -36,7 +36,8 @@ def chat():
     msg = str(data.get("message", "")).strip()
     if not msg:
         return jsonify({"response": "اكتب حاجة الأول 🙂", "thinking": "", "confidence": 1.0,
-                        "seconds": 0, "fallback": False})
+                        "seconds": 0, "fallback": False, "source": "none", "matched": "",
+                        "suggestion": ""})
     try:
         temperature = min(1.5, max(0.0, float(data.get("temperature", 0.0))))
     except (TypeError, ValueError):

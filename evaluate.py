@@ -1,9 +1,10 @@
 """
 قياس نموذج seshat.chet — من غير torch
 
-    python evaluate.py              نسبة الردود الصح بالحرف لكل نوع
-    python evaluate.py --samples    يطبع ردود على أسئلة تجريبية
-    python evaluate.py --limit 300  يقيس على عينة بس (أسرع)
+    python evaluate.py               نسبة الردود الصح بالحرف لكل نوع (النموذج لوحده)
+    python evaluate.py --paraphrase  أسئلة بصيغ جديدة خالص: النموذج لوحده × النموذج + الذاكرة
+    python evaluate.py --samples     يطبع ردود على أسئلة تجريبية
+    python evaluate.py --limit 300   يقيس على عينة بس (أسرع)
 
 الرد بيتحسب "صح" لو طلع مطابق بالحرف للرد اللي في بيانات التدريب.
 """
@@ -14,6 +15,7 @@ import sys
 import time
 
 from engine import Seshat, CONFIDENCE_THRESHOLD
+from tokenizer import normalize_question
 
 SAMPLES = [
     "انت مين", "عامل ايه", "بتعرف تعمل ايه", "مين بنى الهرم الاكبر", "عاصمة مصر ايه",
@@ -36,13 +38,65 @@ def run_samples(seshat):
               f"   (ثقة {r['confidence']:.0%} — {r['seconds']} ث){tag}\n")
 
 
+def run_paraphrase(seshat, show):
+    """
+    أسئلة data/paraphrase_tests.py مكتوبة بصيغ مش موجودة في البيانات.
+    بنقارن النموذج لوحده بالنموذج + الذاكرة. الذاكرة هنا من غير الصيغ اللي
+    متشالة للاختبار، عشان المقارنة تفضل عادلة.
+    """
+    from dataset import DATA_DIR, build_intents
+    from memory import QuestionMemory
+    sys.path.insert(0, DATA_DIR)
+    import paraphrase_tests as pt
+    import unknown_questions as uq
+
+    intents = build_intents(holdout=True, verbose=False)
+    answers = {}
+    for it in intents:
+        answers.setdefault(normalize_question(it.canonical), it.answer)
+    seshat.memory = QuestionMemory(intents, include_holdout=False)
+
+    inside = [(q, {answers[normalize_question(c)] for c in ok},
+               {normalize_question(c) for c in ok}) for q, ok in pt.IN_SCOPE]
+    outside = pt.OUT_OF_SCOPE + uq.AR_TEST + uq.EN_TEST
+    print(f"{len(inside)} سؤال بصيغة جديدة يعرف ردها | {len(outside)} سؤال برّه اللي اتعلمه\n")
+
+    for name, use_memory in (("النموذج لوحده", False), ("النموذج + الذاكرة", True)):
+        right = wrong = silent = hinted = 0
+        misses = []
+        for q, ok, ok_questions in inside:
+            r = seshat.reply(q, use_memory=use_memory)
+            if r["fallback"]:
+                silent += 1
+                good_hint = normalize_question(r.get("suggestion", "")) in ok_questions
+                hinted += good_hint
+                misses.append(f"    مش عارف ← {q}" + ("   (واقترح السؤال الصح)" if good_hint else ""))
+            elif r["response"] in ok:
+                right += 1
+            else:
+                wrong += 1
+                misses.append(f"    رد غلط ← {q}   ({r['thinking']})")
+        refused = made_up = 0
+        for q in outside:
+            r = seshat.reply(q, use_memory=use_memory)
+            if r["fallback"]:
+                refused += 1
+            else:
+                made_up += 1
+                misses.append(f"    ألّف رد ← {q}   ({r['thinking']})")
+        n = len(inside)
+        print(f"— {name} —")
+        print(f"  صيغ جديدة:      رد صح {right}/{n} = {right / n:.0%} | رد غلط {wrong} | قال مش عارف {silent}"
+              + (f" (منهم {hinted} اقترح فيهم السؤال الصح)" if use_memory else ""))
+        print(f"  برّه اللي اتعلمه: قال مش عارف {refused}/{len(outside)} = "
+              f"{refused / len(outside):.0%} | رد برد غلط {made_up}")
+        if show:
+            print("\n".join(misses))
+        print()
+
+
 def run_accuracy(seshat, limit, seed):
-    # dataset.py بيستورد torch عشان التدريب؛ هنا محتاجين منه البيانات بس
-    try:
-        from dataset import build_intents
-    except ImportError:
-        sys.exit("القياس الكامل محتاج torch متثبت (pip install -r requirements-train.txt).\n"
-                 "جرب:  python evaluate.py --samples")
+    from dataset import build_intents
 
     intents = build_intents(holdout=True, verbose=False)
     rng = random.Random(seed)
@@ -58,7 +112,7 @@ def run_accuracy(seshat, limit, seed):
     stats = {}
     t0 = time.time()
     for q, it, kind in seen + unseen:
-        r = seshat.reply(q, use_fallback=False)
+        r = seshat.reply(q, use_fallback=False, use_memory=False)     # النموذج لوحده
         ok = r["response"] == it.answer
         low = r["confidence"] < CONFIDENCE_THRESHOLD and not r["fallback"]
         for key in ((kind, it.cat), (kind, "الكل")):
@@ -86,6 +140,8 @@ def run_accuracy(seshat, limit, seed):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--samples", action="store_true")
+    p.add_argument("--paraphrase", action="store_true")
+    p.add_argument("--show", action="store_true", help="مع --paraphrase: اطبع الأسئلة اللي غلط فيها")
     p.add_argument("--limit", type=int, default=0)
     p.add_argument("--seed", type=int, default=7)
     args = p.parse_args()
@@ -95,6 +151,8 @@ def main():
           f"| المحرك: {seshat.engine_name}\n")
     if args.samples:
         run_samples(seshat)
+    elif args.paraphrase:
+        run_paraphrase(seshat, args.show)
     else:
         run_accuracy(seshat, args.limit, args.seed)
 

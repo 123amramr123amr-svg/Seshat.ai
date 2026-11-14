@@ -22,7 +22,7 @@ import os
 import random
 import sys
 
-import torch
+# torch بيتستورد جوه دوال التدريب بس — عشان التشغيل (والذاكرة) يفضلوا من غير torch
 
 from engine import FALLBACK_AR, FALLBACK_EN, UNKNOWN_AR, UNKNOWN_EN
 from tokenizer import CharTokenizer, normalize_question, is_arabic
@@ -398,6 +398,7 @@ class Dataset:
         return x, y
 
     def _collate(self, pairs, device):
+        import torch
         T = max(len(x) for x, _ in pairs)
         T = min(-(-T // 16) * 16, max(T, self._pad_limit))   # تقريب الطول لمضاعفات 16 (أرحم للذاكرة)
         X = torch.full((len(pairs), T), self.tok.pad_id, dtype=torch.long)
@@ -444,32 +445,32 @@ class Dataset:
         unseen = [(q, it) for it in self.intents for q in it.holdout]
         return seen, unseen
 
-    @torch.no_grad()
     def evaluate(self, model, pairs, device, batch_size=8):
         """
         بيرجع (الخسارة، نسبة الردود الصح بالحرف).
         الرد يعتبر صح لو أعلى احتمال في كل موضع هو الحرف المطلوب —
         وده بالظبط اللي هيطلع لو ولّدنا الرد بـ temperature = 0.
         """
+        import torch
         if not pairs:
             return 0.0, 0.0
         model.eval()
         enc = [self.encode_pair(q, it, model.cfg.block_size) for q, it in pairs]
         order = sorted(range(len(enc)), key=lambda i: len(enc[i][0]))
         loss_sum, n_tok, exact = 0.0, 0, 0
-        for s in range(0, len(order), batch_size):
-            X, Y = self._collate([enc[i] for i in order[s:s + batch_size]], device)
-            logits, _ = model(X)
-            mask = Y != -1
-            lp = torch.log_softmax(logits, dim=-1)
-            tok_lp = lp.gather(-1, Y.clamp(min=0).unsqueeze(-1)).squeeze(-1)
-            loss_sum += float(-(tok_lp * mask).sum())
-            n_tok += int(mask.sum())
-            correct = (logits.argmax(-1) == Y) | ~mask
-            exact += int(correct.all(dim=1).sum())
+        with torch.no_grad():
+            for s in range(0, len(order), batch_size):
+                X, Y = self._collate([enc[i] for i in order[s:s + batch_size]], device)
+                logits, _ = model(X)
+                mask = Y != -1
+                lp = torch.log_softmax(logits, dim=-1)
+                tok_lp = lp.gather(-1, Y.clamp(min=0).unsqueeze(-1)).squeeze(-1)
+                loss_sum += float(-(tok_lp * mask).sum())
+                n_tok += int(mask.sum())
+                correct = (logits.argmax(-1) == Y) | ~mask
+                exact += int(correct.all(dim=1).sum())
         model.train()
         return loss_sum / max(1, n_tok), exact / len(pairs)
-
 
 if __name__ == "__main__":
     ds = Dataset()

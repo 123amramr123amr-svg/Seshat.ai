@@ -13,6 +13,7 @@ seshat.chet — محرك الرد: بيحمّل النموذج المحفوظ و
 
 import math
 import os
+import re
 import threading
 import time
 
@@ -34,6 +35,22 @@ CONFIDENCE_THRESHOLD = 0.93
 CONFIDENCE_HEAD = 12
 
 
+def _trim_memory():
+    """بيرجّع للنظام الرام اللي اتستخدمت مؤقتًا في بناء الذاكرة (لينكس بس)"""
+    try:
+        import ctypes
+        import gc
+        gc.collect()
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:
+        pass
+
+
+def _numbers(text):
+    """الأرقام اللي في النص مترتبة — عشان نتأكد إن النموذج قرا المسألة صح"""
+    return sorted(re.findall(r"\d+", text))
+
+
 def confidence_from(probs, n_think=0):
     """
     probs: احتمال كل توكن النموذج اختاره. n_think: عدد توكنز سطر التفكير.
@@ -46,6 +63,13 @@ def confidence_from(probs, n_think=0):
 
 FALLBACK_AR = "لسه ماتعلمتش الرد على السؤال ده. جرب تسأله بطريقة تانية، أو اسألني عن حاجة تانية."
 FALLBACK_EN = "I haven't learned how to answer that yet. Try asking in another way, or ask me something else."
+
+# ذاكرة الأسئلة (memory.py): التشابه من 0 لـ 1
+MEMORY_STRONG = 0.60      # فوق كده الذاكرة بترد لوحدها
+MEMORY_AGREE = 0.30       # فوق كده بترد لو النموذج فهم السؤال بنفس المعنى
+MEMORY_SUGGEST = 0.35     # فوق كده (ومن غير اتفاق) بيسأل المستخدم "تقصد كذا؟"
+UNKNOWN_MARGIN = 0.15     # لو السؤال أقرب بكتير لموضوع برّه اللي اتعلمه → مش عارف
+MATH_LABEL = "حساب"       # نوع السؤال في سطر التفكير لما يكون مسألة حساب
 
 # سطر التفكير اللي النموذج بيكتبه لما يحس إن السؤال برّه اللي اتعلمه
 UNKNOWN_AR = "مش معروف | سؤال برّه اللي اتعلمته"
@@ -88,6 +112,14 @@ class BaseSeshat:
         self.metrics = ckpt.get("metrics", {})
         self._lock = threading.Lock()
         self._banned = (self.tok.pad_id, self.tok.unk_id, self.tok.user_id, self.tok.bot_id)
+        self.memory = None
+        if os.environ.get("SESHAT_MEMORY", "1") != "0":
+            try:
+                from memory import QuestionMemory
+                self.memory = QuestionMemory()
+                _trim_memory()
+            except Exception as e:                 # مجلد data مش موجود مثلًا
+                print(f"⚠️  ذاكرة الأسئلة مش شغالة ({e}) — النموذج هيرد لوحده")
 
     def num_params(self):
         raise NotImplementedError
@@ -107,16 +139,106 @@ class BaseSeshat:
             "vocab_size": c["vocab_size"],
             "trained_steps": self.step,
             "engine": self.engine_name,
+            "memory_questions": len(self.memory) if self.memory else 0,
         }
 
-    def reply(self, message, temperature=0.0, max_new_tokens=600, use_fallback=True):
-        """بيرجع dict فيه: response, confidence, seconds, fallback"""
+    # ------------------------------------------------------------
+    # الرد = الذاكرة (أقرب سؤال) + النموذج (الفهم والحساب)
+    # ------------------------------------------------------------
+    def reply(self, message, temperature=0.0, max_new_tokens=600, use_fallback=True,
+              use_memory=True):
+        """
+        بيرجع dict فيه: response, thinking, confidence, seconds, fallback, source, matched,
+        suggestion (سؤال بيقترحه لما يكون مش متأكد).
+
+        source بيقول الرد جه منين:
+          "memory"        سؤال قريب كفاية من سؤال متخزن
+          "memory+model"  الذاكرة والنموذج اتفقوا على نفس السؤال
+          "model"         النموذج لوحده (الحساب، أو لما الذاكرة مش شغالة)
+          "none"          مفيش رد — السؤال برّه اللي اتعلمه
+        use_memory=False بيرجع رد النموذج لوحده (ده اللي evaluate.py بيقيسه).
+        """
         t0 = time.time()
         question = normalize_question(message)[:300]
         if not question:
             return {"response": "اكتب حاجة الأول 🙂", "thinking": "", "confidence": 1.0,
-                    "seconds": 0.0, "fallback": False}
+                    "seconds": 0.0, "fallback": False, "source": "none", "matched": "",
+                    "suggestion": ""}
 
+        memory = self.memory if use_memory else None
+        if memory is None:
+            out = self._model_reply(message, question, temperature, max_new_tokens, use_fallback)
+            out.update(source="none" if out["fallback"] else "model", matched="", suggestion="")
+        else:
+            out = self._hybrid_reply(message, question, memory, temperature, max_new_tokens)
+        out["seconds"] = round(time.time() - t0, 2)
+        return out
+
+    def _hybrid_reply(self, message, question, memory, temperature, max_new_tokens):
+        arabic = is_arabic(message)
+        known, unknown_score = memory.lookup(message)
+
+        def answer(match, source, agreed=False):
+            pct = round(match.score * 100)
+            if arabic:
+                think = f"أقرب سؤال أعرفه: «{match.intent.canonical}» — تشابه {pct}%"
+                think += " — والنموذج فهمه بنفس المعنى" if agreed else ""
+            else:
+                think = f"closest question I know: “{match.intent.canonical}” — {pct}% similar"
+                think += " — the model read it the same way" if agreed else ""
+            return {"response": match.intent.answer, "thinking": think,
+                    "confidence": round(match.score, 3), "fallback": False,
+                    "source": source, "matched": match.intent.canonical, "suggestion": ""}
+
+        def dont_know():
+            # مش متأكد → منألّفش رد. لو فيه سؤال قريب شوية بنقترحه على المستخدم.
+            text, think, suggestion = (FALLBACK_AR if arabic else FALLBACK_EN), "", ""
+            if (known is not None and known.score >= MEMORY_SUGGEST
+                    and known.score >= unknown_score - UNKNOWN_MARGIN):
+                suggestion = known.intent.canonical
+                pct = round(known.score * 100)
+                if arabic:
+                    text = f"مش متأكد إني فهمت سؤالك. تقصد: «{suggestion}»؟"
+                    think = f"أقرب سؤال أعرفه: «{suggestion}» — تشابه {pct}% بس، مش كفاية عشان أرد"
+                else:
+                    text = f"I'm not sure I understood. Did you mean: “{suggestion}”?"
+                    think = f"closest question I know: “{suggestion}” — only {pct}% similar, not enough to answer"
+            return {"response": text, "thinking": think,
+                    "confidence": round(known.score, 3) if known else 0.0, "fallback": True,
+                    "source": "none", "matched": "", "suggestion": suggestion}
+
+        # 1) نفس السؤال موجود بالحرف → مش محتاجين النموذج
+        if known is not None and known.score >= 0.999:
+            return answer(known, "memory")
+        if known is None and unknown_score >= 0.999:
+            return dont_know()
+
+        # 2) النموذج يفكر: السؤال ده نوعه إيه ومعناه إيه
+        model = self._model_reply(message, question, temperature, max_new_tokens, True)
+        thinking = model["thinking"]
+
+        # 3) سؤال قريب جدًا من سؤال متخزن
+        if known is not None and known.score >= MEMORY_STRONG and known.score > unknown_score:
+            agreed = thinking == known.intent.think
+            return answer(known, "memory+model" if agreed else "memory", agreed=agreed)
+
+        # 4) حساب: النموذج هو اللي بيحسب، بشرط إنه يكون قرا نفس الأرقام اللي في السؤال
+        if thinking.startswith(MATH_LABEL + " |"):
+            if model["fallback"] or _numbers(question) != _numbers(thinking):
+                return dont_know()
+            model.update(source="model", matched="", suggestion="")
+            return model
+
+        # 5) تشابه متوسط، بس النموذج فهم السؤال بنفس المعنى → الاتنين متفقين
+        if (known is not None and thinking == known.intent.think
+                and known.score >= MEMORY_AGREE
+                and known.score >= unknown_score - UNKNOWN_MARGIN):
+            return answer(known, "memory+model", agreed=True)
+
+        return dont_know()
+
+    def _model_reply(self, message, question, temperature, max_new_tokens, use_fallback):
+        """رد النموذج لوحده: بيكتب سطر التفكير وبعدين الرد"""
         prompt = self.tok.encode_prompt(question)
         max_prompt = self.config["block_size"] // 2
         if len(prompt) > max_prompt:               # نسيب مكان للرد
@@ -143,8 +265,7 @@ class BaseSeshat:
             text = FALLBACK_AR if is_arabic(message) else FALLBACK_EN
             fallback = True
         return {"response": text, "thinking": thinking,
-                "confidence": round(float(confidence), 3),
-                "seconds": round(time.time() - t0, 2), "fallback": fallback}
+                "confidence": round(float(confidence), 3), "fallback": fallback}
 
 
 # ============================================================

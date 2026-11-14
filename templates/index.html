@@ -107,6 +107,7 @@
     background: var(--gold-soft); border-radius: 4px;
   }
   .think b { color: var(--gold); font-weight: 600; }
+  .chip.suggest { display: block; margin-top: 10px; color: var(--text, inherit); }
 
   .code { margin: 8px 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; direction: ltr; }
   .code-head {
@@ -226,7 +227,7 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
     </button>
   </div>
-  <div class="hint">seshat نموذج صغير ولسه بيتعلم — بيجاوب على اللي اتدرب عليه، ولو مش عارف هيقولك. تطوير: عمرو أحمد</div>
+  <div class="hint">seshat بيدوّر على أقرب سؤال يعرفه ويرد عليه — ولو مش متأكد هيسألك تقصد إيه. تطوير: عمرو أحمد</div>
 </footer>
 
 <script>
@@ -349,9 +350,18 @@
         }
         typeOut(bubble, data.response, function () {
           if (think) bubble.insertBefore(think, bubble.firstChild);
+          if (data.suggestion) {
+            // مش متأكد → زرار بالسؤال اللي يقصده، دوسة واحدة تبعته
+            var hint = el("button", "chip suggest", data.suggestion);
+            hint.dir = "auto";
+            hint.addEventListener("click", function () { send(data.suggestion); });
+            bubble.appendChild(hint);
+          }
           if (!data.fallback) {
             var conf = Math.round((data.confidence || 0) * 100);
-            bubble.appendChild(el("div", "foot", data.seconds + "s · confidence " + conf + "%"));
+            var from = { "memory": "memory", "memory+model": "memory + model", "model": "model" }[data.source];
+            bubble.appendChild(el("div", "foot",
+              data.seconds + "s · " + (from ? from + " · " : "") + conf + "%"));
           }
           toBottom();
           finish();
