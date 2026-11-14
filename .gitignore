@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.tmp
+*.tmp.npz
+.venv/
+venv/
+.env
+
+# ملفات بتتولد وقت التدريب ومش لازمة للتشغيل
+*.optimizer.pt
+seshat_chet_model.pt
+train_log.txt
