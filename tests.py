@@ -107,6 +107,69 @@ check("حفظ وتحميل التشيك بوينت",
       back["weights"]["tok_emb.weight"][1][0] == 3.0 and back["step"] == 5
       and back["tokens"] == ["<pad>", "a"])
 
+print("\n7) المخ الجديد (brain.py): الأدب والحساب والرسم والتعلم")
+import brain as brain_mod
+from brain import is_insult, parse_teach, try_math, try_draw, LearnedMemory, Brain
+
+check("شتم: انت اهبل", is_insult("انت اهبل"))
+check("شتم بالأرقام: ا7مق", is_insult("ا7مق"))
+check("شتم مركب: ابن الكلب", is_insult("ابن الكلب"))
+check("شتم إنجليزي: you are stupid", is_insult("you are stupid"))
+check("شتم لاتيني: ks emak", is_insult("ks emak"))
+check("مش شتم: شكرا يا صديقي", not is_insult("شكرا يا صديقي"))
+check("مش شتم: ارسم لي كلب صغير", not is_insult("ارسم لي كلب صغير"))
+check("مش شتم: الزبون محتاج مساعدة", not is_insult("الزبون محتاج مساعدة"))
+check("شتم موجّه: انت كلب", is_insult("انت كلب"))
+
+check("تعليم سليم", parse_teach("علمني: س: لعبة عمرو ج: الشطرنج") ==
+      ("لعبة عمرو", "الشطرنج"))
+check("تعليم غلط بيرفض", parse_teach("علمني حاجة كويسة") is None)
+
+check("حساب: 7 × 8", try_math("7 × 8") == "7 × 8 = 56")
+check("حساب أرقام كبيرة", try_math("1543 + 2991") == "1543 + 2991 = 4534")
+check("حساب بكسور", try_math("12.5 + 3.5") == "12.5 + 3.5 = 16")
+
+d = try_draw("ارسم لي قطة بتنظر للقمر")
+check("رسم: بيطلع رابط pollinations من غير params",
+      d is not None and d["url"].startswith("https://image.pollinations.ai/prompt/")
+      and "?" not in d["url"], str(d))
+check("رسم: بيستخرج الوصف", d["prompt"] == "قطة بتنظر للقمر", str(d))
+check("مش رسم: يعني ايه رسم", try_draw("يعني ايه رسم") is None)
+
+tmp_dir = tempfile.mkdtemp()
+learned = LearnedMemory(os.path.join(tmp_dir, "learned.json"))
+learned.add("لعبة عمرو المفضلة", "الشطرنج", src="user")
+check("ذاكرة التعلم: نفس السؤال", (learned.lookup("لعبة عمرو المفضلة ايه") or {}).get("a") == "الشطرنج")
+check("ذاكرة التعلم: صيغة مختلفة", (learned.lookup("ايه لعبة عمرو المفضلة") or {}).get("a") == "الشطرنج")
+check("ذاكرة التعلم: سؤال تاني خالص مبيتخفيش",
+      learned.lookup("مين اكتشف بنزين") is None)
+
+class _DummyEngine:
+    """محرك وهمي ردوده كلها fallback — عشان نجبر المخ يمشي في الخطوات الجديدة"""
+    def reply(self, *a, **kw):
+        return {"response": "", "thinking": "", "confidence": 0.0,
+                "seconds": 0, "fallback": True, "source": "none",
+                "matched": "", "suggestion": ""}
+
+b = Brain(_DummyEngine())
+b.learned = LearnedMemory(os.path.join(tmp_dir, "learned2.json"))
+b.cfg.api_key = ""                              # من غير مخ خارجي
+b.cfg.search_enabled = False                    # ومن غير نت — عشان الاختبار يبقى سريع ومضمون
+r = b.reply("انت اهبل")
+check("المخ: الشتم بياخد رد مؤدب", r["source"] == "politeness" and "يسامحك" in r["response"])
+r = b.reply("7 × 8")
+check("المخ: الحساب مضمون", r["source"] == "math" and r["response"] == "7 × 8 = 56")
+r = b.reply("ارسم قرد بيغني")
+check("المخ: الرسم بيرجع صورة", r["source"] == "draw" and r["image"] and r["image"].startswith("https://image.pollinations.ai/prompt/"))
+r = b.reply("علمني: س: ايه هواية عمرو ج: البرمجة")
+check("المخ: التعلم اليدوي", r["source"] == "learn")
+r = b.reply("ايه هواية عمرو")
+check("المخ: بيرد من اللي اتعلمه", r["source"] == "learned" and r["response"] == "البرمجة")
+r = b.reply("سؤال غريب خالص عن غيبزة محسمة")
+check("المخ: لو مفيش حاجة بيقول الصراحة", r["fallback"] and r["source"] == "none")
+r = b.reply("")
+check("المخ: رسالة فاضية", "اكتب حاجة" in r["response"])
+
 print("\n" + "—" * 40)
 if FAILURES:
     print(f"❌ {len(FAILURES)} اختبار فشل: {', '.join(FAILURES)}")
