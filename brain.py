@@ -322,6 +322,40 @@ class LearnedMemory:
             return best
         return None
 
+    def forget(self, message):
+        """بيمسح سؤال اتعلم — بالحرف أو أقرب واحد شبهه كفاية (٧٥٪+ عشان
+        ما يمسحش سؤال تاني بالغلط). بيرجع السؤال الممسوح أو None."""
+        from tokenizer import normalize_question
+        q = normalize_question(message)
+        if not q:
+            return None
+        if q in self.exact:
+            target = q
+        else:
+            best, best_ratio = None, 0.0
+            for it in self.items:
+                r = difflib.SequenceMatcher(None, q, it["q"]).ratio()
+                if r > best_ratio:
+                    best, best_ratio = it, r
+            target = best["q"] if best and best_ratio >= 0.75 else None
+        if not target:
+            return None
+        self.items = [it for it in self.items if it["q"] != target]
+        self._save()
+        self._index()
+        return target
+
+
+_FORGET_RE = re.compile(r"^\s*(انسى|انسي|forget)\s*[:،]?\s*(.+)$", re.I)
+
+
+def parse_forget(message):
+    m = _FORGET_RE.match(message)
+    if not m:
+        return None
+    q = m.group(2).strip(" -–—؟?")
+    return q or None
+
 
 _TEACH_RE = re.compile(r"^\s*(علمني|احفظ\s*لي|احفظ|تذكر|teach)\s*[:،]?\s*(.*)$",
                        re.I)
@@ -679,6 +713,18 @@ class Brain:
             return self._out(
                 "اتعلمت ✔ سؤال: «%s» — والمرة اللي جاية هرد عليك من الذاكرة." % q,
                 "learn", "تعلم جديد", thinking="خزنت سؤال جديد في ذاكرتي")
+
+        # 5.5) نسيان: انسى: السؤال — بيحذف حاجة اتعلمت غلط
+        forget_q = parse_forget(msg)
+        if forget_q:
+            removed = self.learned.forget(forget_q)
+            if removed:
+                return self._out("انسيتها ✔ — مسحت «%s» من الذاكرة." % removed,
+                                 "learn", "تعلم جديد",
+                                 thinking="مسحت سؤال من الذاكرة")
+            return self._out(
+                "مش لاقي «%s» في اللي اتعلمته — تأكد من السؤال وجرب تاني." % forget_q,
+                "learn", "تعلم جديد", fallback=True)
 
         # 6) حاجة اتعلمتها بنفسي قبل كده
         learned = self.learned.lookup(msg)
