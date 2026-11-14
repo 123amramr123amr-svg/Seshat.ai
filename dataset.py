@@ -24,6 +24,17 @@ from tokenizer import CharTokenizer, normalize_question, is_arabic
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
+# نسبة ظهور كل نوع في التدريب (لكل رد). المحادثة والمعلومات ردودها طويلة ومختلفة
+# عن بعض فمحتاجة تتكرر أكتر، والحساب والترجمة شبه بعض فبيتعلموا أسرع.
+CAT_WEIGHTS = {
+    "chat": 3.0,
+    "knowledge": 3.0,
+    "code": 1.2,
+    "translate": 0.5,
+    "capital": 0.8,
+    "math": 0.3,
+}
+
 
 class Intent:
     __slots__ = ("questions", "answer", "cat", "weight", "aug", "typo", "holdout")
@@ -246,6 +257,8 @@ def build_intents(holdout=True, verbose=True):
                 keep.append(q)
         it.questions = keep
     intents = [it for it in intents if it.questions]
+    for it in intents:
+        it.weight = CAT_WEIGHTS.get(it.cat, 1.0)
 
     # نشيل صيغة واحدة من بعض الأسئلة عشان نختبر بيها النموذج على صيغ ماشافهاش
     if holdout:

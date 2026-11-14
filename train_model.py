@@ -137,13 +137,17 @@ def main():
     # كل خانة في مصفوفة الانتباه بتاخد حوالي 24 بايت وقت التدريب (لكل رأس ولكل طبقة)
     max_cells = int(args.ram_gb * 1e9 / 24 / (cfg.n_head * cfg.n_layer))
     batches = ds.batches(args.batch, cfg.block_size, device, max_cells=max_cells)
-    t0 = time.time()
+    # بنحسب وقت التدريب الفعلي بس: لو الجهاز نام أو اتوقف شوية، الوقت ده مبيتحسبش
+    active, last = 0.0, time.time()
     run_loss, run_n = 0.0, 0
     metrics = {}
     step = start_step
     try:
         while step < total_steps:
-            elapsed = time.time() - t0
+            now = time.time()
+            active += min(now - last, 30.0)
+            last = now
+            elapsed = active
             if budget and elapsed >= budget:
                 print("⏱️  خلص الوقت المحدد")
                 break
@@ -167,11 +171,11 @@ def main():
                 un_loss, un_acc = ds.evaluate(model, unseen_set, device)
                 metrics = {"train_loss": run_loss / run_n, "seen_exact": seen_acc,
                            "unseen_exact": un_acc, "unseen_loss": un_loss,
-                           "minutes": (time.time() - t0) / 60}
+                           "minutes": active / 60}
                 print(f"خطوة {step:5d} | خسارة {run_loss / run_n:.4f} | lr {lr:.5f} "
                       f"| ردود صح (اتشافت) {seen_acc * 100:5.1f}% "
                       f"| ردود صح (صيغ جديدة) {un_acc * 100:5.1f}% "
-                      f"| {(time.time() - t0) / 60:5.1f} دقيقة", flush=True)
+                      f"| {active / 60:5.1f} دقيقة", flush=True)
                 run_loss, run_n = 0.0, 0
                 save(args.out, model, cfg, tok, step, metrics, opt)
                 trim_memory()
@@ -181,7 +185,7 @@ def main():
     seen_loss, seen_acc = ds.evaluate(model, seen_set, device)
     un_loss, un_acc = ds.evaluate(model, unseen_set, device)
     metrics = {"seen_exact": seen_acc, "unseen_exact": un_acc, "unseen_loss": un_loss,
-               "minutes": (time.time() - t0) / 60}
+               "minutes": active / 60}
     save(args.out, model, cfg, tok, step, metrics, opt)
     print("--- انتهى التدريب ---\n")
     print(f"✅ اتحفظ في {args.out}")
