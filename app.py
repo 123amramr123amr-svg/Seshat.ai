@@ -1,13 +1,21 @@
 """
-سيرفر seshat.chet — بيعرض الواجهة ويرد على رسائل المستخدم
+سيرفر Seshat.ai — واجهة Flask.
 
 التشغيل:
     python app.py
-وبعدين افتح  http://localhost:5000
+ثم افتح http://localhost:5000
+
+إعدادات النشر:
+    SESHAT_ADMIN_TOKEN=<long-random-secret>  # مطلوب لتعديل /config
+    SESHAT_CHAT_RATE_LIMIT=30                # طلبًا لكل IP خلال 60 ثانية
+    SESHAT_MAX_MESSAGE_CHARS=4000
 """
 
+import hmac
 import os
+import threading
 import time
+from collections import deque
 
 from flask import Flask, jsonify, render_template, request
 
@@ -16,8 +24,53 @@ from engine import Seshat, drawings, _trim_memory
 from brain import Brain
 
 app = Flask(__name__)
-app.json.ensure_ascii = False           # عشان العربي يطلع عربي في الـ JSON
-app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024      # أكبر طلب: 8 ميجا (صورة أو لقطات فيديو)
+app.json.ensure_ascii = False
+app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+
+# محدد معدل بسيط داخل العملية. في النشر متعدد العمال استخدم محددًا مشتركًا
+# (مثل Redis) أمام التطبيق، ولا تعتمد على هذا المحدد وحده.
+_RATE_WINDOW_SECONDS = 60
+_rate_lock = threading.Lock()
+_chat_requests = {}
+
+
+def _chat_rate_limit():
+    """يسمح بعدد محدود من طلبات الشات لكل عنوان IP في نافذة زمنية متحركة."""
+    try:
+        limit = max(1, min(300, int(os.environ.get("SESHAT_CHAT_RATE_LIMIT", "30"))))
+    except ValueError:
+        limit = 30
+    now = time.monotonic()
+    client = request.remote_addr or "unknown"
+    with _rate_lock:
+        # تنظيف دوري للمدخلات القديمة والحد من نمو الذاكرة.
+        stale_before = now - _RATE_WINDOW_SECONDS
+        for ip in list(_chat_requests):
+            q = _chat_requests[ip]
+            while q and q[0] <= stale_before:
+                q.popleft()
+            if not q:
+                del _chat_requests[ip]
+        if client not in _chat_requests and len(_chat_requests) >= 10000:
+            return False
+        q = _chat_requests.setdefault(client, deque())
+        if len(q) >= limit:
+            return False
+        q.append(now)
+    return True
+
+
+def _authorized_config_write():
+    """لا تسمح بتغيير إعدادات المخ إلا بتوكن إداري مضبوط في بيئة التشغيل."""
+    expected = os.environ.get("SESHAT_ADMIN_TOKEN", "")
+    supplied = request.headers.get("Authorization", "")
+    if not expected:
+        return False
+    prefix = "Bearer "
+    if not supplied.startswith(prefix):
+        return False
+    return hmac.compare_digest(supplied[len(prefix):], expected)
+
 
 print("⏳ جاري تحميل النموذج...")
 seshat = Seshat()
@@ -45,15 +98,21 @@ def info():
 
 @app.route("/config", methods=["GET", "POST"])
 def config_route():
-    """إعدادات المخ: مفتاح API اختياري + البحث. المفتاح بيتخزن في
-    data/config.local.json (مش بيترفع على جيت هاب) ومش بيتعرض أبدًا."""
+    """GET يعرض الإعدادات العامة؛ POST يتطلب Authorization: Bearer."""
     if request.method == "GET":
         out = brain.cfg.public()
         out["learned"] = len(brain.learned.items)
         return jsonify(out)
-    data = request.get_json(silent=True) or {}
-    brain.cfg.save(**{k: data[k] for k in ("api_key", "api_base", "api_model",
-                                           "search_enabled") if k in data})
+
+    if not _authorized_config_write():
+        # لا نكشف هل التوكن غير مضبوط أم غير صحيح.
+        return jsonify({"error": "غير مصرح بتعديل الإعدادات."}), 401
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "محتوى JSON غير صالح."}), 400
+    allowed = ("api_key", "api_base", "api_model", "search_enabled")
+    brain.cfg.save(**{k: data[k] for k in allowed if k in data})
     out = brain.cfg.public()
     out["learned"] = len(brain.learned.items)
     return jsonify(out)
@@ -62,11 +121,27 @@ def config_route():
 @app.route("/chat", methods=["POST"])
 def chat():
     """
-    الطلب: {"message": "...", "image": {w, h, data}, "video": {duration, w, h, frames: [...]}}
-    الصورة واللقطات بتيجي بكسلات خام RGBA (base64) — المتصفح هو اللي بيفك الملف ويصغّره.
+    الطلب: {"message": "...", "image": {...}, "video": {...}}
+    الصور والفيديو تظل خاضعة لحد حجم الطلب العام (8 ميجا).
     """
-    data = request.get_json(silent=True) or {}
-    msg = str(data.get("message", "")).strip()
+    if not _chat_rate_limit():
+        return jsonify({"error": "طلبات كثيرة. انتظر قليلًا ثم حاول مرة أخرى."}), 429
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "محتوى JSON غير صالح."}), 400
+
+    raw_msg = data.get("message", "")
+    if not isinstance(raw_msg, str):
+        return jsonify({"error": "يجب أن تكون الرسالة نصًا."}), 400
+    msg = raw_msg.strip()
+    try:
+        max_chars = max(100, min(20000, int(os.environ.get("SESHAT_MAX_MESSAGE_CHARS", "4000"))))
+    except ValueError:
+        max_chars = 4000
+    if len(msg) > max_chars:
+        return jsonify({"error": f"الرسالة أطول من الحد المسموح ({max_chars} حرف)."}), 413
+
     image, video = data.get("image"), data.get("video")
     t0 = time.time()
 
@@ -75,7 +150,6 @@ def chat():
             out = None
             if isinstance(image, dict) and not isinstance(video, dict) \
                     and brain.cfg.api_key and vision.wants_look(msg):
-                # فيه مخ خارجي بمفتاح → هو اللي بيشوف الصورة ويقول فيها إيه بجد
                 from brain import llm_vision
                 seen = llm_vision(msg, vision.jpeg_free_data_url(image), brain.cfg)
                 if seen:
@@ -85,8 +159,9 @@ def chat():
             if out is None:
                 out = (vision.handle_video(msg, video) if isinstance(video, dict)
                        else vision.handle_image(msg, image))
-        except Exception as err:                    # ملف بايظ أو بيانات ناقصة
-            out = {"response": f"معرفتش أقرا الملف ده ({err}). جرب صورة أو فيديو تاني.",
+        except Exception:
+            app.logger.exception("فشل تحليل صورة أو فيديو")
+            out = {"response": "معرفتش أقرا الملف ده. جرب صورة أو فيديو تاني.",
                    "thinking": "", "confidence": 0.0, "fallback": True, "source": "none",
                    "matched": "", "suggestion": ""}
         if out is not None:
@@ -94,9 +169,8 @@ def chat():
             out.setdefault("source_label", "صور" if out.get("source") == "vision" else "")
             response = jsonify(out)
             del data, image, video, out
-            _trim_memory()                          # نرجّع رام البكسلات للنظام (حد الاستضافة 100 ميجا)
+            _trim_memory()
             return response
-        # الكلام ملوش علاقة بالصورة (مثلاً "اسمك ايه") → رد الشات العادي
 
     if not msg:
         return jsonify({"response": "اكتب حاجة الأول 🙂", "thinking": "", "confidence": 1.0,
@@ -107,32 +181,26 @@ def chat():
     except (TypeError, ValueError):
         temperature = 0.0
     try:
-        # المخ الجديد: أدب + حساب + رسم + تعلم + نموذج محلي + مخ خارجي + بحث
-        # SESHAT_LOCAL_ONLY=1 يرجّع سلوك النموذج المحلي القديم لوحده
         if os.environ.get("SESHAT_LOCAL_ONLY", "0") != "1":
             out = brain.reply(msg, temperature=temperature)
         else:
             out = seshat.reply(msg, temperature=temperature)
-    except Exception:                       # غلط غير متوقع → JSON واضح بدل صفحة HTML
-        app.logger.exception("حصلت مشكلة وقت الرد على: %r", msg[:200])
+    except Exception:
+        app.logger.exception("حصلت مشكلة وقت معالجة طلب الشات")
         return jsonify({"response": "حصلت مشكلة جوه السيرفر. جرب تاني بعد شوية.",
                         "thinking": "", "confidence": 0.0, "seconds": 0, "fallback": True,
                         "source": "none", "matched": "", "suggestion": ""}), 500
     if isinstance(image, dict) and out.get("source") == "none" and not out.get("suggestion"):
-        # معاه صورة وكلام مفهمناهوش → نقوله إيه اللي ينفع يتعمل في الصورة
         out["response"] = vision.help_text(vision.is_arabic(msg))
     return jsonify(out)
 
 
 @app.errorhandler(413)
 def too_large(_):
-    return jsonify({"response": "الملف كبير أوي. جرب صورة أصغر.", "thinking": "", "confidence": 0.0,
-                    "seconds": 0, "fallback": True, "source": "none", "matched": "",
-                    "suggestion": ""}), 200
+    return jsonify({"error": "الملف أو الرسالة أكبر من الحد المسموح."}), 413
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"🚀 شغال على http://localhost:{port}")
-    # debug=False: وضع الـ debug بيفتح ثغرة تنفيذ أكواد لو السيرفر اتنشر على النت
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
