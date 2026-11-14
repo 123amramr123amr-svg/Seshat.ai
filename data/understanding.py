@@ -21,6 +21,7 @@
 اللي النموذج مبيشوفهاش، و compose / detect اللي المحرك بيراجع بيهم شغل النموذج.
 """
 
+import difflib
 import random
 import re
 
@@ -284,7 +285,49 @@ AR_LETTERS = "ابتثجحخدذرزسشصضطظعغفقكلمنهوي"
 EN_LETTERS = "abcdefghijklmnopqrstuvwxyz"
 
 
+_FILLER = set("""يا في من على عن ال هو هي ده دي ايه اي ما هل كم كام لو سمحت ممكن طيب بقى بقا
+كده قولي قوللي عايز عاوز اعرف هى انت هو ليه امتى فين مين ازاي
+the a an of is are was were what how many much please tell me do does did you know in on
+to for why when where who which""".split())
+
+# كلمات السؤال: وجودها معناه إن ده سؤال عن معلومة حتى لو مفيش قالب اتطابق
+_ASK = set("""كم كام ليه لماذا امتى متى فين اين مين ازاي كيف ايه ما هل
+what why when where who which how is are was were does do did can""".split())
+
+
+def content_words(text):
+    """الكلمات اللي شايلة المعنى (من غير أدوات السؤال وحروف الجر)"""
+    text = re.sub(r"[^\w\s]", " ", text.lower())
+    return {w for w in text.split() if len(w) >= 3 and w not in _FILLER}
+
+
+def _bare(word):
+    return word[2:] if word.startswith("ال") and len(word) > 4 else word
+
+
+def other_subject(question, known):
+    """
+    السؤال والسؤال المعروف نفس الجملة بس كلمة واحدة مهمة اتبدلت بكلمة تانية خالص؟
+    ("مين اخترع التليفون" × "مين اخترع الصفر"، "كم عدد سكان الصين" × "عدد سكان مصر").
+    ساعتها رد السؤال المعروف يبقى إجابة عن حاجة تانية، فمينفعش يتقال.
+    الصيغ المختلفة لنفس السؤال ("مين الشخص اللي برمجك" × "مين طورك") مش بتتحسب: دي مفيهاش
+    كلام مشترك والفرق أكتر من كلمة. والكلمتين القريبين من بعض ("بتغلي" × "غليان") نفس المعنى.
+    """
+    q, k = content_words(question), content_words(known)
+    if not (q & k) or len(q - k) != 1 or len(k - q) != 1:
+        return False
+    a, b = _bare(next(iter(q - k))), _bare(next(iter(k - q)))
+    return difflib.SequenceMatcher(None, a, b).ratio() < 0.5
+
+
+def is_fact_question(question):
+    """سؤال فيه أداة استفهام وكلمة معنى واحدة على الأقل → سؤال عن معلومة"""
+    return bool(set(question.split()) & _ASK) and bool(content_words(question))
+
+
 def label(kind, arabic):
+    if kind == "fact":
+        return "سؤال عن معلومة" if arabic else "fact question"
     k = KINDS.get(kind) or FIXED[kind]
     return k[1] if arabic else k[2]
 
@@ -326,9 +369,18 @@ def _template_regex(template):
     return re.compile("^" + re.escape(head) + r"(.{2,80})" + re.escape(tail) + "$")
 
 
+def _norm_template(t):
+    """القالب بنفس تنضيف الأسئلة (ى → ي، ة → ه…) عشان يطابق السؤال بعد normalize_question"""
+    try:
+        from tokenizer import normalize_question
+    except Exception:
+        return t
+    return normalize_question(t.replace("{x}", "QXQ")).replace("qxq", "{x}").replace("QXQ", "{x}")
+
+
 # قوالب الكشف بالقواعد: الأطول الأول. القالب "{x}" لوحده مبيدخلش (أي جملة هتطابقه).
 _DETECT = sorted(
-    ((kind, arabic, t, _template_regex(t))
+    ((kind, arabic, t, _template_regex(_norm_template(t)))
      for kind, _, _, ar, en, _, _ in TOPIC_KINDS
      for arabic, templates in ((True, ar), (False, en))
      for t in templates if t != "{x}"),
@@ -343,8 +395,21 @@ def detect(question):
     for kind, _, _, rx in _DETECT:
         m = rx.match(question)
         if m:
-            return kind, m.group(1).strip()
+            topic = _TIME_TAIL.sub("", m.group(1).strip()).strip() or m.group(1).strip()
+            if kind == "person" and (len(topic.split()) > 4 or topic.split()[0] in _NOT_NAME):
+                return None        # "مين اخترع التليفون" سؤال عن معلومة، مش عن شخص اسمه كده
+            return kind, topic
     return None
+
+
+_NOT_NAME = set("""اخترع اكتشف كتب الف بنى بنا اسس عمل صنع رسم قال فاز كسب هيكسب هيفوز حكم قتل
+هو هي اللي اول اخر اكبر اصغر اشهر احسن افضل اغنى اطول اسرع صاحب مؤلف مخترع مكتشف رئيس ملك
+invented discovered wrote built founded made created painted said won wins killed ruled
+is was are first last best richest tallest fastest will would can owns runs""".split())
+
+
+# "سعر الدهب النهارده كام" → الموضوع "الدهب" مش "الدهب النهارده"
+_TIME_TAIL = re.compile(r"\s+(النهارده|انهارده|دلوقتي|دلوقت|اليوم|حاليا|الان|today|now|right now|currently)$")
 
 
 def _clean(topic):

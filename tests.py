@@ -195,6 +195,19 @@ check("طلب تنفيذ بيتفهم", r["source"] == "understand" and r["kind"
 r = seshat.reply("who is marie curie")
 check("سؤال عن شخص: قابل للبحث", r["kind"] == "person" and r["searchable"], str(r))
 
+check("سعر: كلمة الوقت مش من الموضوع", un.detect("سعر الدهب النهارده كام") == ("price", "الدهب"))
+check("مين اخترع… مش سؤال عن شخص", un.detect("مين اخترع التليفون") is None)
+check("كلمة اتبدلت = موضوع تاني", un.other_subject("كم عدد سكان الصين", "عدد سكان مصر"))
+check("صيغة تانية لنفس السؤال مش موضوع تاني",
+      not un.other_subject("مين الشخص اللي برمجك وعملك", "مين طورك")
+      and not un.other_subject("ايه هي عاصمه فرنسا يا صاحبي", "عاصمه فرنسا ايه"))
+r = seshat.reply("كم عدد سكان الصين")
+check("مبيردش برد سؤال شبهه عن حاجة تانية",
+      r["fallback"] and r["kind"] == "fact" and r["searchable"] and "مصر" not in r["response"], str(r))
+r = seshat.reply("مين اخترع التليفون")
+check("سؤال معلومة مش عنده: بيقول كده عن السؤال نفسه",
+      r["fallback"] and "مين اخترع التليفون" in r["response"], str(r))
+
 print("\n9) الرسم والصور (data/drawings.py + vision.py)")
 import base64
 import numpy as np
@@ -220,6 +233,14 @@ check("تعديل صورة بيرجع صورة", r["edited"].startswith("data:im
 r = vision.handle_image("ايه ده", img)
 check("وصف صورة: الألوان", "أزرق" in r["response"] and "أخضر" in r["response"], r["response"])
 check("كلام ملوش علاقة بالصورة بيروح للشات", vision.handle_image("اسمك ايه", img) is None)
+check("سؤال عن الصورة × تعديل", vision.wants_look("ايه ده") and vision.wants_look("")
+      and not vision.wants_look("خليها ابيض واسود"))
+check("الصورة بتتحول PNG للمخ الخارجي",
+      vision.jpeg_free_data_url(img).startswith("data:image/png;base64,iVBOR"))
+from brain import BrainConfig, llm_vision
+cfg0 = BrainConfig()
+cfg0.api_key = ""
+check("من غير مفتاح مفيش مخ خارجي للصور", llm_vision("ايه ده", "data:image/png;base64,AA", cfg0) is None)
 
 print("\n" + "—" * 40)
 if FAILURES:

@@ -577,7 +577,9 @@ def _ddg(query):
                 break
         if not results:
             return None
-        lines = ["دي أقرب معلومات لقيتها على النت:"]
+        ar = _is_arabic_text(query)
+        lines = ["دي أقرب معلومات لقيتها على النت:" if ar
+                 else "Here is the closest information I found on the web:"]
         for i, (title, href) in enumerate(results):
             snip = ""
             if i < len(snippets):
@@ -585,9 +587,10 @@ def _ddg(query):
                 snip = re.sub(r"\s+", " ", snip)[:220]
             dom = urlparse(href).netloc.replace("www.", "")
             lines.append("• " + title + (" — " + snip if snip else "") +
-                         "\n  المصدر: " + dom)
+                         ("\n  المصدر: " if ar else "\n  Source: ") + dom)
         return {"text": "\n".join(lines),
-                "think": "دورت في DuckDuckGo على سؤالك",
+                "think": ("دورت في DuckDuckGo على سؤالك" if ar
+                          else "Searched DuckDuckGo for your question"),
                 "url": results[0][1]}
     except Exception:
         return None
@@ -633,6 +636,45 @@ def llm_answer(message, cfg):
                                {"role": "user", "content": message[:4000]}],
                   "temperature": 0.6,
                   "max_tokens": 1024},
+            timeout=60)
+        r.raise_for_status()
+        text = r.json()["choices"][0]["message"]["content"].strip()
+        return text or None
+    except Exception:
+        return None
+
+
+def _other_subject(question, suggestion):
+    """نفس شكل السؤال بس عن حاجة تانية؟ (شوف understanding.other_subject)"""
+    try:
+        from engine import understanding
+        from tokenizer import normalize_question as norm
+        return understanding.other_subject(norm(question), norm(suggestion))
+    except Exception:
+        return False
+
+
+def llm_vision(message, image_url, cfg):
+    """
+    فهم صورة بالمخ الخارجي (لو فيه مفتاح والموديل بيشوف صور، زي gpt-4o-mini).
+    image_url: الصورة data URL. بيرجع النص أو None لو مفيش مفتاح / الموديل مبيشوفش / حصل خطأ.
+    """
+    if not cfg.api_key:
+        return None
+    base = (cfg.api_base or "https://api.openai.com/v1").rstrip("/")
+    ask = message.strip() or "اوصف الصورة دي بالتفصيل: فيها إيه؟"
+    try:
+        r = requests.post(
+            base + "/chat/completions",
+            headers={"Authorization": "Bearer " + cfg.api_key,
+                     "Content-Type": "application/json"},
+            json={"model": cfg.api_model,
+                  "messages": [{"role": "system", "content": _LLM_SYSTEM},
+                               {"role": "user", "content": [
+                                   {"type": "text", "text": ask[:2000]},
+                                   {"type": "image_url", "image_url": {"url": image_url}}]}],
+                  "temperature": 0.4,
+                  "max_tokens": 700},
             timeout=60)
         r.raise_for_status()
         text = r.json()["choices"][0]["message"]["content"].strip()
@@ -806,6 +848,8 @@ class Brain:
 
         # 10) البحث مجابش حاجة. لو السؤال قريب من سؤال يعرفه → يرد بيه ويقول إنه افترض كده.
         sug = (local or {}).get("suggestion") or ""
+        if sug and _other_subject(msg, sug):
+            sug = ""          # نفس شكل السؤال بس عن حاجة تانية (سكان الصين ≠ سكان مصر)
         if sug and self.engine is not None:
             try:
                 near = self.engine.reply(sug, temperature=temperature,

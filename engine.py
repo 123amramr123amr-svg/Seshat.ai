@@ -282,7 +282,8 @@ class BaseSeshat:
             """
             suggestion = ""
             if (known is not None and known.score >= MEMORY_SUGGEST
-                    and known.score >= unknown_score - UNKNOWN_MARGIN):
+                    and known.score >= unknown_score - UNKNOWN_MARGIN
+                    and not understanding.other_subject(question, known.intent.canonical)):
                 suggestion = known.intent.canonical
             kind, topic, by = None, "", ""
             got = understanding.parse_think(model["thinking"]) if model else None
@@ -298,9 +299,19 @@ class BaseSeshat:
                     kind, topic, by = found[0], found[1], "rules"
             if kind is None and fixed and near_unknown.score >= 0.5:
                 kind, by = near_unknown.intent.kind, "memory"
+            if kind is None and understanding.is_fact_question(question):
+                kind, by = "fact", "rules"     # سؤال عن معلومة مش عنده: يقولها عن السؤال نفسه
             if kind is None:
                 kind, by = "unclear", "none"
-            text = understanding.compose(kind, topic, arabic)
+            if kind == "fact":
+                asked = message.strip()[:120]
+                text = (f"فهمت إنك عايز معلومة: «{asked}». المعلومة دي مش ضمن اللي اتعلمته، "
+                        f"ومش هألف إجابة من عندي."
+                        if arabic else
+                        f"I understand you want a fact: “{asked}”. That is not among the things "
+                        f"I learned, and I will not make up an answer.")
+            else:
+                text = understanding.compose(kind, topic, arabic)
             if by == "model" and model["response"] == text:
                 by = "model-text"              # الجملة نفسها طلعت من النموذج حرف حرف وسليمة
             if kind == "unclear" and by == "none":
@@ -312,7 +323,7 @@ class BaseSeshat:
                 think = f"نوع السؤال: {name}" + (f" — الموضوع: «{topic}»" if topic else "")
             else:
                 think = f"question type: {name}" + (f" — topic: “{topic}”" if topic else "")
-            if suggestion and kind in ("unclear", "about"):
+            if suggestion and kind in ("unclear", "about", "fact"):
                 # سؤال قريب من حاجة يعرفها → يسأل "تقصد كذا؟" (والمخ بيرد بيها لو البحث مجابش حاجة)
                 pct = round(known.score * 100)
                 if arabic:
@@ -325,7 +336,8 @@ class BaseSeshat:
                     "confidence": round(known.score, 3) if known else 0.0, "fallback": True,
                     "source": "understand", "matched": "", "suggestion": suggestion,
                     "kind": kind, "topic": topic, "understood_by": by,
-                    "searchable": kind in understanding.SEARCHABLE or by == "none"}
+                    "searchable": kind in understanding.SEARCHABLE or kind == "fact"
+                                  or by == "none"}
 
         # 1) نفس السؤال موجود بالحرف → مش محتاجين النموذج
         if known is not None and known.score >= 0.999:
@@ -352,7 +364,9 @@ class BaseSeshat:
                     "suggestion": ""}
 
         # 3) سؤال قريب جدًا من سؤال متخزن
-        if known is not None and known.score >= MEMORY_STRONG and known.score > unknown_score:
+        #    (بس مش لو السؤالين عن حاجتين مختلفتين: "سكان الصين" مش "سكان مصر")
+        if (known is not None and known.score >= MEMORY_STRONG and known.score > unknown_score
+                and not understanding.other_subject(question, known.intent.canonical)):
             agreed = thinking == known.intent.think
             return answer(known, "memory+model" if agreed else "memory", agreed=agreed)
 
@@ -364,9 +378,11 @@ class BaseSeshat:
             return model
 
         # 5) تشابه متوسط، بس النموذج فهم السؤال بنفس المعنى → الاتنين متفقين
+        #    (إلا لو السؤالين عن حاجتين مختلفتين: "مين اخترع التليفون" مش "مين اخترع الصفر")
         if (known is not None and thinking == known.intent.think
                 and known.score >= MEMORY_AGREE
-                and known.score >= unknown_score - UNKNOWN_MARGIN):
+                and known.score >= unknown_score - UNKNOWN_MARGIN
+                and not understanding.other_subject(question, known.intent.canonical)):
             return answer(known, "memory+model", agreed=True)
 
         return dont_know()

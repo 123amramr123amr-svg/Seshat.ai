@@ -575,6 +575,17 @@ def help_text(arabic):
 # ============================================================
 # نقطة الدخول من السيرفر
 # ============================================================
+def wants_look(message):
+    """الرسالة سؤال عن اللي في الصورة (مش تعديل ولا رجوع للأصل)؟ رسالة فاضية = "ايه ده"."""
+    ops, _, describe, reset = find_edits(message)
+    return not ops and not reset and (describe or not message.strip())
+
+
+def jpeg_free_data_url(image):
+    """الصورة اللي جاية من المتصفح → data URL بصيغة PNG (عشان تتبعت للمخ الخارجي)"""
+    return png_data_url(decode_pixels(image))
+
+
 def handle_image(message, image):
     """
     بيرجع dict للرد، أو None لو الكلام ملوش علاقة بالصورة (يتبعت للشات العادي).

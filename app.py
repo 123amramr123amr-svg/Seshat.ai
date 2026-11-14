@@ -72,8 +72,19 @@ def chat():
 
     if isinstance(video, dict) or isinstance(image, dict):
         try:
-            out = (vision.handle_video(msg, video) if isinstance(video, dict)
-                   else vision.handle_image(msg, image))
+            out = None
+            if isinstance(image, dict) and not isinstance(video, dict) \
+                    and brain.cfg.api_key and vision.wants_look(msg):
+                # فيه مخ خارجي بمفتاح → هو اللي بيشوف الصورة ويقول فيها إيه بجد
+                from brain import llm_vision
+                seen = llm_vision(msg, vision.jpeg_free_data_url(image), brain.cfg)
+                if seen:
+                    out = {"response": seen, "thinking": "المخ الخارجي شاف الصورة ووصفها",
+                           "confidence": 0.9, "fallback": False, "source": "llm",
+                           "source_label": "شبكة عصبية خارجية", "matched": "", "suggestion": ""}
+            if out is None:
+                out = (vision.handle_video(msg, video) if isinstance(video, dict)
+                       else vision.handle_image(msg, image))
         except Exception as err:                    # ملف بايظ أو بيانات ناقصة
             out = {"response": f"معرفتش أقرا الملف ده ({err}). جرب صورة أو فيديو تاني.",
                    "thinking": "", "confidence": 0.0, "fallback": True, "source": "none",
