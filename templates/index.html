@@ -297,6 +297,10 @@
     <p class="desc">hofo شغال لوحده من غير أي مفتاح (ذاكرة + بحث في النت + صور + تعلم). لو حبيت تزوده شبكة عصبية أقوى بجد، حط مفتاح API من أي خدمة متوافقة مع OpenAI (زي OpenAI أو GLM أو DeepSeek أو Groq) — والمفتاح بيتخزن عندك بس، مش بيتعرض ولا بيترفع على جيت هاب.</p>
     <div class="settings-grid">
       <div>
+        <label for="set-admin-token">رمز إدارة الإعدادات</label>
+        <input type="password" id="set-admin-token" placeholder="SESHAT_ADMIN_TOKEN" autocomplete="off">
+      </div>
+      <div>
         <label for="set-key">مفتاح API (اختياري)</label>
         <input type="password" id="set-key" placeholder="sk-..." autocomplete="off">
       </div>
@@ -805,20 +809,42 @@
       search_enabled: document.getElementById("set-search").checked
     };
     var key = document.getElementById("set-key").value.trim();
+    var adminToken = document.getElementById("set-admin-token").value.trim();
     if (key) body.api_key = key;
+    var headers = { "Content-Type": "application/json" };
+    if (adminToken) headers.Authorization = "Bearer " + adminToken;
     fetch("config", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: headers,
       body: JSON.stringify(body)
-    }).then(function (r) { return r.json(); }).then(loadSettings);
+    }).then(function (r) {
+      if (!r.ok) throw new Error("رمز الإدارة غير صحيح أو غير مضبوط على السيرفر.");
+      return r.json();
+    }).then(function () {
+      document.getElementById("set-admin-token").value = "";
+      loadSettings();
+    }).catch(function (err) {
+      document.getElementById("settings-status").textContent = err.message;
+    });
   });
 
   document.getElementById("set-clear").addEventListener("click", function () {
+    var adminToken = document.getElementById("set-admin-token").value.trim();
+    var headers = { "Content-Type": "application/json" };
+    if (adminToken) headers.Authorization = "Bearer " + adminToken;
     fetch("config", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: headers,
       body: JSON.stringify({ api_key: "" })
-    }).then(function (r) { return r.json(); }).then(loadSettings);
+    }).then(function (r) {
+      if (!r.ok) throw new Error("رمز الإدارة غير صحيح أو غير مضبوط على السيرفر.");
+      return r.json();
+    }).then(function () {
+      document.getElementById("set-admin-token").value = "";
+      loadSettings();
+    }).catch(function (err) {
+      document.getElementById("settings-status").textContent = err.message;
+    });
   });
 
   input.focus();
