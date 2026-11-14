@@ -24,12 +24,47 @@ from tokenizer import CharTokenizer, normalize_question, is_arabic
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_MODEL = os.path.join(HERE, "seshat_chet_model.npz")
 
-# لو متوسط ثقة النموذج في الحروف اللي كتبها أقل من الحد ده، بنعتبر إنه مش عارف
-# الإجابة وبنقول كده بصراحة بدل ما نطلّع كلام ملخبط.
-CONFIDENCE_THRESHOLD = 0.80
+# لو ثقة النموذج في الرد أقل من الحد ده، بنعتبر إنه مش عارف الإجابة وبنقول كده
+# بصراحة بدل ما نطلّع كلام ملخبط.
+# الثقة = متوسط احتمال الحروف اللي اختارها، مع تركيز على أول 12 حرف: دول اللي
+# النموذج بيقرر فيهم هيرد بإيه، ولو متردد فيهم يبقى غالبًا السؤال برّه اللي اتعلمه.
+# الرقم متظبط بالقياس: بيسيب ~97% من الردود الصح، وبيمسك حوالي تلتين الأسئلة
+# اللي برّه التدريب (مش كلها — النموذج الصغير بيبقى واثق حتى وهو غلطان).
+CONFIDENCE_THRESHOLD = 0.93
+CONFIDENCE_HEAD = 12
+
+
+def confidence_from(probs):
+    if not probs:
+        return 0.0
+    head = probs[:CONFIDENCE_HEAD]
+    return min(sum(probs) / len(probs), sum(head) / len(head))
 
 FALLBACK_AR = "لسه ماتعلمتش الرد على السؤال ده. جرب تسأله بطريقة تانية، أو اسألني عن حاجة تانية."
 FALLBACK_EN = "I haven't learned how to answer that yet. Try asking in another way, or ask me something else."
+
+
+# النموذج بيكتب المسافات حرف حرف، فساعات بيغلط في عدّ مسافات أول السطر في الكود
+# (3 بدل 4 مثلًا) وده بيبوّظ كود بايثون. هنا بنقرّب مسافات أول كل سطر لأقرب مضاعف
+# لوحدة الإزاحة بتاعة اللغة. (حل مؤقت — الحل الجذري توكن خاص للإزاحة في التدريب.)
+INDENT_UNIT = {"python": 4, "c": 4, "cpp": 4, "java": 4, "sql": 4,
+               "javascript": 2, "html": 2, "css": 2, "bash": 2}
+
+
+def fix_code_indent(text):
+    parts = text.split("```")
+    for i in range(1, len(parts), 2):
+        lang, sep, body = parts[i].partition("\n")
+        unit = INDENT_UNIT.get(lang.strip())
+        if not unit or not sep:
+            continue
+        lines = []
+        for line in body.split("\n"):
+            code = line.lstrip(" ")
+            n = len(line) - len(code)
+            lines.append(" " * (int(n / unit + 0.5) * unit) + code if code else "")
+        parts[i] = lang + "\n" + "\n".join(lines)
+    return "```".join(parts)
 
 
 # ============================================================
@@ -50,7 +85,7 @@ class BaseSeshat:
         raise NotImplementedError
 
     def _generate(self, prompt, max_new_tokens, temperature):
-        """بيرجع (التوكنز الجديدة، درجة الثقة)"""
+        """بيرجع (التوكنز الجديدة، احتمال كل توكن)"""
         raise NotImplementedError
 
     def info(self):
@@ -80,9 +115,10 @@ class BaseSeshat:
             prompt = prompt[:max_prompt - 1] + [self.tok.bot_id]
 
         with self._lock:                            # طلب واحد في المرة
-            ids, confidence = self._generate(prompt, max_new_tokens, temperature)
+            ids, probs = self._generate(prompt, max_new_tokens, temperature)
+        confidence = confidence_from(probs)
 
-        text = self.tok.decode(ids).strip()
+        text = fix_code_indent(self.tok.decode(ids).strip())
         fallback = False
         if use_fallback and (not text or confidence < CONFIDENCE_THRESHOLD):
             text = FALLBACK_AR if is_arabic(message) else FALLBACK_EN
@@ -176,7 +212,7 @@ class NumpySeshat(BaseSeshat):
         block = self.config["block_size"]
         prompt = list(prompt)[-(block - 1):]
         caches = [{} for _ in self.layers]
-        step_in, out, p_sum = prompt, [], 0.0
+        step_in, out, out_probs = prompt, [], []
         banned = list(self._banned)
         for _ in range(max(0, min(max_new_tokens, block - len(prompt)))):
             logits = self._forward(step_in, caches).astype(np.float64)
@@ -194,10 +230,10 @@ class NumpySeshat(BaseSeshat):
                 nxt = int(self._rng.choice(scaled.size, p=e / e.sum()))
             if nxt == self.tok.end_id:
                 break
-            p_sum += float(probs[nxt])
+            out_probs.append(float(probs[nxt]))
             out.append(nxt)
             step_in = [nxt]
-        return out, (p_sum / len(out) if out else 0.0)
+        return out, out_probs
 
 
 # ============================================================

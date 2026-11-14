@@ -210,9 +210,9 @@ class MiniGPT(nn.Module):
             step_in = torch.tensor([[nxt]], dtype=torch.long, device=device)
 
     def generate(self, prompt_ids, **kw):
-        """بيرجع (التوكنز الجديدة، درجة الثقة) — الثقة = متوسط احتمال الحروف اللي اختارها"""
-        out, p_sum = [], 0.0
+        """بيرجع (التوكنز الجديدة، احتمال كل توكن اختاره)"""
+        out, probs = [], []
         for tok, p in self.generate_stream(prompt_ids, **kw):
             out.append(tok)
-            p_sum += p
-        return out, (p_sum / len(out) if out else 0.0)
+            probs.append(p)
+        return out, probs
