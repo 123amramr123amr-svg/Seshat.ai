@@ -38,7 +38,7 @@ def parse_args():
                    help="الرام المتاحة للتدريب تقريبًا (بتحدد حجم باتشات الأكواد الطويلة)")
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--dropout", type=float, default=0.05)
-    p.add_argument("--block-size", type=int, default=512)
+    p.add_argument("--block-size", type=int, default=1024)
     p.add_argument("--eval-every", type=int, default=250)
     p.add_argument("--threads", type=int, default=0, help="عدد أنوية الـ CPU (0 = تلقائي)")
     p.add_argument("--resume", action="store_true", help="يكمل من الملف المحفوظ")
