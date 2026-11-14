@@ -42,7 +42,13 @@ def chat():
         temperature = min(1.5, max(0.0, float(data.get("temperature", 0.0))))
     except (TypeError, ValueError):
         temperature = 0.0
-    return jsonify(seshat.reply(msg, temperature=temperature))
+    try:
+        return jsonify(seshat.reply(msg, temperature=temperature))
+    except Exception:                       # غلط غير متوقع → JSON واضح بدل صفحة HTML
+        app.logger.exception("حصلت مشكلة وقت الرد على: %r", msg[:200])
+        return jsonify({"response": "حصلت مشكلة جوه السيرفر. جرب تاني بعد شوية.",
+                        "thinking": "", "confidence": 0.0, "seconds": 0, "fallback": True,
+                        "source": "none", "matched": "", "suggestion": ""}), 500
 
 
 if __name__ == "__main__":

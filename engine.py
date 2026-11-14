@@ -76,6 +76,66 @@ UNKNOWN_AR = "مش معروف | سؤال برّه اللي اتعلمته"
 UNKNOWN_EN = "unknown | outside what I have learned"
 
 
+# ============================================================
+# التحقق من ناتج الحساب
+# ============================================================
+# النموذج بيفهم المسألة صح (بيكتب الأرقام في سطر التفكير) لكن ممكن يغلط في
+# حساب الناتج — خصوصًا الأرقام الكبيرة اللي ماتدربش عليها (الجمع والطرح
+# متدرب لحد 20 والضرب لحد 12). هنا بنقرا المسألة من سطر التفكير ونحسبها
+# بنفسنا كفحص ثاني، ولو الناتج المكتوب غلط بنصلحه. المسألة بتتعبر متحققة
+# بس لو أرقام السؤال = أرقام سطر التفكير = أرقام الرد، وساعتها الرد مضمون.
+_THINK_MATH = re.compile(r"^" + MATH_LABEL + r" \| (\d+) ([+\-*x×]) (\d+)$")
+_ANSWER_MATH = re.compile(r"^(\d+) ([+\-*x×]) (\d+) = (\d+)$")
+_QUESTION_MATH = re.compile(r"(\d+)\s*([+\-*x×])\s*(\d+)")
+
+
+def _norm_sym(sym):
+    """رمز الضرب في سطر التفكير ممكن يكون * أو x، والرد بييتكتب بـ ×"""
+    return "×" if sym in ("*", "x", "×") else sym
+
+
+def _math_from_question(question):
+    """
+    بيقرا المسألة من السؤال نفسه (لما النموذج يغلط في قراية الأرقام زي 154).
+    بيرجع (a, sym, b) بس لو فيه مسألة واحدة نضيفة وأرقامها هي كل أرقام السؤال.
+    """
+    matches = _QUESTION_MATH.findall(question)
+    if len(matches) != 1:
+        return None
+    a_s, sym, b_s = matches[0]
+    if _numbers(question) != sorted([a_s, b_s]):
+        return None
+    return int(a_s), _norm_sym(sym), int(b_s)
+
+
+def _solve(a, sym, b):
+    return a + b if sym == "+" else a - b if sym == "-" else a * b
+
+
+def _verify_math(question, thinking, text):
+    """
+    فحص ثاني للحساب: بيرجع (سطر التفكير، الرد) بعد التأكد من الناتج، أو None
+    لو مش قادر يقرا المسألة. الأول بيجرب قراية النموذج (سطر التفكير)، ولو
+    قرا الأرقام غلط بيقري المسألة من السؤال نفسه ويحسبها بنفسه.
+    """
+    if not thinking.startswith(MATH_LABEL + " |"):
+        return None
+    t = _THINK_MATH.match(thinking.strip())
+    if t and _numbers(question) == _numbers(thinking):
+        a, sym, b = int(t.group(1)), _norm_sym(t.group(2)), int(t.group(3))
+        r = _ANSWER_MATH.match(text.strip())
+        if not r or (int(r.group(1)), _norm_sym(r.group(2)), int(r.group(3))) != (a, sym, b):
+            return None
+        if int(r.group(4)) == _solve(a, sym, b):
+            return thinking, text                        # الناتج كان صح من الأول
+        return thinking, f"{a} {sym} {b} = {_solve(a, sym, b)}"
+    m = _math_from_question(question)                    # قراية النموذج غلط أو ناقصة
+    if not m or not _ANSWER_MATH.match(text.strip()):    # الرد لازم يكون شكله رد حساب
+        return None
+    a, sym, b = m
+    return f"{MATH_LABEL} | {a} {sym} {b}", f"{a} {sym} {b} = {_solve(a, sym, b)}"
+
+
 # النموذج بيكتب المسافات حرف حرف، فساعات بيغلط في عدّ مسافات أول السطر في الكود
 # (3 بدل 4 مثلًا) وده بيبوّظ كود بايثون. هنا بنقرّب مسافات أول كل سطر لأقرب مضاعف
 # لوحدة الإزاحة بتاعة اللغة. (حل مؤقت — الحل الجذري توكن خاص للإزاحة في التدريب.)
@@ -261,7 +321,15 @@ class BaseSeshat:
         fallback = lost or thinking in (UNKNOWN_AR, UNKNOWN_EN)   # النموذج نفسه قال مش عارف
         if fallback:
             text = FALLBACK_AR if is_arabic(message) else FALLBACK_EN
-        if use_fallback and not fallback and (not text or confidence < CONFIDENCE_THRESHOLD):
+        # فحص ثاني للحساب: لو المسألة اتقرت صح، المحرك بيحسب الناتج بنفسه وبيصلح
+        # الرد — ساعتها الرد مضمون مهما كانت ثقة النموذج
+        verified = False
+        if not fallback:
+            fixed = _verify_math(question, thinking, text)
+            if fixed is not None:
+                thinking, text, verified = fixed[0], fixed[1], True
+                confidence = 1.0
+        if use_fallback and not fallback and not verified and (not text or confidence < CONFIDENCE_THRESHOLD):
             text = FALLBACK_AR if is_arabic(message) else FALLBACK_EN
             fallback = True
         return {"response": text, "thinking": thinking,

@@ -103,8 +103,8 @@ def run_accuracy(seshat, limit, seed):
     seen = [(rng.choice(it.questions), it, "اتدرب عليها") for it in intents
             if it.questions and it.cat != "unknown"]
     for it in intents:                       # الأسئلة اللي برّه التدريب ليها ردّين بس، فبناخد منها عينة
-        if it.cat == "unknown":
-            seen += [(q, it, "اتدرب عليها") for q in rng.sample(it.questions, 60)]
+        if it.cat == "unknown" and it.questions:
+            seen += [(q, it, "اتدرب عليها") for q in rng.sample(it.questions, min(60, len(it.questions)))]
     unseen = [(q, it, "صيغ جديدة") for it in intents for q in it.holdout]
     if limit and len(seen) > limit:
         seen = rng.sample(seen, limit)
