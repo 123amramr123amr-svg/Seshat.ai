@@ -27,7 +27,9 @@ def main():
         if not msg:
             continue
         r = seshat.reply(msg)
-        print(f"سشات: {r['response']}\n      (ثقة {r['confidence']:.0%} — {r['seconds']} ث)\n")
+        if r["thinking"]:
+            print(f"  🧠 {r['thinking']}")
+        print(f"seshat: {r['response']}\n      (ثقة {r['confidence']:.0%} — {r['seconds']} ث)\n")
 
 
 if __name__ == "__main__":

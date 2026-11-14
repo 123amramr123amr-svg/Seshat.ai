@@ -970,3 +970,242 @@ else
   echo "File not found"
 fi
 ''')
+
+# ============================================================
+# Python — مجموعة تانية
+# ============================================================
+add("python", "يتأكد إن الرقم موجب ولا سالب", "check if a number is positive or negative", '''
+n = float(input("Enter a number: "))
+if n > 0:
+    print("Positive")
+elif n < 0:
+    print("Negative")
+else:
+    print("Zero")
+''')
+
+add("python", "يحسب مربع رقم", "calculate the square of a number", '''
+def square(n):
+    return n * n
+
+print(square(7))
+''')
+
+add("python", "يجيب أكبر رقم من تلات أرقام", "find the largest of three numbers", '''
+def largest(a, b, c):
+    return max(a, b, c)
+
+print(largest(4, 9, 2))
+''')
+
+add("python", "يطبع الأرقام الزوجية من 1 لـ 20", "print the even numbers from 1 to 20", '''
+for i in range(2, 21, 2):
+    print(i)
+''')
+
+add("python", "يتأكد إن عنصر موجود في ليست", "check if an item is in a list", '''
+fruits = ["apple", "banana", "orange"]
+if "banana" in fruits:
+    print("Found")
+else:
+    print("Not found")
+''')
+
+add("python", "يضيف عنصر لليست", "add an item to a list", '''
+items = [1, 2, 3]
+items.append(4)
+print(items)
+''')
+
+add("python", "يمسح عنصر من ليست", "remove an item from a list", '''
+items = [1, 2, 3, 4]
+items.remove(3)
+print(items)
+''')
+
+add("python", "يعكس ليست", "reverse a list", '''
+items = [1, 2, 3, 4]
+items.reverse()
+print(items)
+''')
+
+add("python", "يحول نص لرقم", "convert a string to a number", '''
+text = "42"
+number = int(text)
+print(number + 1)
+''')
+
+add("python", "يقسم نص لكلمات", "split a string into words", '''
+text = "learn python every day"
+words = text.split(" ")
+print(words)
+''')
+
+add("python", "يستبدل كلمة في نص", "replace a word in a string", '''
+text = "I like tea"
+new_text = text.replace("tea", "coffee")
+print(new_text)
+''')
+
+add("python", "يحسب مجموع أرقام عدد", "sum the digits of a number", '''
+def digit_sum(n):
+    total = 0
+    while n > 0:
+        total += n % 10
+        n //= 10
+    return total
+
+print(digit_sum(1234))
+''')
+
+add("python", "يطبع مثلث نجوم", "print a triangle of stars", '''
+rows = 5
+for i in range(1, rows + 1):
+    print("*" * i)
+''')
+
+add("python", "يعمل دالة لامدا", "write a lambda function", '''
+double = lambda x: x * 2
+print(double(5))
+''')
+
+add("python", "يستخدم map و filter", "use map and filter", '''
+numbers = [1, 2, 3, 4, 5]
+squares = list(map(lambda x: x * x, numbers))
+evens = list(filter(lambda x: x % 2 == 0, numbers))
+print(squares)
+print(evens)
+''')
+
+add("python", "يقرأ ملف json", "read a json file", '''
+import json
+
+with open("data.json", "r", encoding="utf-8") as f:
+    data = json.load(f)
+print(data)
+''')
+
+add("python", "يعمل طلب http", "make an http request", '''
+from urllib.request import urlopen
+
+with urlopen("https://example.com") as response:
+    html = response.read().decode("utf-8")
+print(html[:100])
+''')
+
+add("python", "يحسب الوقت اللي الكود بياخده", "measure how long code takes", '''
+import time
+
+start = time.time()
+total = sum(range(1000000))
+end = time.time()
+print("Seconds:", end - start)
+''')
+
+add("python", "يعمل وراثة بين كلاسين", "use inheritance between classes", '''
+class Animal:
+    def __init__(self, name):
+        self.name = name
+
+    def speak(self):
+        print(self.name, "makes a sound")
+
+class Dog(Animal):
+    def speak(self):
+        print(self.name, "says woof")
+
+d = Dog("Rex")
+d.speak()
+''')
+
+add("python", "يعمل قايمة مهام", "make a to-do list", '''
+tasks = []
+
+def add_task(task):
+    tasks.append(task)
+
+def show_tasks():
+    for i, task in enumerate(tasks, 1):
+        print(i, task)
+
+add_task("Study Python")
+add_task("Write code")
+show_tasks()
+''')
+
+add("python", "يحسب عدد الأيام بين تاريخين", "count the days between two dates", '''
+from datetime import date
+
+d1 = date(2026, 1, 1)
+d2 = date(2026, 12, 31)
+print((d2 - d1).days)
+''')
+
+add("python", "يتأكد إن كلمة السر قوية", "check if a password is strong", '''
+def is_strong(password):
+    has_digit = any(ch.isdigit() for ch in password)
+    has_upper = any(ch.isupper() for ch in password)
+    return len(password) >= 8 and has_digit and has_upper
+
+print(is_strong("Seshat2026"))
+''')
+
+add("python", "يعمل طابور", "implement a queue", '''
+from collections import deque
+
+queue = deque()
+queue.append("a")
+queue.append("b")
+print(queue.popleft())
+''')
+
+add("python", "يحول ليست لنص", "join a list into a string", '''
+words = ["I", "love", "code"]
+sentence = " ".join(words)
+print(sentence)
+''')
+
+add("python", "يطبع الأرقام الأولية لحد 50", "list the prime numbers up to 50", '''
+primes = []
+for n in range(2, 51):
+    if all(n % i != 0 for i in range(2, int(n ** 0.5) + 1)):
+        primes.append(n)
+print(primes)
+''')
+
+# ============================================================
+# JavaScript — مجموعة تانية
+# ============================================================
+add("javascript", "يعمل دالة سهم", "write an arrow function", '''
+const double = (x) => x * 2;
+console.log(double(5));
+''')
+
+add("javascript", "يستخدم map على ليست", "use map on an array", '''
+const numbers = [1, 2, 3, 4];
+const squares = numbers.map((n) => n * n);
+console.log(squares);
+''')
+
+add("javascript", "يفلتر ليست", "filter an array", '''
+const numbers = [1, 2, 3, 4, 5, 6];
+const evens = numbers.filter((n) => n % 2 === 0);
+console.log(evens);
+''')
+
+add("javascript", "يحفظ بيانات في المتصفح", "save data in local storage", '''
+localStorage.setItem("name", "Ali");
+const name = localStorage.getItem("name");
+console.log(name);
+''')
+
+add("javascript", "يخفي عنصر في الصفحة", "hide an element", '''
+const box = document.getElementById("box");
+box.style.display = "none";
+''')
+
+add("javascript", "يحول نص json لكائن", "parse a json string", '''
+const text = '{"name": "Ali", "age": 20}';
+const user = JSON.parse(text);
+console.log(user.name);
+''')

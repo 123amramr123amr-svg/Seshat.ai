@@ -34,14 +34,22 @@ CONFIDENCE_THRESHOLD = 0.93
 CONFIDENCE_HEAD = 12
 
 
-def confidence_from(probs):
+def confidence_from(probs, n_think=0):
+    """
+    probs: احتمال كل توكن النموذج اختاره. n_think: عدد توكنز سطر التفكير.
+    لو فيه تفكير، الثقة بتتحسب عليه (هو اللي بيحدد النموذج فهم السؤال ولا لأ).
+    """
     if not probs:
         return 0.0
-    head = probs[:CONFIDENCE_HEAD]
+    head = probs[:n_think] if n_think else probs[:CONFIDENCE_HEAD]
     return min(sum(probs) / len(probs), sum(head) / len(head))
 
 FALLBACK_AR = "لسه ماتعلمتش الرد على السؤال ده. جرب تسأله بطريقة تانية، أو اسألني عن حاجة تانية."
 FALLBACK_EN = "I haven't learned how to answer that yet. Try asking in another way, or ask me something else."
+
+# سطر التفكير اللي النموذج بيكتبه لما يحس إن السؤال برّه اللي اتعلمه
+UNKNOWN_AR = "مش معروف | سؤال برّه اللي اتعلمته"
+UNKNOWN_EN = "unknown | outside what I have learned"
 
 
 # النموذج بيكتب المسافات حرف حرف، فساعات بيغلط في عدّ مسافات أول السطر في الكود
@@ -106,7 +114,7 @@ class BaseSeshat:
         t0 = time.time()
         question = normalize_question(message)[:300]
         if not question:
-            return {"response": "اكتب حاجة الأول 🙂", "confidence": 1.0,
+            return {"response": "اكتب حاجة الأول 🙂", "thinking": "", "confidence": 1.0,
                     "seconds": 0.0, "fallback": False}
 
         prompt = self.tok.encode_prompt(question)
@@ -116,14 +124,26 @@ class BaseSeshat:
 
         with self._lock:                            # طلب واحد في المرة
             ids, probs = self._generate(prompt, max_new_tokens, temperature)
-        confidence = confidence_from(probs)
 
-        text = fix_code_indent(self.tok.decode(ids).strip())
-        fallback = False
-        if use_fallback and (not text or confidence < CONFIDENCE_THRESHOLD):
+        # النموذج بيكتب الأول سطر تفكير (فهم السؤال إزاي) وبعدين الرد
+        thinking, n_think, lost = "", 0, False
+        et = self.tok.end_think_id
+        if et is not None and et in ids:
+            n_think = ids.index(et) + 1
+            thinking = self.tok.decode(ids[:n_think]).strip()
+        elif et is not None and self.tok.think_id in ids:
+            lost = True                        # بدأ يفكر ومقفلش التفكير → تاه
+        confidence = 0.0 if lost else confidence_from(probs, n_think)
+
+        text = "" if lost else fix_code_indent(self.tok.decode(ids[n_think:]).strip())
+        fallback = lost or thinking in (UNKNOWN_AR, UNKNOWN_EN)   # النموذج نفسه قال مش عارف
+        if fallback:
+            text = FALLBACK_AR if is_arabic(message) else FALLBACK_EN
+        if use_fallback and not fallback and (not text or confidence < CONFIDENCE_THRESHOLD):
             text = FALLBACK_AR if is_arabic(message) else FALLBACK_EN
             fallback = True
-        return {"response": text, "confidence": round(float(confidence), 3),
+        return {"response": text, "thinking": thinking,
+                "confidence": round(float(confidence), 3),
                 "seconds": round(time.time() - t0, 2), "fallback": fallback}
 
 

@@ -5,7 +5,11 @@ seshat.chet — تجهيز بيانات التدريب
   1. ملفات .txt مكتوبة بالإيد (محادثات ومعلومات عربي/إنجليزي)
   2. code_snippets.py — أكواد، وبيتولّد لكل كود أسئلة عربي وإنجليزي
   3. wordlists.py — ترجمة كلمات + عواصم
-  4. عمليات حسابية بتتولّد هنا
+  4. unknown_questions.py — أسئلة برّه اللي اتعلمه (عشان يقول "مش عارف")
+  5. عمليات حسابية بتتولّد هنا
+
+التفكير: كل رد بيتدرب عليه النموذج بيبدأ بسطر تفكير فيه نوع السؤال + السؤال
+بصيغته الأساسية. يعني النموذج بيتعلم الأول "السؤال ده معناه إيه" وبعدين يرد.
 
 كل "Intent" = مجموعة صيغ لنفس السؤال + رد واحد.
 وقت التدريب بنختار صيغة عشوائية ونضيف عليها تغييرات بسيطة (كلمة زيادة، غلطة كتابة)
@@ -20,6 +24,7 @@ import sys
 
 import torch
 
+from engine import FALLBACK_AR, FALLBACK_EN, UNKNOWN_AR, UNKNOWN_EN
 from tokenizer import CharTokenizer, normalize_question, is_arabic
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -27,19 +32,42 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 # نسبة ظهور كل نوع في التدريب (لكل رد). المحادثة والمعلومات ردودها طويلة ومختلفة
 # عن بعض فمحتاجة تتكرر أكتر، والحساب والترجمة شبه بعض فبيتعلموا أسرع.
 CAT_WEIGHTS = {
-    "chat": 3.0,
+    "chat": 4.0,
     "knowledge": 3.0,
+    "programming": 3.0,
     "code": 1.2,
     "translate": 0.5,
     "capital": 0.8,
     "math": 0.3,
+    "unknown": 120.0,     # ردّين بس (عربي/إنجليزي) لكن وراهم مئات الأسئلة
+}
+
+# أسئلة الهوية (الاسم والمطوّر) لازم تتحفظ كويس جدًا → وزنها بيتضرب في الرقم ده
+IDENTITY_BOOST = 10.0
+IDENTITY_QUESTIONS = {
+    "اسمك ايه", "مين طورك", "انت مين", "مين عمرو احمد",
+    "what is your name", "who developed you", "who are you", "who is amr ahmed",
+}
+
+# اسم النوع اللي بيتكتب في سطر التفكير
+THINK_LABELS = {
+    "chat": ("محادثة", "chat"),
+    "knowledge": ("معلومة", "fact"),
+    "programming": ("برمجة", "programming"),
+    "code": ("كود", "code"),
+    "translate": ("ترجمة", "translation"),
+    "capital": ("عاصمة", "capital"),
+    "math": ("حساب", "math"),
 }
 
 
 class Intent:
-    __slots__ = ("questions", "answer", "cat", "weight", "aug", "typo", "holdout")
+    __slots__ = ("questions", "answer", "cat", "weight", "aug", "typo", "holdout",
+                 "canonical", "think")
 
     def __init__(self, questions, answer, cat, weight=1.0, aug=True, typo=True):
+        self.canonical = questions[0].strip() if questions else ""   # الصيغة الأساسية للسؤال
+        self.think = ""
         seen, qs = set(), []
         for q in questions:
             q = normalize_question(q)
@@ -223,6 +251,25 @@ def make_math_intents():
 
 
 # ============================================================
+# 5) أسئلة برّه اللي اتعلمه
+# ============================================================
+def make_unknown_intents():
+    sys.path.insert(0, DATA_DIR)
+    import unknown_questions as uq
+    ar_qs, en_qs = uq.build()
+    out = []
+    for qs, answer, think, test in ((ar_qs, FALLBACK_AR, UNKNOWN_AR, uq.AR_TEST),
+                                    (en_qs, FALLBACK_EN, UNKNOWN_EN, uq.EN_TEST)):
+        it = Intent(qs, answer, "unknown")
+        it.think = think
+        test = {normalize_question(q) for q in test}
+        it.questions = [q for q in it.questions if q not in test]
+        it.holdout = sorted(test)              # للاختبار بس، مبيتدربش عليها
+        out.append(it)
+    return out
+
+
+# ============================================================
 # تجميع كل البيانات
 # ============================================================
 def _stable_hash(text):
@@ -233,13 +280,14 @@ def build_intents(holdout=True, verbose=True):
     intents = []
     for path in sorted(glob.glob(os.path.join(DATA_DIR, "*.txt"))):
         name = os.path.basename(path)
-        cat = "knowledge" if "knowledge" in name else "chat"
+        cat = ("programming" if "programming" in name
+               else "knowledge" if "knowledge" in name else "chat")
         got = load_dialog_file(path, cat)
         intents += got
         if verbose:
             print(f"  {name:<22} {len(got):>5} رد")
     for label, loader in (("أكواد", load_code_intents), ("ترجمة وعواصم", load_wordlist_intents),
-                          ("حساب", make_math_intents)):
+                          ("حساب", make_math_intents), ("برّه اللي اتعلمه", make_unknown_intents)):
         got = loader()
         intents += got
         if verbose:
@@ -259,11 +307,17 @@ def build_intents(holdout=True, verbose=True):
     intents = [it for it in intents if it.questions]
     for it in intents:
         it.weight = CAT_WEIGHTS.get(it.cat, 1.0)
+        if normalize_question(it.canonical) in IDENTITY_QUESTIONS:
+            it.weight *= IDENTITY_BOOST
+        if not it.think:                       # سطر التفكير: النوع | السؤال بصيغته الأساسية
+            ar_label, en_label = THINK_LABELS[it.cat]
+            label = ar_label if is_arabic(it.canonical) or it.cat == "math" else en_label
+            it.think = f"{label} | {it.canonical}"
 
     # نشيل صيغة واحدة من بعض الأسئلة عشان نختبر بيها النموذج على صيغ ماشافهاش
     if holdout:
         for it in intents:
-            if it.cat in ("chat", "knowledge", "code") and len(it.questions) >= 4:
+            if it.cat in ("chat", "knowledge", "programming", "code") and len(it.questions) >= 4:
                 h = _stable_hash(it.answer)
                 if h % 3 == 0:
                     it.holdout = [it.questions.pop(h % len(it.questions))]
@@ -319,9 +373,8 @@ class Dataset:
     def __init__(self, tokenizer=None, holdout=True, seed=1234, verbose=True):
         self.intents = build_intents(holdout=holdout, verbose=verbose)
         self.tok = tokenizer or CharTokenizer()
-        if tokenizer is None:
-            self.tok.add_chars_from("".join(it.answer + "".join(it.questions + it.holdout)
-                                            for it in self.intents))
+        self.tok.add_chars_from("".join(it.answer + it.think + "".join(it.questions + it.holdout)
+                                        for it in self.intents))
         self.rng = random.Random(seed)
         self.weights = [it.weight for it in self.intents]
         self._answer_ids = {}
@@ -332,7 +385,9 @@ class Dataset:
         """بيرجع (x, y): الخسارة بتتحسب على حروف الرد بس، مش على السؤال"""
         a = self._answer_ids.get(id(intent))
         if a is None:
-            a = self.tok.encode(intent.answer) + [self.tok.end_id]
+            # <think> النوع | السؤال الأساسي </think> الرد <end>
+            a = ([self.tok.think_id] + self.tok.encode(intent.think) + [self.tok.end_think_id]
+                 + self.tok.encode(intent.answer) + [self.tok.end_id])
             self._answer_ids[id(intent)] = a
         max_q = block_size - len(a) - 1
         q = self.tok.encode(question)[:max(1, max_q - 1)]

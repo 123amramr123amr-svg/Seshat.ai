@@ -31,7 +31,9 @@ def run_samples(seshat):
     for q in SAMPLES:
         r = seshat.reply(q)
         tag = " [مش عارف]" if r["fallback"] else ""
-        print(f"س: {q}\nج: {r['response']}\n   (ثقة {r['confidence']:.0%} — {r['seconds']} ث){tag}\n")
+        think = f"🧠 {r['thinking']}\n" if r["thinking"] else ""
+        print(f"س: {q}\n{think}ج: {r['response']}\n"
+              f"   (ثقة {r['confidence']:.0%} — {r['seconds']} ث){tag}\n")
 
 
 def run_accuracy(seshat, limit, seed):
@@ -44,7 +46,11 @@ def run_accuracy(seshat, limit, seed):
 
     intents = build_intents(holdout=True, verbose=False)
     rng = random.Random(seed)
-    seen = [(rng.choice(it.questions), it, "اتدرب عليها") for it in intents if it.questions]
+    seen = [(rng.choice(it.questions), it, "اتدرب عليها") for it in intents
+            if it.questions and it.cat != "unknown"]
+    for it in intents:                       # الأسئلة اللي برّه التدريب ليها ردّين بس، فبناخد منها عينة
+        if it.cat == "unknown":
+            seen += [(q, it, "اتدرب عليها") for q in rng.sample(it.questions, 60)]
     unseen = [(q, it, "صيغ جديدة") for it in intents for q in it.holdout]
     if limit and len(seen) > limit:
         seen = rng.sample(seen, limit)
@@ -54,20 +60,26 @@ def run_accuracy(seshat, limit, seed):
     for q, it, kind in seen + unseen:
         r = seshat.reply(q, use_fallback=False)
         ok = r["response"] == it.answer
+        low = r["confidence"] < CONFIDENCE_THRESHOLD and not r["fallback"]
         for key in ((kind, it.cat), (kind, "الكل")):
-            s = stats.setdefault(key, [0, 0, 0])
+            s = stats.setdefault(key, [0, 0, 0, 0, 0])
             s[0] += ok
             s[1] += 1
-            s[2] += r["confidence"] < CONFIDENCE_THRESHOLD      # هيتقال عليها "مش عارف"
+            s[2] += r["thinking"] == it.think                  # فهم السؤال صح
+            s[3] += low and ok                                 # رد صح بس هيترفض بسبب الثقة
+            s[4] += (not ok) and (low or r["fallback"])        # رد غلط بس المستخدم هيشوف "مش عارف"
 
-    names = {"chat": "محادثة", "knowledge": "معلومات", "code": "أكواد", "translate": "ترجمة",
-             "capital": "عواصم", "math": "حساب", "الكل": "الكل"}
+    names = {"chat": "محادثة", "knowledge": "معلومات", "programming": "برمجة", "code": "أكواد",
+             "translate": "ترجمة", "capital": "عواصم", "math": "حساب",
+             "unknown": "برّه التدريب", "الكل": "الكل"}
     for kind in ("اتدرب عليها", "صيغ جديدة"):
         print(f"\n— أسئلة {kind} —")
-        for (k, cat), (ok, n, low) in sorted(stats.items(), key=lambda x: x[0][1] == "الكل"):
+        print("  (رد صح بالحرف | فهم السؤال صح | صح واترفض بالثقة | غلط واتقال مش عارف)")
+        for (k, cat), (ok, n, th, lost, caught) in sorted(stats.items(),
+                                                          key=lambda x: x[0][1] == "الكل"):
             if k == kind:
-                print(f"  {names.get(cat, cat):<8} {ok:>5}/{n:<5} صح = {ok / n * 100:5.1f}%"
-                      f"   | ثقة أقل من الحد: {low}")
+                print(f"  {names.get(cat, cat):<12} {ok:>5}/{n:<5} = {ok / n * 100:5.1f}%"
+                      f" | فهم {th / n * 100:5.1f}% | {lost:>3} | {caught:>3}")
     print(f"\nالوقت: {time.time() - t0:.0f} ثانية")
 
 

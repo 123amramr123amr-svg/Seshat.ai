@@ -35,7 +35,7 @@ def chat():
     data = request.get_json(silent=True) or {}
     msg = str(data.get("message", "")).strip()
     if not msg:
-        return jsonify({"response": "اكتب حاجة الأول 🙂", "confidence": 1.0,
+        return jsonify({"response": "اكتب حاجة الأول 🙂", "thinking": "", "confidence": 1.0,
                         "seconds": 0, "fallback": False})
     try:
         temperature = min(1.5, max(0.0, float(data.get("temperature", 0.0))))

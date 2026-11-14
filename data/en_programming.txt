@@ -1,0 +1,109 @@
+# Programming questions in English — "Q:" variants separated by |, then "A:" the reply.
+
+Q: difference between = and == | what is the difference between = and == | what does == mean | what does == do
+A: The = sign puts a value in a variable, like x = 5. The == sign compares two values and gives True or False.
+
+Q: what does return do | what is return | return statement | what is a return statement
+A: The return statement sends a value back to the place that called the function, and ends the function at that line.
+
+Q: difference between print and return | print vs return
+A: print only shows a value on the screen. return gives the value back so you can use it in the rest of the code.
+
+Q: how to write a comment in python | what is a comment | comments in python | how do i comment code
+A: A comment is a note for yourself that the computer ignores. In Python it starts with #, and in JavaScript and C it starts with //.
+
+Q: what is a syntax error | syntax error | what does syntax error mean
+A: A syntax error means the code is written in a wrong form, like a missing bracket or colon. Check the line shown in the error message.
+
+Q: what is an index error | index out of range | list index out of range
+A: This error means you asked for an item at a position that does not exist. Remember that counting starts at zero, so the last item is at length minus one.
+
+Q: what is a name error | name is not defined | what does name error mean
+A: A NameError means you used a variable or function name before defining it, or you misspelled the name.
+
+Q: what is a type error | type error | what does type error mean
+A: A TypeError means you used an operation on the wrong data type, like adding a string to a number. Convert the type first with int or str.
+
+Q: what is an indentation error | indentation error | what is indentation
+A: Python uses the spaces at the start of a line to know which block the code belongs to. This error means the spaces are not equal. Use 4 spaces for each level.
+
+Q: my code is not working | how to fix my code | i have an error | how to debug | how to find a bug
+A: Read the error message carefully and check the line number, print your variables to see where the problem is, and test each part alone.
+
+Q: what is a data type | data types | data types in python
+A: A data type tells what kind of value you have. The main ones in Python are int for whole numbers, float for decimals, str for text, bool for true or false, and list.
+
+Q: what is a string | string | what is a string in programming
+A: A string is text, which means a group of characters between quotes, like "hello".
+
+Q: what is an integer | what is an int | difference between int and float | what is a float
+A: An int is a whole number like 5, and a float is a number with a decimal point like 3.14.
+
+Q: what is a boolean | what is a bool | boolean
+A: A boolean is a data type with only two values, True or False. We use it in conditions.
+
+Q: difference between for and while | for vs while | when to use a while loop
+A: Use for when you know how many times to repeat or you are going over a list. Use while when the repeat depends on a condition that may change.
+
+Q: what is import | what does import do | what is a library | what is a module
+A: A library is ready code written by someone else, and import lets you use it in your program, like import math.
+
+Q: what is pip | what does pip do | how to install a python library | how to install a package
+A: pip is the installer for Python libraries. In the terminal, type pip install and then the library name.
+
+Q: what is a framework | framework | define framework
+A: A framework is a ready structure you build your program on instead of starting from zero, like Flask and Django for Python websites.
+
+Q: what is json | json | json file
+A: JSON is a simple text format for storing and exchanging data as keys and values. Most APIs use it.
+
+Q: what is http | http | http protocol
+A: HTTP is the protocol the browser uses to talk to a server. The most common requests are GET to fetch data and POST to send data.
+
+Q: what is a server | server | define server
+A: A server is a computer or program that runs all the time, receives requests from other devices, and answers them.
+
+Q: what is an ide | what is a code editor | where do i write code | best code editor
+A: An IDE is a program for writing code that helps you with colors and auto-complete, like VS Code and PyCharm.
+
+Q: what is a terminal | terminal | what is the command line
+A: The terminal is a screen where you type text commands for the computer instead of clicking icons. We run programs and install libraries from it.
+
+Q: what is a stack | stack | stack data structure
+A: A stack is a data structure where the last item in is the first item out, like a pile of plates.
+
+Q: what is a queue | queue | queue data structure
+A: A queue is a data structure where the first item in is the first item out, like a line of people waiting.
+
+Q: what is big o | what is time complexity | big o notation
+A: Big O is a way to measure how fast an algorithm is as the data grows. For example, O(n) means the time grows with the number of items.
+
+Q: what are data structures | data structures | define data structures
+A: Data structures are ways to organize data in memory so we can reach it quickly, like lists, dictionaries, stacks, and trees.
+
+Q: what is object oriented programming | object oriented programming | define oop
+A: Object oriented programming is a style where code is organized into classes and objects. Each object has its own data and functions.
+
+Q: what is inheritance | inheritance | inheritance in programming
+A: Inheritance is when a class takes the properties and functions of another class and adds to them, so we do not repeat code.
+
+Q: what is a parameter | what is an argument | parameter vs argument | function inputs
+A: A parameter is the variable a function receives between the brackets. An argument is the value you send when you call the function.
+
+Q: what is an index | index | index in a list
+A: An index is the position number of an item in a list. It starts at zero, so the first item is at index 0.
+
+Q: how to become a good programmer | how to get better at programming | tips for programmers
+A: Write code every day, build small projects on your own, read other people's code, and do not fear errors because they are the best teacher.
+
+Q: what project should i build | programming project ideas | projects for beginners
+A: Try a calculator, a number guessing game, a to-do list, or a simple personal website. Start small and grow step by step.
+
+Q: what is flask | flask | flask framework
+A: Flask is a light Python framework for building websites and APIs. I run on it myself.
+
+Q: what is numpy | numpy | numpy library
+A: NumPy is a Python library for fast math on arrays. It is what I use when I answer you.
+
+Q: what is pytorch | pytorch | pytorch library
+A: PyTorch is a Python library for building and training neural networks. I was trained with it.

@@ -83,9 +83,12 @@ def main():
     ckpt = None
     if args.resume and os.path.exists(args.out):
         ckpt = load_checkpoint(args.out)
-        ds = Dataset(tokenizer=CharTokenizer(ckpt["tokens"]), holdout=not args.no_holdout,
+        old_tok = CharTokenizer(ckpt["tokens"])
+        old_tok.add_extra_tokens()             # نموذج قديم؟ نضيفله توكنز التفكير والإزاحة
+        ds = Dataset(tokenizer=old_tok, holdout=not args.no_holdout,
                      seed=args.seed + ckpt["step"])
         cfg = Config(**ckpt["config"])
+        cfg.vocab_size = ds.tok.vocab_size     # ممكن يكون كبر (حروف أو توكنز جديدة)
     else:
         ds = Dataset(holdout=not args.no_holdout, seed=args.seed)
         cfg = Config(block_size=args.block_size, dropout=args.dropout,
@@ -95,9 +98,23 @@ def main():
     # ---------- النموذج ----------
     model = MiniGPT(cfg).to(device)
     start_step = 0
+    vocab_grew = False
     if ckpt:
-        model.load_state_dict({k: torch.from_numpy(np.array(v))
-                               for k, v in ckpt["weights"].items()})
+        state = {k: torch.from_numpy(np.array(v)) for k, v in ckpt["weights"].items()}
+        old_vocab = state["tok_emb.weight"].shape[0]
+        vocab_grew = cfg.vocab_size > old_vocab
+        if vocab_grew:
+            # المفردات كبرت: بنكبّر جدول التضمين ونسيب الصفوف القديمة زي ما هي.
+            # توكنز الإزاحة بتبدأ بنفس تضمين المسافة عشان النموذج يتعلمها بسرعة.
+            emb = model.tok_emb.weight.detach().clone()
+            emb[:old_vocab] = state["tok_emb.weight"]
+            space = tok.stoi[" "]
+            for t in ("    ", "  "):
+                if tok.stoi[t] >= old_vocab:
+                    emb[tok.stoi[t]] = state["tok_emb.weight"][space]
+            state["tok_emb.weight"] = state["lm_head.weight"] = emb
+            print(f"🔤 المفردات كبرت من {old_vocab} لـ {cfg.vocab_size} توكن")
+        model.load_state_dict(state)
         start_step = ckpt["step"]
         print(f"↩️  تكملة من الخطوة {start_step}")
 
@@ -106,7 +123,7 @@ def main():
     opt = torch.optim.AdamW(
         [{"params": decay, "weight_decay": 0.01}, {"params": no_decay, "weight_decay": 0.0}],
         lr=args.lr, betas=(0.9, 0.99))
-    if ckpt and os.path.exists(opt_path(args.out)):
+    if ckpt and not vocab_grew and os.path.exists(opt_path(args.out)):
         opt_state = torch.load(opt_path(args.out), map_location=device, weights_only=True)
         if opt_state.get("step") == start_step:
             opt.load_state_dict(opt_state["optimizer_state_dict"])
