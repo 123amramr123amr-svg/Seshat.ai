@@ -22,6 +22,7 @@ from flask import Flask, jsonify, render_template, request
 import vision
 from engine import Seshat, drawings, _trim_memory
 from brain import Brain
+from models import list_models
 
 app = Flask(__name__)
 app.json.ensure_ascii = False
@@ -87,6 +88,12 @@ print(f"✅ المخ جاهز — بحث النت: {'شغال' if st['search'] e
 @app.route("/")
 def index():
     return render_template("index.html", palette=drawings.PALETTE, grid=drawings.N)
+
+
+@app.route("/models")
+def models_route():
+    """List only model versions that have a registered runtime."""
+    return jsonify({"models": list_models(), "default": "khufu-1.0"})
 
 
 @app.route("/info")
