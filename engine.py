@@ -71,6 +71,48 @@ MEMORY_SUGGEST = 0.35     # فوق كده (ومن غير اتفاق) بيسأل 
 UNKNOWN_MARGIN = 0.15     # لو السؤال أقرب بكتير لموضوع برّه اللي اتعلمه → مش عارف
 MATH_LABEL = "حساب"       # نوع السؤال في سطر التفكير لما يكون مسألة حساب
 
+# ============================================================
+# استخراج السؤال من رسالة طويلة
+# ============================================================
+# الناس لما تكتب رسالة طويلة بتحط التحية والكلام في الأول أو في الآخر والسؤال
+# جواه. النموذج الصغير بيتلخبط لو اتجاهله الرسالة كلها (بيقرا أول جزء على
+# إنه السؤال)، فالمحرك بيستخرج السؤال قبل ما يدخل للنموذج والذاكرة:
+#  1. لو فيه كلمة سؤال (عربي/إنجليزي) → بناخد من قبلها بشوية لحد آخر الرسالة،
+#     لأن آخر كلمة سؤال غالبًا هي بداية السؤال الفعلي.
+#  2. مفيش كلمة سؤال → بناخد آخر جملة (تقسيم على السطور والترقيم) أو آخر
+#     400 حرف. الرسايل القصيرة بتتحول زي ما هي.
+_Q_WORD = re.compile(
+    r"[؟?]"
+    r"|(?<![\w])(ايه|مين|ازاي|امتى|فين|ليه|كام|ناتج|احسب|اكتب|اكتبلي|اعمللي|قوللي|قولى|علمني|يعني ايه|معنى|عايز|عاوز|ممكن|طب|بص)"
+    r"|(?<![\w])(what|how|who|where|when|why|which|write|give|tell|translate|capital|define|print|calculate|mean)",
+    re.I)
+
+
+def extract_question(message):
+    """بيرجع جزء الرسالة اللي فيه السؤال الفعلي (للنموذج والذاكرة).
+    الرسالة القصيرة أو اللي مفيهاش كلام زيادة بترجع زي ما هي."""
+    if len(message) <= 40:
+        return message
+    matches = list(_Q_WORD.finditer(message))
+    if matches:
+        last = matches[-1]
+        # كلمة أو اتنين قبل آخر كلمة سؤال عشان السؤال ميتقطعش من أوله
+        start = message.rfind(" ", 0, max(0, last.start() - 12))
+        seg = message[start + 1:] if start > 0 else message
+        seg = seg.strip()
+        if len(seg) > 400:
+            seg = seg[-400:]
+        if len(seg) >= 8:                     # الجزء المنستخرج معقول؟
+            return seg
+    # مفيش كلمة سؤال → آخر جملة (أو آخر 400 حرف لو مفيش تقسيم واضح)
+    parts = [p.strip() for p in re.split(r"[\n]+|[،؛,.!]+", message) if p.strip()]
+    if len(parts) > 1:
+        tail = parts[-1]
+        if len(tail.split()) < 3 and len(parts) >= 2:
+            tail = parts[-2] + " " + tail
+        return tail[-400:]
+    return message[-400:]
+
 # سطر التفكير اللي النموذج بيكتبه لما يحس إن السؤال برّه اللي اتعلمه
 UNKNOWN_AR = "مش معروف | سؤال برّه اللي اتعلمته"
 UNKNOWN_EN = "unknown | outside what I have learned"
@@ -185,7 +227,7 @@ class BaseSeshat:
         raise NotImplementedError
 
     def _generate(self, prompt, max_new_tokens, temperature):
-        """بيرجع (التوكنز الجديدة، احتمال كل توكن)"""
+        """بيرجع (التوكنز الجديدة، احتمال كل توكن) — بيتقفل بـ block_size لوحده"""
         raise NotImplementedError
 
     def info(self):
@@ -202,10 +244,18 @@ class BaseSeshat:
             "memory_questions": len(self.memory) if self.memory else 0,
         }
 
+    def _max_input_chars(self):
+        """أقصى طول للسؤال اللي بيدخل النموذج فعلاً — آخر جزء من الرسالة.
+        الناس بيكتبوا الرسالة الطويلة والسؤال في آخرها، فبناخد الآخر مش الأول.
+        الحد متظبط مع التدريب: الأمثلة بأغلفة الكلام الزيادة بتوصل لحد ~٤٥٠ حرف.
+        (الرسالة كاملة بتتقرا في ذاكرة الأسئلة والمخ — الحد ده للنموذج بس،
+        والرد ليه غرفة كبيرة: block_size ناقص البرومبت)."""
+        return max(120, min(400, self.config["block_size"] // 4))
+
     # ------------------------------------------------------------
     # الرد = الذاكرة (أقرب سؤال) + النموذج (الفهم والحساب)
     # ------------------------------------------------------------
-    def reply(self, message, temperature=0.0, max_new_tokens=600, use_fallback=True,
+    def reply(self, message, temperature=0.0, max_new_tokens=1000, use_fallback=True,
               use_memory=True):
         """
         بيرجع dict فيه: response, thinking, confidence, seconds, fallback, source, matched,
@@ -219,7 +269,9 @@ class BaseSeshat:
         use_memory=False بيرجع رد النموذج لوحده (ده اللي evaluate.py بيقيسه).
         """
         t0 = time.time()
-        question = normalize_question(message)[:300]
+        # استخراج السؤال من الرسالة (لو طويلة) وبعدين التنضيف — التحية والكلام
+        # الزيادة مبيوصلوش للنموذج ولا للذاكرة
+        question = normalize_question(extract_question(message))[-self._max_input_chars():]
         if not question:
             return {"response": "اكتب حاجة الأول 🙂", "thinking": "", "confidence": 1.0,
                     "seconds": 0.0, "fallback": False, "source": "none", "matched": "",
@@ -236,7 +288,18 @@ class BaseSeshat:
 
     def _hybrid_reply(self, message, question, memory, temperature, max_new_tokens):
         arabic = is_arabic(message)
-        known, unknown_score = memory.lookup(message)
+        # الذاكرة بتدور على السؤال المستخرج، ولو المطابقة ضعيفة بتجرب كمان
+        # آخر جزء من الرسالة كلها — عشان السؤال ما يضيعش لو الاستخراج قصه
+        known, unknown_score = memory.lookup(question)
+        best_known, best_unknown = known, unknown_score
+        tail_full = normalize_question(message)[-400:]
+        if tail_full and tail_full != question:
+            known2, unknown2 = memory.lookup(tail_full)
+            s1 = known.score if known else unknown_score
+            s2 = known2.score if known2 else unknown2
+            if s2 > s1:
+                best_known, best_unknown = known2, unknown2
+        known, unknown_score = best_known, best_unknown
 
         def answer(match, source, agreed=False):
             pct = round(match.score * 100)

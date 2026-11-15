@@ -176,6 +176,29 @@ check("المخ: لو مفيش حاجة بيقول الصراحة", r["fallback"
 r = b.reply("")
 check("المخ: رسالة فاضية", "اكتب حاجة" in r["response"])
 
+print("\n8) السياق الموسّع: الرسايل الطويلة والسؤال جواها (engine.extract_question)")
+from engine import extract_question
+
+# الاستخراج نفسه
+check("رسالة قصيرة بتترجع زي ما هي", extract_question("اسمك ايه") == "اسمك ايه")
+check("تحية + سؤال → السؤال", extract_question("مساء الخير يا سشات ازيك عامل ايه عاصمة اليابان ايه").endswith("عاصمة اليابان ايه"))
+check("سؤال + كلام بعده → السؤال في الأول", extract_question("عاصمة مصر ايه وبالمناسبة انا تعبان النهاردة كتير من الشغل").startswith("عاصمة مصر ايه"))
+check("رسالة سطرين والسؤال في آخر سطر", extract_question("مساء الخير\nان جدعنة دلوقتي الوقت متاخر\nمين بنى الهرم الاكبر").endswith("مين بنى الهرم الاكبر"))
+check("رسالة إنجليزي طويلة", "capital of japan" in extract_question(
+    "hey seshat i hope you are fine today " * 8 + "what is the capital of japan").lower())
+
+# الرد على رسايل طويلة (الذاكرة بتلاقي السؤال المستخرج)
+LONG = ("مساء الخير يا سشات ازيك عامل ايه اتمنى تكون بخير انا دلوقتي قاعد في البيت لوحدي "
+        "والجو بردان شوية وقعدت افكر في سؤال لحد ما لقيت انك انت الوحيد اللي ممكن يساعدني "
+        "فيه سمعت عنك كتير وصاحبي قال لي انك بتجاوب صح دايمًا المهم خلاص كفاية كلام فاضي ")
+r = seshat.reply(LONG + "عاصمة مصر ايه")
+check("رسالة 300+ حرف: عاصمة مصر", not r["fallback"] and "القاهرة" in r["response"], r["response"][:50])
+r = seshat.reply(LONG * 3 + "عاصمة اليابان ايه")
+check("رسالة 900+ حرف: عاصمة اليابان", not r["fallback"] and "طوكيو" in r["response"], r["response"][:50])
+r = seshat.reply(LONG + "154 + 382")
+check("رسالة طويلة فيها حساب", not r["fallback"] and "536" in r["response"], r["response"][:50])
+check("السياق في الملف 2048", seshat.config["block_size"] == 2048, str(seshat.config["block_size"]))
+
 print("\n" + "—" * 40)
 if FAILURES:
     print(f"❌ {len(FAILURES)} اختبار فشل: {', '.join(FAILURES)}")

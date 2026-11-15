@@ -38,7 +38,7 @@ def parse_args():
                    help="الرام المتاحة للتدريب تقريبًا (بتحدد حجم باتشات الأكواد الطويلة)")
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--dropout", type=float, default=0.05)
-    p.add_argument("--block-size", type=int, default=512)
+    p.add_argument("--block-size", type=int, default=2048)
     p.add_argument("--eval-every", type=int, default=250)
     p.add_argument("--threads", type=int, default=0, help="عدد أنوية الـ CPU (0 = تلقائي)")
     p.add_argument("--resume", action="store_true", help="يكمل من الملف المحفوظ")
@@ -88,6 +88,11 @@ def main():
         ds = Dataset(tokenizer=old_tok, holdout=not args.no_holdout,
                      seed=args.seed + ckpt["step"])
         cfg = Config(**ckpt["config"])
+        # السياق: بناخد الأكبر بين إعداد الملف والإعداد اللي المستخدم طربه —
+        # يعني resume عادي بعد كده بيكبر السياق تلقائيًا لـ 2048 (جدول المواقع
+        # بيتوسّع بتكرار الصفوف، شوف تحت). لو عايز تثبّت السياق القديم:
+        # --block-size بنفس رقم الملف.
+        cfg.block_size = max(cfg.block_size, args.block_size)
         cfg.vocab_size = ds.tok.vocab_size     # ممكن يكون كبر (حروف أو توكنز جديدة)
     else:
         ds = Dataset(holdout=not args.no_holdout, seed=args.seed)
@@ -99,6 +104,7 @@ def main():
     model = MiniGPT(cfg).to(device)
     start_step = 0
     vocab_grew = False
+    ctx_grew = False
     if ckpt:
         state = {k: torch.from_numpy(np.array(v)) for k, v in ckpt["weights"].items()}
         old_vocab = state["tok_emb.weight"].shape[0]
@@ -114,6 +120,20 @@ def main():
                     emb[tok.stoi[t]] = state["tok_emb.weight"][space]
             state["tok_emb.weight"] = state["lm_head.weight"] = emb
             print(f"🔤 المفردات كبرت من {old_vocab} لـ {cfg.vocab_size} توكن")
+
+        # توسيع السياق: جدول المواقع القديم أصغر من السياق الجديد → بنكرر الصفوف
+        # (توسيع دوره). المواقع الجديدة بتبدأ من قيم متعلمة، والتدريب على الأمثلة
+        # الطويلة (الأغلفة الطويلة في dataset.py) بيظبطها على طول. المواقع القديمة
+        # (0..old_ctx-1) بتفضل زي ما هي فجودة الردود القصيرة متبوظش.
+        old_ctx = state["pos_emb.weight"].shape[0]
+        ctx_grew = cfg.block_size > old_ctx
+        if ctx_grew:
+            reps = -(-cfg.block_size // old_ctx)          # عدد مرات التكرار
+            tiled = state["pos_emb.weight"].repeat(reps, 1)[:cfg.block_size]
+            state["pos_emb.weight"] = tiled
+            print(f"📏 السياق كبر من {old_ctx} لـ {cfg.block_size} حرف "
+                  f"(جدول المواقع اتكرر {reps} مرات — هيتظبط بالتدريب)")
+
         model.load_state_dict(state)
         start_step = ckpt["step"]
         print(f"↩️  تكملة من الخطوة {start_step}")
@@ -123,7 +143,8 @@ def main():
     opt = torch.optim.AdamW(
         [{"params": decay, "weight_decay": 0.01}, {"params": no_decay, "weight_decay": 0.0}],
         lr=args.lr, betas=(0.9, 0.99))
-    if ckpt and not vocab_grew and os.path.exists(opt_path(args.out)):
+    # حالة الـ optimizer القديمة مش تنفع لو الجداول كبرت (أشكال جديدة)
+    if ckpt and not vocab_grew and not ctx_grew and os.path.exists(opt_path(args.out)):
         opt_state = torch.load(opt_path(args.out), map_location=device, weights_only=True)
         if opt_state.get("step") == start_step:
             opt.load_state_dict(opt_state["optimizer_state_dict"])
@@ -144,7 +165,9 @@ def main():
         return min(1.0, p)
 
     def lr_at(step, elapsed):
-        if step - start_step < warmup and not ckpt:
+        # الـ warmup شغال كمان في التكملة: أول خطوات الجولة بـ lr صغير عشان
+        # ما نصدمش النموذج المتقارب (جودة الردود الحرفية حساسة جدًا للحركة)
+        if step - start_step < warmup:
             return args.lr * (step - start_step + 1) / warmup
         return args.lr * (0.05 + 0.95 * 0.5 * (1 + math.cos(math.pi * progress(step, elapsed))))
 

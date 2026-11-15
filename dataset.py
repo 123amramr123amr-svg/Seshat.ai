@@ -338,6 +338,46 @@ AR_SUF = ["لو سمحت", "يا سشات", "بسرعه", "من فضلك", "يا
 EN_PRE = ["please", "hey", "ok", "hi seshat", "so", "seshat", "can you tell me", "well"]
 EN_SUF = ["please", "thanks", "seshat", "now", "pls"]
 
+# ============================================================
+# أغلفة طويلة: الناس في الواقع مش بتكتب سؤال نضيف بس — بتكتب رسالة طويلة
+# فيها تحية وكلام كتير والسؤال في آخرها (أو العكس). عشان النموذج يتعلم
+# يلاقي السؤال في الرسالة، بنضيف وقت التدريب كلام عشوائي من الجمل دي
+# قبل أو بعد السؤال. من غير الكلام ده الرسايل الطويلة ماتتدربش خالص.
+# قواعد الجمل: من غير أرقام (عشان فحص الحساب ما يتلخبطش) ومن غير علامات
+# استفهام، وبالعامية زي ما الناس بتكتب فعلاً.
+# ============================================================
+AR_PREAMBLE = [
+    "مساء الخير يا سشات", "صباح الخير عامل ايه", "ازيك اتمنى تكون بخير",
+    "انا بكلمك من القاهرة", "النهاردة عندي شوية وقت فحبيت اكلمك",
+    "بص انا مش عايز اتعبك معايا بس محتاج مساعدة صغيرة",
+    "سمعت انك بتفهم كويس قوي", "المطور بتاعك عمرو احمد عملك عشان تساعد الناس",
+    "كنت قاري عنك وفيه ناس كتير مديحاك", "عندي حاجة مش عارف اجاوبها لوحدي",
+    "جربت ادور على الاجابة بس مقدرتش", "معلش هطول عليك شوية",
+    "دايمًا بترد عليا بسرعة وده حلو", "الوقت دلوقتي بالليل والجو بردان",
+    "قاعد في البيت لوحدي وفاضي", "يا رب تكون ردودك دايمًا في محلها",
+    "المهم خلاص كفاية كلام فاضي", "بص السؤال بقا",
+    "طيب ماشي هسألك حاجة تانية", "يعني بالبلدي كده",
+    "مش عايز اخرق عليك كتير", "على فكرة انا بحب الشات معاك قوي",
+    "صاحبي قال لي انك تساعد اي حد", "انا ثقة فيك عشان تعرف الاجابة",
+    "الكمبيوتر بتاعي بطيء شوية فسامحني لو اتاخرت", "خلاص هسيبك من الكلام الدوشة",
+    "وعلى فكرة اسمعني كويس", "تمام يلا بينا نبدأ",
+    "اول حاجة ازيك واتمنى تكون تمام", "ثاني حاجة عندي طلب صغير",
+    "احب اوضح نقطة قبل السؤال", "يا سشات خد وقتك بس جاوب صح",
+]
+EN_PREAMBLE = [
+    "hey seshat good evening", "hi how are you today", "i hope you are doing great",
+    "i am talking to you from home", "i had a long day at work today",
+    "i heard you are pretty smart", "your developer built you to help people",
+    "i searched everywhere and found nothing", "sorry for the long message",
+    "anyway enough small talk", "so here is my question for you",
+    "take your time but answer well", "i really like chatting with you",
+    "my friend told me you help anyone", "i trust you know the answer",
+    "my computer is slow so forgive me", "ok let us get to the point",
+    "first of all how are you doing", "second i have a small request",
+    "let me clear one thing before asking", "thanks in advance for helping",
+    "i will keep it short i promise", "listen to me carefully please",
+]
+
 
 def _typo(q, rng):
     idxs = [i for i, ch in enumerate(q) if ch.isalpha()]
@@ -363,6 +403,25 @@ def augment(q, intent, rng):
         q = q + " " + rng.choice(AR_SUF if ar else EN_SUF)
     if intent.typo and rng.random() < 0.12:
         q = _typo(q, rng)
+    # كلام زيادة حول السؤال — الحساب من غيره عشان فحص الناتج بيقرا أرقام السؤال.
+    # النسبة مضبوطة بالقياس: لما الكلام الزيادة يزيد عن كده تدرجاته بتغلب تدرجات
+    # الردود النضيفة والدقة بتنزل. الغلاف قبل السؤال بيوصل لحد ~٤٥٠ حرف —
+    # نفس الحد اللي المحرك بيقص عليه الرسالة الطويلة وقت الرد (آخر ٤٠٠ حرف)،
+    # فالتدريب بيغطي بالظبط اللي النموذج هيشوفه فعلاً.
+    if intent.cat != "math":
+        p = rng.random()
+        if p < 0.05:
+            n = rng.randint(2, 3)          # غلاف قصير ~ حروف ٦٠–١٥٠
+        elif p < 0.10:
+            n = rng.randint(5, 8)          # وسط ~ حروف ٢٠٠–٤٥٠
+        else:
+            n = 0
+        if n:
+            pool = AR_PREAMBLE if ar else EN_PREAMBLE
+            q = " ".join(rng.choice(pool) for _ in range(n)) + " " + q
+        elif rng.random() < 0.10:          # كلام زيادة بعد السؤال
+            pool = AR_PREAMBLE if ar else EN_PREAMBLE
+            q = q + " " + " ".join(rng.choice(pool) for _ in range(rng.randint(2, 4)))
     return q
 
 
@@ -457,10 +516,22 @@ class Dataset:
         model.eval()
         enc = [self.encode_pair(q, it, model.cfg.block_size) for q, it in pairs]
         order = sorted(range(len(enc)), key=lambda i: len(enc[i][0]))
+        # نفس فكرة batches(): بنقسم بحد أقصى للخلايا عشان مصفوفة الانتباه
+        # متمليش الرام لما السياق كبير (2048)
+        max_cells = 1_000_000
+        chunks, cur = [], []
+        for i in order:
+            T = len(enc[i][0])
+            if cur and (len(cur) >= batch_size or (len(cur) + 1) * T * T > max_cells):
+                chunks.append(cur)
+                cur = []
+            cur.append(i)
+        if cur:
+            chunks.append(cur)
         loss_sum, n_tok, exact = 0.0, 0, 0
         with torch.no_grad():
-            for s in range(0, len(order), batch_size):
-                X, Y = self._collate([enc[i] for i in order[s:s + batch_size]], device)
+            for chunk in chunks:
+                X, Y = self._collate([enc[i] for i in chunk], device)
                 logits, _ = model(X)
                 mask = Y != -1
                 lp = torch.log_softmax(logits, dim=-1)

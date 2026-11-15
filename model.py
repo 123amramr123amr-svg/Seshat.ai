@@ -24,7 +24,11 @@ PRESETS = {
 
 class Config:
     def __init__(self, **kw):
-        self.block_size = 512      # أقصى عدد حروف (سؤال + رد) النموذج يشوفها
+        # 2048 حرف = أكبر سياق ينفع يتدرب على جهاز بـ ٣ جيجا رام (مصفوفة الانتباه
+        # وقت التدريب بتاخد حوالي 24 بايت × عدد الرؤوس × الطبقات × الطول² —
+        # عند 2048 و16 رأس×طبقة ≈ 1.6 جيجا). النموذج القديم كان 512 واتوسّع
+        # بضرب جدول المواقع (توسيع دوره — شوف train_model.py).
+        self.block_size = 2048     # أقصى عدد حروف (سؤال + رد) النموذج يشوفها
         self.n_layer = 4
         self.n_head = 4
         self.n_embd = 128
@@ -178,7 +182,7 @@ class MiniGPT(nn.Module):
         return logits, loss
 
     @torch.no_grad()
-    def generate_stream(self, prompt_ids, max_new_tokens=600, temperature=0.0, top_k=10,
+    def generate_stream(self, prompt_ids, max_new_tokens=1200, temperature=0.0, top_k=10,
                         end_id=None, banned_ids=()):
         """
         بيولّد الرد حرف ورا حرف لحد توكن النهاية، وبيطلّع (التوكن، احتماله) أول بأول.

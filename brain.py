@@ -32,6 +32,8 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import requests
 
+from engine import extract_question
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 LEARNED_PATH = os.path.join(HERE, "data", "learned.json")
 CONFIG_PATH = os.path.join(HERE, "data", "config.local.json")
@@ -40,6 +42,7 @@ _UA = {"User-Agent":
        "seshat.chet/1.0 (https://github.com/123amramr123amr-svg/Seshat.ai)"}
 _NET_TIMEOUT = 12
 LEARNED_MAX = 4000
+LEARNED_Q_MAX = 1200      # أقصى طول للسؤال المتعلم (بيتبع سياق الإدخال الجديد)
 
 SOURCE_LABELS = {
     "memory": "ذاكرة",
@@ -271,7 +274,7 @@ class LearnedMemory:
 
     def add(self, question, answer, src="user"):
         from tokenizer import normalize_question
-        q = normalize_question(question)[:300]
+        q = normalize_question(question)[:LEARNED_Q_MAX]
         a = (answer or "").strip()
         if not q or not a:
             return False
@@ -296,9 +299,12 @@ class LearnedMemory:
         أقرب سؤال اتعلم: بالحرف، أو تشابه كبير (٦٢٪+) مع شرط إن الكلمات
         المهمة في سؤال المستخدم تكون موجودة في السؤال المتعلم — عشان
         "مين اكتشف امريكا" ما تختلطش مع "مين اكتشف بنزين".
+        ولو كل كلمات السؤال المتعلم موجودة في سؤال المستخدم، ده نفس السؤال
+        بكلام زيادة ("لعبة عمرو" جوه "لعبة عمرو المفضلة ايه") — بيتقبل حتى
+        لو التشابه النسبي قل لأن الرسالة أطول.
         """
         from tokenizer import normalize_question
-        q = normalize_question(message)
+        q = normalize_question(message)[:LEARNED_Q_MAX]
         if not q or not self.items:
             return None
         hit = self.exact.get(q)
@@ -310,15 +316,25 @@ class LearnedMemory:
             r = difflib.SequenceMatcher(None, q, it["q"]).ratio()
             if r > best_ratio:
                 best, best_ratio = it, r
-        if not best or best_ratio < 0.62:
+        if best is None:
             return None
         bs = _sig_words(best["q"])
+        # قاعدة الاحتواء: كل كلمات السؤال المتعلم (اتنين أو أكتر) موجودة
+        # في سؤال المستخدم → نفس السؤال
+        if bs and sig and len(bs) >= 2 and all(
+                any(difflib.SequenceMatcher(None, w, b).ratio() >= 0.8
+                    for b in sig) for w in bs):
+            return best
+        if best_ratio < 0.62:
+            return None
         if not bs or not sig:
             return best
         matched = sum(1 for w in sig
                       if any(difflib.SequenceMatcher(None, w, b).ratio() >= 0.8
                              for b in bs))
-        if matched / len(sig) >= 0.5:
+        # من غير التساوي: نص الكلمات بالظبط مش كفاية ("مين اكتشف بنزين" ما
+        # يتاخدش على إنه "مين اكتشف امريكا")
+        if matched / len(sig) > 0.5:
             return best
         return None
 
@@ -326,7 +342,7 @@ class LearnedMemory:
         """بيمسح سؤال اتعلم — بالحرف أو أقرب واحد شبهه كفاية (٧٥٪+ عشان
         ما يمسحش سؤال تاني بالغلط). بيرجع السؤال الممسوح أو None."""
         from tokenizer import normalize_question
-        q = normalize_question(message)
+        q = normalize_question(message)[:LEARNED_Q_MAX]
         if not q:
             return None
         if q in self.exact:
@@ -667,7 +683,7 @@ class Brain:
                 "suggestion": suggestion, "image": image,
                 "source_label": source_label}
 
-    def reply(self, message, temperature=0.0, max_new_tokens=600, **kw):
+    def reply(self, message, temperature=0.0, max_new_tokens=1200, **kw):
         t0 = time.time()
         out = self._reply(message, temperature=temperature,
                           max_new_tokens=max_new_tokens)
@@ -675,7 +691,7 @@ class Brain:
             out["seconds"] = round(time.time() - t0, 2)
         return out
 
-    def _reply(self, message, temperature=0.0, max_new_tokens=600, **kw):
+    def _reply(self, message, temperature=0.0, max_new_tokens=1200, **kw):
         t0 = time.time()
         msg = (message or "").strip()
         if not msg:
@@ -726,8 +742,11 @@ class Brain:
                 "مش لاقي «%s» في اللي اتعلمته — تأكد من السؤال وجرب تاني." % forget_q,
                 "learn", "تعلم جديد", fallback=True)
 
-        # 6) حاجة اتعلمتها بنفسي قبل كده
-        learned = self.learned.lookup(msg)
+        # 6) حاجة اتعلمتها بنفسي قبل كده — بنستخرج السؤال الأول، ولو مالقيناش
+        #    بجرب الرسالة كلها (الاحتواء بيلاقي السؤال جوه الكلام الزيادة)
+        learned = self.learned.lookup(extract_question(msg))
+        if not learned:
+            learned = self.learned.lookup(msg)
         if learned:
             return self._out(learned["a"], "learned", "ذاكرة التعلم",
                              thinking="من اللي اتعلمته: «%s»" % learned["q"])
