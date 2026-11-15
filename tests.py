@@ -159,10 +159,26 @@ check("جملة عادية: عام 1945 انتهت الحرب في 9 مايو",
       try_math("عام 1945 انتهت الحرب في 9 مايو") is None)
 
 d = try_draw("ارسم لي قطة بتنظر للقمر")
-check("رسم: بيطلع رابط pollinations من غير params",
-      d is not None and d["url"].startswith("https://image.pollinations.ai/prompt/")
-      and "?" not in d["url"], str(d))
-check("رسم: بيستخرج الوصف", d["prompt"] == "قطة بتنظر للقمر", str(d))
+check("صور: بيستخرج الوصف", d is not None and d["prompt"] == "قطة بتنظر للقمر" and d["strong"]
+      and not d["pixels"], str(d))
+check("صور: اعمل صورة / انشئ صورة / صورة لـ",
+      try_draw("اعمل صورة عربية حمرا على البحر")["prompt"] == "عربية حمرا على البحر"
+      and try_draw("انشئ صورة لمدينة في المستقبل")["prompt"] == "مدينة في المستقبل"
+      and try_draw("صورة للقطة")["prompt"] == "القطة"
+      and try_draw("اعمل صورة لمبة منورة")["prompt"] == "لمبة منورة")
+check("صور: إنجليزي", try_draw("please draw a castle on a hill")["prompt"] == "castle on a hill"
+      and try_draw("generate an image of a dragon")["prompt"] == "dragon")
+check("صور: «بالمربعات» = رسم seshat نفسه",
+      try_draw("ارسم بالمربعات قطة سودا وشمس") == {"prompt": "قطة سودا وشمس", "strong": True,
+                                                     "pixels": True})
+check("مش طلب صورة: كلام عن الرسم والصور", all(try_draw(m) is None for m in (
+    "بتعرف ترسم", "مين رسم الموناليزا", "ايه في الصورة دي", "الصورة حلوة", "الرسم فن جميل",
+    "بعتلك صورة امبارح", "drawing is fun")))
+from brain import parse_image_edit
+check("تعديل بالوصف", parse_image_edit("خليها بالليل") == ("edit", "خليها بالليل")
+      and parse_image_edit("add a hat") == ("edit", "add a hat")
+      and parse_image_edit("صورة تانية") == ("again", "")
+      and parse_image_edit("اسمك ايه") is None and parse_image_edit("خلاص شكرا") is None)
 check("مش رسم: يعني ايه رسم", try_draw("يعني ايه رسم") is None)
 
 tmp_dir = tempfile.mkdtemp()
@@ -188,15 +204,105 @@ r = b.reply("انت اهبل")
 check("المخ: الشتم بياخد رد مؤدب", r["source"] == "politeness" and "يسامحك" in r["response"])
 r = b.reply("7 × 8")
 check("المخ: الحساب مضمون", r["source"] == "math" and r["response"] == "7 × 8 = 56")
+# --- الصور الواقعية (imagegen.py) بخدمة وهمية: مفيش نت في الاختبارات ---
+from imagegen import ImageMaker, image_kind, add_style
+JPEG = b"\xff\xd8\xff\xe0" + b"0" * 64
+calls, clock = [], [1000.0]
+
+
+def fake_get(url, headers=None, timeout=60):
+    calls.append((url, headers or {}))
+    if "mymemory" in url:
+        return 200, {}, '{"responseData": {"translatedText": "A singing monkey"}}'.encode()
+    if "text.pollinations" in url:
+        if "Requested%20change" in url and "REWRITE" in url:
+            return 200, {}, b'"A singing monkey wearing a hat"'
+        return 500, {}, b""
+    if "REFUSE" in url:
+        return 403, {}, b"{}"
+    if "LIMIT" in url and not any("LIMIT" in u for u, _ in calls[:-1]):
+        return 402, {"Retry-After": "8"}, b'{"error": "FREE_LIMIT"}'
+    if "CARD" in url:
+        return 200, {}, b"<html>Free limit reached</html>"
+    return 200, {}, JPEG
+
+
+def fake_sleep(sec):
+    clock[0] += sec
+
+
+b.images = ImageMaker(store_dir=os.path.join(tmp_dir, "generated"), http_get=fake_get,
+                      sleep=fake_sleep, clock=lambda: clock[0])
 r = b.reply("ارسم قرد بيغني")
-check("المخ: الرسم الخارجي مقفول افتراضيًا (مفيش صورة من شركة تانية)",
-      r["source"] == "draw" and not r["image"] and r["fallback"], str(r))
-b.cfg.external_images = True
-r = b.reply("ارسم قرد بيغني")
-check("المخ: لو اتفتح، الصورة الخارجية مكتوب عليها إنها مش رسمه",
-      r["image"] and r["image"].startswith("https://image.pollinations.ai/prompt/")
-      and "pollinations" in r["response"] and r["source_label"] == "خدمة رسم خارجية", str(r))
+check("المخ: «ارسم» بيرجع صورة من عنوان السيرفر نفسه، والرد مفيهوش اسم خدمة",
+      r["source"] == "image" and r["image"] == "generated/%s.jpg" % r["image_id"]
+      and "قرد بيغني" in r["response"] and "pollinations" not in str(r).lower(), str(r))
+check("المخ: الرد بيرجع قبل ما الصورة تتولد (مفيش طلب للخدمة لسه)", calls == [])
+first = r["image_id"]
+path, err = b.images.ensure(first)
+meta = b.images.meta(first)
+check("الصورة اتولدت واتخزنت", err is None and open(path, "rb").read() == JPEG
+      and meta["state"] == "ready", str(err))
+check("الوصف العربي اتترجم إنجليزي قبل ما يتبعت، واتطلبت صورة واقعية",
+      meta["prompt_en"] == "A singing monkey, realistic photo, sharp focus, detailed"
+      and "A%20singing%20monkey" in calls[-1][0] and "seed=%d" % meta["seed"] in calls[-1][0],
+      str(meta))
+n = len(calls)
+b.images.ensure(first)
+check("الصورة الجاهزة مبتتولدش تاني", len(calls) == n)
+r = b.reply("خليه لابس قبعة", last_image=first)
+edited = b.images.meta(r["image_id"])
+check("تعديل بالوصف: صورة جديدة بنفس البذرة والوصف القديم + التعديل",
+      r["source"] == "image" and edited["seed"] == meta["seed"] and edited["parent"] == first
+      and edited["prompt"] == "قرد بيغني، خليه لابس قبعة" and "مش تعديل" in r["response"], str(r))
+before = clock[0]
+b.images.ensure(r["image_id"])
+check("من غير مفتاح: بيستنى 45 ثانية بين الصورتين بدل ما الخدمة ترفض", clock[0] - before >= 45)
+check("تعديل من غير نموذج نصوص: الوصف كله بيتترجم مع بعض",
+      b.images.meta(r["image_id"])["rewritten"] is False
+      and "mymemory" in calls[-2][0], str(calls[-2:]))
+r2 = b.reply("حط له قبعة REWRITE", last_image=first)
+b.images.ensure(r2["image_id"])
+check("تعديل بنموذج نصوص: وصف إنجليزي جديد بعد التعديل",
+      b.images.meta(r2["image_id"])["prompt_en"].startswith("A singing monkey wearing a hat")
+      and b.images.meta(r2["image_id"])["rewritten"] is True, str(b.images.meta(r2["image_id"])))
+r = b.reply("صورة تانية", last_image=first)
+again = b.images.meta(r["image_id"])
+check("صورة تانية: نفس الوصف وبذرة جديدة", again["prompt"] == "قرد بيغني"
+      and again["seed"] != meta["seed"], str(again))
+check("من غير صورة سابقة «خليه لابس قبعة» مش طلب صورة",
+      b.reply("خليه لابس قبعة")["source"] != "image")
+check("id غلط أو مسار ملفات: مرفوض", b.images.meta("../../etc/passwd") is None
+      and b.images.meta("zz") is None and b.images.ensure("0" * 16)[0] is None)
+limit = b.images.new("LIMIT cat")
+path, err = b.images.ensure(limit)
+check("الحد المجاني (402): بيستنى ويجرب تاني وينجح", path is not None, str(err))
+card = b.images.new("CARD cat")
+path, err = b.images.ensure(card)
+check("رد مش صورة (كارت الحد المجاني): مبيتعرضش وبيقول جرب تاني",
+      path is None and "Try again" in err and b.images.meta(card)["state"] == "pending", str(err))
+refused = b.images.new("REFUSE cat")
+path, err = b.images.ensure(refused)
+check("وصف مرفوض: رسالة واضحة", path is None and "refused" in err
+      and b.images.meta(refused)["state"] == "failed", str(err))
+check("نوع الملف من أول بايتات", image_kind(JPEG) == "jpeg" and image_kind(b"<html>") is None
+      and image_kind(b"\x89PNG\r\n\x1a\n....") == "png")
+check("الأسلوب: الوصف اللي فيه أسلوب بيفضل زي ما هو",
+      add_style("a cat, cartoon style") == "a cat, cartoon style")
+keyed = ImageMaker(store_dir=os.path.join(tmp_dir, "generated2"), key="sk_test", http_get=fake_get,
+                   sleep=fake_sleep, clock=lambda: clock[0])
+keyed.ensure(keyed.new("a red car"))
+check("بمفتاح: المفتاح في الهيدر مش في العنوان",
+      calls[-1][1].get("Authorization") == "Bearer sk_test" and "sk_test" not in calls[-1][0]
+      and calls[-1][0].startswith("https://gen.pollinations.ai/image/"), str(calls[-1]))
+r = b.reply("ارسم بالمربعات قرد بيغني")
+check("«ارسم بالمربعات»: رسم seshat نفسه مش صورة من المولّد",
+      r["source"] == "draw" and not r["image"], str(r))
 b.cfg.external_images = False
+r = b.reply("ارسم قرد بيغني")
+check("المولّد مقفول (SESHAT_EXTERNAL_IMAGES=0): مفيش صورة خارجية",
+      r["source"] == "draw" and not r["image"], str(r))
+b.cfg.external_images = True
 r = b.reply("علمني: س: ايه هواية عمرو ج: البرمجة")
 check("المخ: التعلم اليدوي", r["source"] == "learn")
 r = b.reply("ايه هواية عمرو")

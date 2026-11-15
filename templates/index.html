@@ -253,9 +253,11 @@
   #settings-status { color: var(--muted); font-size: 12.5px; }
   #settings-status b { color: var(--gold); }
   .genimg {
-    display: block; width: 100%; max-width: 340px;
+    display: block; width: 100%; max-width: 420px;
     border-radius: 12px; margin-top: 10px; border: 1px solid var(--line);
   }
+  .genwait { margin-top: 10px; color: var(--muted); font-size: 13.5px; }
+  .generr { margin: 10px 0 8px; }
 
   @media (max-width: 600px) {
     .tagline, .meta { display: none; }
@@ -345,18 +347,18 @@
   <div class="wrap" id="chat">
     <div class="welcome" id="welcome">
       <h1>أهلاً، أنا seshat</h1>
-      <p>بتكلم عربي وإنجليزي، بكتب أكواد، برسم بنفسي (قطة، بيت، عربية، شمس… بأي لون)، وبعدّل الصور اللي تبعتهالي. جرب واحدة من دول:</p>
+      <p>بتكلم عربي وإنجليزي، بكتب أكواد، بعمل صور من الوصف وبعدّلها، وبعدّل الصور اللي تبعتهالي. جرب واحدة من دول:</p>
       <div class="chips">
         <button class="chip">اسمك ايه</button>
         <button class="chip">مين طورك</button>
-        <button class="chip">ارسم قلب احمر</button>
-        <button class="chip">ارسم علم مصر</button>
+        <button class="chip">ارسم قطة بتبص للقمر</button>
+        <button class="chip">اعمل صورة عربية حمرا على البحر وقت الغروب</button>
         <button class="chip">اكتب كود بايثون يحسب المضروب</button>
         <button class="chip">مين بنى الهرم الاكبر</button>
         <button class="chip">يعني ايه book</button>
         <button class="chip">7 × 8</button>
         <button class="chip">عاصمة اليابان ايه</button>
-        <button class="chip">ارسم قطة سودا وشمس</button>
+        <button class="chip">ارسم بالمربعات قطة سودا وشمس</button>
         <button class="chip">مين اكتشف امريكا</button>
         <button class="chip">علمني: س: لعبة عمرو المفضلة ج: الشطرنج</button>
         <button class="chip">علمني: ايه عاصمة تشاد؟ هي ندجامنا</button>
@@ -507,19 +509,67 @@
     return bubble;
   }
 
-  // صورة متولدة بيتعرض جوه الفقاعة مع لينك للحجم الكامل
-  function appendImage(bubble, url) {
-    var a = el("a");
-    a.href = url; a.target = "_blank"; a.rel = "noopener";
-    var img = document.createElement("img");
-    img.className = "genimg";
-    img.alt = "صورة من seshat";
-    img.onload = toBottom;
-    img.onerror = function () { a.remove(); };
-    img.src = url;
-    a.appendChild(img);
-    bubble.appendChild(a);
-    toBottom();
+  // صورة متولدة. العنوان اللي بيبدأ بـ generated/ بتاع السيرفر نفسه: الصورة بتتولد لما نطلبها
+  // (ممكن تاخد لحد دقيقة)، ولما تجهز بتبقى هي الصورة الحالية عشان التعديل اللي بعده يتبني عليها.
+  function appendImage(bubble, url, data) {
+    if (url.indexOf("generated/") !== 0) {            // عنوان خارجي: عرض عادي
+      var link = el("a");
+      link.href = url; link.target = "_blank"; link.rel = "noopener";
+      var pic = document.createElement("img");
+      pic.className = "genimg"; pic.alt = "صورة من seshat";
+      pic.onload = toBottom;
+      pic.onerror = function () { link.remove(); };
+      pic.src = url;
+      link.appendChild(pic); bubble.appendChild(link); toBottom();
+      return;
+    }
+    var box = el("div", "genbox");
+    bubble.appendChild(box);
+    var english = !/[\u0600-\u06FF]/.test((data && data.response) || "");
+    function load() {
+      box.textContent = "";
+      var wait = el("div", "genwait", english ? "⏳ Making the image… this can take a minute or two."
+                                              : "⏳ بجهز الصورة… ممكن تاخد دقيقة أو اتنين.");
+      box.appendChild(wait);
+      toBottom();
+      fetch(url).then(function (r) {
+        if (r.ok) return r.blob().then(function (blob) { return { blob: blob }; });
+        return r.json().then(function (j) { return { error: j.error || "" }; },
+                             function () { return { error: "" }; });
+      }, function () { return { error: "" }; }).then(function (got) {
+        box.textContent = "";
+        if (!got.blob) {
+          bubble.classList.add("fallback");
+          box.appendChild(el("div", "generr", got.error ||
+            (english ? "The image did not arrive. Try again." : "الصورة موصلتش. جرب تاني.")));
+          var again = el("button", "chip", english ? "Try again" : "جرب تاني");
+          again.addEventListener("click", function () { bubble.classList.remove("fallback"); load(); });
+          box.appendChild(again);
+          toBottom();
+          return;
+        }
+        var src = URL.createObjectURL(got.blob);
+        var img = document.createElement("img");
+        img.className = "genimg"; img.alt = "صورة من seshat";
+        img.src = src;
+        box.appendChild(img);
+        var a = el("a", "save", english ? "Save image" : "حفظ الصورة");
+        a.href = src; a.download = "seshat-image.jpg";
+        box.appendChild(a);
+        loadImage(src).then(function (loaded) {
+          var ow = loaded.naturalWidth, oh = loaded.naturalHeight;
+          var px = grab(loaded, ow, oh, MAX_SIDE);
+          var preview = px.canvas.toDataURL("image/jpeg", 0.85);
+          var pixels = { w: px.w, h: px.h, data: px.data, ow: ow, oh: oh };
+          attached = { kind: "image", name: english ? "seshat image" : "صورة seshat", ow: ow, oh: oh,
+                       preview: preview, original: pixels, originalPreview: preview,
+                       current: pixels, fresh: false, generated: (data && data.image_id) || "" };
+          showAttachment();
+          toBottom();
+        }, function () {});
+      });
+    }
+    load();
   }
 
   // بيكتب الرد تدريجي عشان يبان إنه بيتولّد حرف حرف
@@ -589,7 +639,9 @@
     if (attached.kind === "image") {
       var img = el("img"); img.src = attached.preview; img.alt = "";
       thumb.appendChild(img);
-      note.textContent = attached.ow + " × " + attached.oh + " — اكتب عايز إيه، أو اختار من تحت";
+      note.textContent = attached.ow + " × " + attached.oh + (attached.generated
+        ? " — اكتب التعديل (خليها بالليل، ضيف قبعة، صورة تانية) أو اختار من تحت"
+        : " — اكتب عايز إيه، أو اختار من تحت");
       quick.classList.add("on");
     } else {
       var v = el("video"); v.src = attached.url; v.muted = true;
@@ -688,6 +740,7 @@
     var userBubble = addMessage("user", text || undefined);
     if (attached && attached.kind === "image") {
       body.image = attached.current;
+      if (attached.generated) body.image_id = attached.generated;   // صورة seshat ولّدها
       if (fresh) {
         var pic = el("img", "media"); pic.src = attached.preview; pic.alt = attached.name;
         userBubble.insertBefore(pic, userBubble.firstChild);
@@ -729,7 +782,7 @@
         typeOut(bubble, data.response, function () {
           if (think) bubble.insertBefore(think, bubble.firstChild);
           if (data.edited) showEdited(bubble, data);
-          if (data.image) appendImage(bubble, data.image);
+          if (data.image) appendImage(bubble, data.image, data);
           if (data.reset && attached && attached.kind === "image") {
             attached.current = attached.original;
             attached.preview = attached.originalPreview;

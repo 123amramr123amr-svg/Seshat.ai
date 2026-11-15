@@ -13,8 +13,8 @@ seshat.chet — المخ الجديد (brain.py)
      على طول. وكمان يقدر تعلمه بيدويًا بصيغتين:
          علمني: س: اللعبة المفضلة لعمرو ج: الشطرنج
          علمني: ايه اللعبة المفضلة لعمرو؟ الشطرنج   (صيغة مرنة: سؤال؟ جواب)
-  4. الرسم — "ارسم قطة سودا وشمس": النموذج المحلي بيرسم بنفسه (engine.draw). صور الخدمة
-     الخارجية مقفولة افتراضيًا (SESHAT_EXTERNAL_IMAGES=1 بيفتحها).
+  4. الصور — "ارسم قطة بتبص للقمر" → صورة واقعية من مولّد صور خارجي (imagegen.py)، وتعديلها
+     بالوصف. "ارسم بالمربعات …" → النموذج المحلي بيرسم بنفسه (engine.draw).
   5. مخ خارجي اختياري — لو ضفت مفتاح API متوافق مع OpenAI (زرار الإعدادات
      ⚙ في الواجهة أو متغيرات البيئة)، الردود بتشتغل بشبكة عصبية ضخمة بترد
      على أي سؤال في الدنيا — و seshat لسه بيحافظ على هويته (seshat من
@@ -65,8 +65,11 @@ class BrainConfig:
         self.api_base = os.environ.get("SESHAT_API_BASE", "https://api.openai.com/v1")
         self.api_model = os.environ.get("SESHAT_API_MODEL", "gpt-4o-mini")
         self.search_enabled = os.environ.get("SESHAT_SEARCH", "1") != "0"
-        # صور من خدمة خارجية للحاجات اللي seshat لسه مبيعرفش يرسمها (مقفولة افتراضيًا)
-        self.external_images = os.environ.get("SESHAT_EXTERNAL_IMAGES", "0") == "1"
+        # الصور الواقعية بتيجي من مولّد صور خارجي (شوف imagegen.py). SESHAT_EXTERNAL_IMAGES=0
+        # بيقفله، وساعتها "ارسم" بيرجع لرسم seshat بالمربعات بس.
+        self.external_images = os.environ.get("SESHAT_EXTERNAL_IMAGES", "1") != "0"
+        # مفتاح مجاني من خدمة الصور: بيشيل اللوجو وحد الـ 45 ثانية (اختياري)
+        self.image_key = os.environ.get("SESHAT_IMAGE_KEY", "").strip()
         self.reload()
 
     def reload(self):
@@ -487,43 +490,90 @@ def try_math(message):
 
 
 # ============================================================
-# طلب الرسم: استخراج الوصف (+ رابط الخدمة الخارجية الاختيارية pollinations.ai، مقفولة افتراضيًا)
+# طلب الصور: استخراج الوصف، ومعرفة هل المطلوب صورة واقعية ولا رسم seshat بالمربعات
 # ============================================================
-_DRAW_RE = re.compile(
-    r"\b(ارسم|ارسمي|ارسمها?|ارسملي|ارسم\s*لي|اعمل\s*صوره|انشئ\s*صوره|"
-    r"اصنع\s*صوره|صوره\s*(لـ|ل)\s*|لوحه\s*(لـ|ل)\s*|رسمه\s*(لـ|ل)\s*|"
-    r"ديزاين\s*(لـ|ل)\s*|draw|draw\s+me|generate\s+(an?\s+)?(image|picture|photo|art)|"
-    r"create\s+(an?\s+)?(image|picture|photo)|image\s+of|picture\s+of|"
-    r"photo\s+of)", re.I)
+# "صورة لقطة" = صورة + لـ + قطة: اللام بتتشال، إلا لو الكلمة نفسها بتبدأ بلام (لمبة، ليمون…)
+_L_OF = (r"(?:\s+ل(?!مب|يمون|عب|بن|وح|يل|حم|ؤلؤ|اعب|ون|سان|هب|ندن|بنان|يبيا|اب|عوب|ص|غز|حظ|قاء)"
+         r"(?=[\u0621-\u064A]{3}))?")
+_NOUN = r"(?:صور[ةه]|لوح[ةه]|رسم[ةه])"
+# الأفعال الصريحة: المطلوب صورة جديدة حتى لو فيه صورة مرفوعة
+_DRAW_VERBS = (
+    r"(?:ارسم(?:ي|ها|ه|لي|ولي|\s+لي)?|[تن]رسم(?:لي|ي|\s+لي)?)(?![\w\u0600-\u06FF])|"
+    r"(?:[اأإ]نش[ئيى]|انشاء|إنشاء|ول[ّ]?د|صمم|اصنع)(?:لي|\s+لي)?\s+" + _NOUN
+    + r"(?![\w\u0600-\u06FF])" + _L_OF + r"|"
+    r"(?:draw(?:\s+me)?|imagine|"
+    r"(?:generate|create|make)(?:\s+me)?\s+(?:an?\s+)?(?:image|picture|photo|art|drawing)(?:\s+of)?)"
+    r"(?![\w\u0600-\u06FF])")
+# صيغ ممكن تكون طلب صورة جديدة أو كلام عن صورة مرفوعة ("اعمل صورة أبيض وأسود")
+_DRAW_SOFT = (
+    r"(?:اعمل|اعملي|هات|هاتلي|عايز|عاوز|عايزه|عاوزه|محتاج|اريد|أريد|ابغى|أبغى)(?:لي|\s+لي)?\s+"
+    + _NOUN + r"(?![\w\u0600-\u06FF])" + _L_OF + r"|"
+    r"(?:" + _NOUN + r"|ديزاين)\s+(?:لـ\s*|ل(?!مب|يمون|عب|بن|وح|يل|حم|ؤلؤ|اعب|ون|سان|هب|ندن|بنان|يبيا|اب|عوب|ص|غز|حظ|قاء)"
+    r"(?=[\u0621-\u064A]{3}))|"
+    r"(?:image|picture|photo)\s+of(?![\w\u0600-\u06FF])")
+_DRAW_RE = re.compile(r"(?<![\w\u0600-\u06FF])(?:(?P<strong>" + _DRAW_VERBS + r")|" + _DRAW_SOFT
+                      + r")", re.I)
+_LL = re.compile(r"(" + _NOUN + r")\s+لل(?=[\u0621-\u064A]{2})")      # "صورة للقطة" → "صورة لالقطة"
 
 _FILLERS = re.compile(
-    r"^\s*(لي|لانا|من\s*فضلك|please|me|a|an|the|صورة|صوره|رسمة|رسمه|"
-    r"لوحة|لوحه|لـ)\s+", re.I)
+    r"^\s*(لي|لانا|ليا|من\s*فضلك|لو\s*سمحت|ممكن|please|me|a|an|the|of|صورة|صوره|رسمة|رسمه|"
+    r"لوحة|لوحه|لـ|عن)\s+", re.I)
 
+# طلب صريح لرسم seshat نفسه بالمربعات
+_PIXEL_RE = re.compile(
+    r"(بالمربعات|مربعات|بكسل|بيكسل|بنفسك|ب[اإ]يدك|رسمتك\s+انت|pixel|in\s+pixels|by\s+yourself|"
+    r"yourself)", re.I)
 
-_DRAW_STYLES = ("digital art", "oil painting", "watercolor", "photorealistic",
-                "cartoon style", "fantasy art", "anime style", "3d render")
+# تعديل بالوصف على آخر صورة اتولدت: "خليها بالليل"، "ضيف قبعة"، "make it night"
+_EDIT_DESC_RE = re.compile(
+    r"^\s*(?:ممكن\s+|لو\s+سمحت\s+|please\s+|can\s+you\s+|could\s+you\s+)?"
+    r"(خل[يى]\S*|غي[ّ]?ر\S*|بد[ّ]?ل\S*|عد[ّ]?ل\S*|ضيف\S*|[اأ]ضف\S*|زو[ّ]?د\S*|حط\S*|شيل\S*|"
+    r"احذف\S*|امسح\S*|لو[ّ]?ن\S*|اجعل\S*|make|change|turn|add|put|remove|replace|give)"
+    r"(?![\w\u0600-\u06FF])", re.I)
+# صورة تانية لنفس الوصف
+_AGAIN_RE = re.compile(
+    r"^\s*(?:(?:عايز|عاوز|هات|اعمل|ولد|ارسم)\S*\s+)?(?:(?:صور[ةه]|واحد[ةه])\s+(?:تاني[ةه]|كمان|غيرها)|"
+    r"كمان\s+(?:صور[ةه]|واحد[ةه])|غيرها|جرب\s+تاني|تاني|another(?:\s+one)?|one\s+more|again|"
+    r"try\s+again)\s*[.!؟?]*\s*$", re.I)
 
 
 def try_draw(message):
+    """
+    طلب صورة؟ بيرجع {"prompt": الوصف، "strong": فعل رسم صريح، "pixels": رسم seshat بالمربعات}
+    أو None.
+    """
+    message = _LL.sub(r"\1 لال", message)
     m = _DRAW_RE.search(message)
     if not m:
         return None
-    prompt = _DRAW_RE.sub(" ", message)
+    prompt = message[m.end():]                 # الوصف = اللي بعد فعل الطلب
+    pixels = bool(_PIXEL_RE.search(prompt))
+    prompt = _PIXEL_RE.sub(" ", prompt)
     prompt = re.sub(r"\s+", " ", prompt).strip()
-    for _ in range(3):
+    for _ in range(4):
         new = _FILLERS.sub("", prompt)
         if new == prompt:
             break
         prompt = new.strip()
-    prompt = prompt.strip("؟?،,. -–—")
+    prompt = re.sub(r"\s+(please|من\s*فضلك|لو\s*سمحت)\s*[.!؟?]*$", "", prompt, flags=re.I)
+    prompt = prompt.strip("؟?،,. -–—:")
     if len(prompt) < 2:
-        prompt = "seshat golden egyptian art"
-    # أسلوب عشوائي عشان نفس الرسمة كل مرة تطلع مختلفة
-    style = random.choice(_DRAW_STYLES)
-    # مفيش query params — الخدمة المجانية بتضربها بـ 402، والـ prompt لوحده هو الرابط
-    url = "https://image.pollinations.ai/prompt/" + quote(prompt[:220] + ", " + style)
-    return {"prompt": prompt, "url": url}
+        return None
+    return {"prompt": prompt, "strong": bool(m.group("strong")), "pixels": pixels}
+
+
+def parse_image_edit(message):
+    """
+    كلام عن آخر صورة اتولدت؟ بيرجع ("edit", نص التعديل) أو ("again", "") أو None.
+    """
+    msg = (message or "").strip()
+    if not msg or len(msg) > 300:
+        return None
+    if _AGAIN_RE.match(msg):
+        return "again", ""
+    if _EDIT_DESC_RE.match(msg):
+        return "edit", msg.strip(" .!؟?")
+    return None
 
 
 # ============================================================
@@ -765,6 +815,12 @@ class Brain:
         self.engine = engine            # ممكن يكون None في وضع المحلي الخالص
         self.cfg = BrainConfig()
         self.learned = LearnedMemory()
+        from imagegen import ImageMaker
+        self.images = ImageMaker(key=self.cfg.image_key, llm=self._llm_translate)
+
+    def _llm_translate(self, ask):
+        """ترجمة وصف الصورة بالمخ الخارجي لو متربط (غير كده imagegen بيستخدم طرق تانية)"""
+        return llm_answer(ask, self.cfg) if self.cfg.api_key else None
 
     def status(self):
         return {"search": self.cfg.search_enabled, "api": bool(self.cfg.api_key),
@@ -774,8 +830,8 @@ class Brain:
 
     def _out(self, response, source, source_label="", thinking="",
              confidence=1.0, fallback=False, matched="", suggestion="",
-             image=None):
-        return {"response": response, "thinking": thinking,
+             image=None, image_id=None):
+        return {"response": response, "thinking": thinking, "image_id": image_id,
                 "confidence": round(float(confidence), 3), "seconds": 0.0,
                 "fallback": fallback, "source": source, "matched": matched,
                 "suggestion": suggestion, "image": image,
@@ -793,7 +849,7 @@ class Brain:
     def reply(self, message, temperature=0.0, max_new_tokens=2000, **kw):
         t0 = time.time()
         out = self._reply(message, temperature=temperature,
-                          max_new_tokens=max_new_tokens)
+                          max_new_tokens=max_new_tokens, last_image=kw.get("last_image"))
         if not out.get("seconds"):
             out["seconds"] = round(time.time() - t0, 2)
         return out
@@ -819,33 +875,52 @@ class Brain:
         if math:
             return self._out(math, "math", "حساب", thinking="حسبتها بنفسي بدقة")
 
-        # 4) رسم صورة: seshat بيرسم بنفسه (النموذج بيكتب الرسمة مربع مربع والمحرك بيراجعها).
-        #    الصور اللي من خدمة خارجية (pollinations.ai) مقفولة افتراضيًا: دي مش رسمه،
-        #    وبتطلع ساعات حاجة غير المطلوب. تتفتح بـ SESHAT_EXTERNAL_IMAGES=1 وبتتكتب عليها
-        #    إنها من خدمة خارجية.
+        # 4) الصور.
+        #    • "ارسم / اعمل صورة …" → صورة واقعية من مولّد الصور (imagegen.py). الرد بيرجع
+        #      فورًا والصورة بتتولد لما المتصفح يطلبها من /generated/<id>.jpg.
+        #    • "ارسم بالمربعات …" أو المولّد مقفول → رسم seshat نفسه (النموذج المحلي).
+        #    • فيه صورة اتولدت قبل كده (last_image) والكلام تعديل عليها ("خليها بالليل") أو
+        #      "صورة تانية" → صورة جديدة مبنية على وصف القديمة.
+        arabic = _is_arabic_text(msg)
         draw = try_draw(msg)
-        if draw:
+        last = self.images.meta(kw.get("last_image")) if kw.get("last_image") else None
+        if draw and (draw["pixels"] or not self.cfg.external_images):
             own = self._own_drawing(msg, temperature, max_new_tokens)
-            arabic = _is_arabic_text(msg)
-            external = self.cfg.external_images
-            if own and not own.get("fallback"):
-                return self._out(own["response"], "draw", "رسم seshat",
-                                 thinking=own.get("thinking", ""),
-                                 confidence=own.get("confidence", 1.0))
-            if external:
-                note = ("الصورة دي مش رسمي أنا — دي من خدمة خارجية (pollinations.ai) عن «%s»، "
-                        "وممكن تطلع مش زي الوصف بالظبط." if arabic else
-                        "This image is not my own drawing. It comes from an external service "
-                        "(pollinations.ai) for “%s” and may not match the description exactly.")
-                return self._out(note % draw["prompt"], "draw", "خدمة رسم خارجية",
-                                 thinking="طلب رسم لحاجة مش من اللي اتعلمت أرسمه → خدمة خارجية",
-                                 image=draw["url"], confidence=0.5)
             if own:
                 return self._out(own["response"], "draw", "رسم seshat",
-                                 thinking=own.get("thinking", ""), fallback=True, confidence=0.0)
+                                 thinking=own.get("thinking", ""),
+                                 fallback=bool(own.get("fallback")),
+                                 confidence=own.get("confidence", 1.0))
             return self._out("الرسم محتاج النموذج المحلي، وهو مش شغال دلوقتي." if arabic else
                              "Drawing needs the local model, which is not loaded right now.",
                              "draw", "رسم seshat", fallback=True)
+        if draw:
+            image_id = self.images.new(draw["prompt"])
+            return self._out(("بجهزلك صورة «%s»." if arabic else "Making an image of “%s”.")
+                             % draw["prompt"], "image", "صور",
+                             thinking=("طلب صورة: " if arabic else "image request: ") + draw["prompt"],
+                             image="generated/%s.jpg" % image_id, image_id=image_id, confidence=0.9)
+        if last and self.cfg.external_images:
+            change = parse_image_edit(msg)
+            if change and change[0] == "again":
+                image_id = self.images.new("", parent=last["id"])
+                return self._out(("صورة تانية لـ «%s»." if arabic else "Another image of “%s”.")
+                                 % last["prompt"], "image", "صور",
+                                 thinking="صورة تانية لنفس الوصف" if arabic
+                                 else "another image for the same description",
+                                 image="generated/%s.jpg" % image_id, image_id=image_id,
+                                 confidence=0.9)
+            if change:
+                image_id = self.images.new("", parent=last["id"], edit=change[1])
+                text = ("بعمل صورة جديدة بالوصف: «%s».\n(ده توليد من الأول بنفس البذرة مش تعديل "
+                        "على نفس البكسلات، فممكن تفاصيل تانية تتغير.)" if arabic else
+                        "Making a new image from: “%s”.\n(This regenerates the picture with the "
+                        "same seed; it does not edit the same pixels, so other details may change.)")
+                return self._out(text % self.images.meta(image_id)["prompt"], "image", "صور",
+                                 thinking=("تعديل بالوصف على آخر صورة: " if arabic
+                                           else "edit by description on the last image: ") + change[1],
+                                 image="generated/%s.jpg" % image_id, image_id=image_id,
+                                 confidence=0.8)
 
         # 5) تعليم يدوي: علمني: س: … ج: …
         teach = parse_teach(msg)

@@ -17,7 +17,7 @@ import threading
 import time
 from collections import deque
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_file
 
 import vision
 from engine import Seshat, drawings, _trim_memory
@@ -90,6 +90,25 @@ def index():
     return render_template("index.html", palette=drawings.PALETTE, grid=drawings.N)
 
 
+@app.route("/generated/<name>")
+def generated_image(name):
+    """
+    الصورة المتولدة. بتتولد أول مرة حد يطلبها (ممكن تاخد لحد دقيقة أو اتنين لو فيه دور)،
+    وبعد كده بتتبعت من الملف المتخزن. لو فشلت → JSON فيه رسالة للمستخدم.
+    الطلبات بتتسجل من /chat بس، فالعنوان ده ميقدرش يولّد حاجة من عنده.
+    """
+    image_id = name[:-4] if name.endswith(".jpg") else ""
+    if brain.images.meta(image_id) is None:
+        return jsonify({"error": "الصورة دي مش موجودة."}), 404
+    path, error = brain.images.ensure(image_id)
+    if path is None:
+        return jsonify({"error": error}), 503
+    kind = (brain.images.meta(image_id) or {}).get("kind", "jpeg")
+    response = send_file(path, mimetype="image/" + kind, max_age=3600)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 @app.route("/models")
 def models_route():
     """List only model versions that have a registered runtime."""
@@ -152,6 +171,16 @@ def chat():
     image, video = data.get("image"), data.get("video")
     t0 = time.time()
 
+    last_image = data.get("image_id") if isinstance(data.get("image_id"), str) else None
+    if isinstance(image, dict) and not isinstance(video, dict) and msg \
+            and os.environ.get("SESHAT_LOCAL_ONLY", "0") != "1":
+        # فيه صورة مرفوعة والكلام طلب صورة جديدة ("ارسم قطة") → مش تعديل على المرفوعة.
+        # الصيغ المحتملة ("اعمل صورة أبيض وأسود") بتفضل تعديل لو فيها تعديل معروف.
+        from brain import try_draw
+        wanted = try_draw(msg)
+        if wanted and (wanted["strong"] or not vision.find_edits(msg)[0]):
+            image = None
+
     if isinstance(video, dict) or isinstance(image, dict):
         try:
             out = None
@@ -189,7 +218,7 @@ def chat():
         temperature = 0.0
     try:
         if os.environ.get("SESHAT_LOCAL_ONLY", "0") != "1":
-            out = brain.reply(msg, temperature=temperature)
+            out = brain.reply(msg, temperature=temperature, last_image=last_image)
         else:
             out = seshat.reply(msg, temperature=temperature)
     except Exception:
@@ -197,7 +226,8 @@ def chat():
         return jsonify({"response": "حصلت مشكلة جوه السيرفر. جرب تاني بعد شوية.",
                         "thinking": "", "confidence": 0.0, "seconds": 0, "fallback": True,
                         "source": "none", "matched": "", "suggestion": ""}), 500
-    if isinstance(image, dict) and out.get("source") == "none" and not out.get("suggestion"):
+    if isinstance(image, dict) and not last_image and out.get("source") == "none" \
+            and not out.get("suggestion"):
         out["response"] = vision.help_text(vision.is_arabic(msg))
     return jsonify(out)
 
