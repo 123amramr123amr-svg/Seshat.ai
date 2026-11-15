@@ -432,14 +432,38 @@ def parse_teach(message):
 _MATH_ONE = re.compile(
     r"^\D*?(-?\d+(?:[.,]\d+)?)\s*([+\-*x×÷/])\s*(-?\d+(?:[.,]\d+)?)\D*$")
 
+# الحساب بالكلمات العربي: «احسب 17 في 24» / «15 على 3» / «8 زائد 2» / «10 ناقص 4»
+# الشرط: المسألة رقم + كلمة العملية + رقم من غير كلام كتير حواليها،
+# عشان «في» العادي في الجمل (زي «في 2024 حصلت حاجة») ما تتحسبش غلط.
+_MATH_WORDS = re.compile(
+    r"^\s*\D*?(-?\d+(?:[.,]\d+)?)\s*"
+    r"(مضروب\s*في|تقسيم\s*على|مقسوم\s*على|زائد|ناقص|ضرب|في|على)\s*"
+    r"(-?\d+(?:[.,]\d+)?)\s*\D*$")
+_MATH_WORD_SYM = {"مضروب في": "×", "تقسيم على": "÷", "مقسوم على": "÷",
+                  "ضرب": "×", "في": "×", "زائد": "+", "ناقص": "-", "على": "÷"}
+
+
+def _math_word_sym(sym):
+    """بتوحّد المسافات جوه كلمة العملية (مضروب  في → مضروب في)."""
+    return " ".join(sym.split())
+
 
 def try_math(message):
     m = _MATH_ONE.search(message)
-    if not m:
+    if m:
+        a, sym, b = m.group(1), m.group(2), m.group(3)
+    elif len(message.split()) <= 6:
+        mw = _MATH_WORDS.search(message)
+        if not mw:
+            return None
+        sym = _MATH_WORD_SYM.get(_math_word_sym(mw.group(2)))
+        if not sym:
+            return None
+        a, b = mw.group(1), mw.group(3)
+    else:
         return None
-    a = m.group(1).replace(",", ".")
-    b = m.group(3).replace(",", ".")
-    sym = m.group(2)
+    a = a.replace(",", ".")
+    b = b.replace(",", ".")
     try:
         x, y = float(a), float(b)
     except ValueError:
@@ -844,14 +868,16 @@ class Brain:
                 "مش لاقي «%s» في اللي اتعلمته — تأكد من السؤال وجرب تاني." % forget_q,
                 "learn", "تعلم جديد", fallback=True)
 
-        # 6) حاجة اتعلمتها بنفسي قبل كده — بنستخرج السؤال الأول، ولو مالقيناش
-        #    بجرب الرسالة كلها (الاحتواء بيلاقي السؤال جوه الكلام الزيادة)
+        # 6) حاجة اتعلمتها بنفسي قبل كده — تعليم المستخدم وردود المخ الخارجي
+        #    أولوية على كل حاجة، لكن أجوبة الويب المتخزنة ما بتغطيش على النموذج:
+        #    بتتفعل بس لو النموذج والبحث الحي ما جابوش حاجة (شوف خطوة 9.5)
         learned = self.learned.lookup(extract_question(msg))
         if not learned:
             learned = self.learned.lookup(msg)
-        if learned:
+        if learned and learned.get("src") in ("user", "llm"):
             return self._out(learned["a"], "learned", "ذاكرة التعلم",
                              thinking="من اللي اتعلمته: «%s»" % learned["q"])
+        web_cached = learned if learned and learned.get("src") == "web" else None
 
         # 7) النموذج المحلي: الهوية والأكواد وكل اللي اتعلمه — لو واثق ممنقلش
         local = None
@@ -897,6 +923,13 @@ class Brain:
                     think = understood.get("thinking", "") + " — " + think
                 return self._out(web["text"], "web", "بحث ويب",
                                  thinking=think, confidence=0.9)
+
+        # 9.5) جواب ويب متخزن من جلسة قبل — بيتفعل هنا بس، بعد ما النموذج
+        #      والبحث الحي ما جابوش حاجة، عشان ما يغطيش على معرفة النموذج المتدربة
+        if web_cached:
+            return self._out(web_cached["a"], "learned", "ذاكرة بحث سابقة",
+                             thinking="من بحث سابق: «%s»" % web_cached["q"],
+                             confidence=0.75)
 
         # 10) البحث مجابش حاجة. لو السؤال قريب من سؤال يعرفه → يرد بيه ويقول إنه افترض كده.
         sug = (local or {}).get("suggestion") or ""
