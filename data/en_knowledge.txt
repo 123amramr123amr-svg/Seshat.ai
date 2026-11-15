@@ -321,3 +321,19 @@ a: William Shakespeare wrote Romeo and Juliet around 1595.
 
 q: smallest country in the world
 a: Vatican City is the smallest country in the world, with an area of about 0.44 square kilometers.
+
+# ---------- Round 14 knowledge (8-hour cycle) ----------
+q: how many continents are there
+a: There are 7 continents: Asia, Africa, North America, South America, Antarctica, Europe, and Australia.
+
+q: largest country by area
+a: Russia is the largest country by area, about 17 million square kilometers.
+
+q: who invented the airplane
+a: Orville and Wilbur Wright made the first controlled airplane flight in 1903.
+
+q: longest river in Africa
+a: The Nile is the longest river in Africa and the world, about 6,650 kilometers long.
+
+q: smallest bone in the human body
+a: The stapes in the middle ear is the smallest bone in the human body, about 3 millimeters.
