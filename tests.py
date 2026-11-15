@@ -176,7 +176,14 @@ check("المخ: الشتم بياخد رد مؤدب", r["source"] == "politenes
 r = b.reply("7 × 8")
 check("المخ: الحساب مضمون", r["source"] == "math" and r["response"] == "7 × 8 = 56")
 r = b.reply("ارسم قرد بيغني")
-check("المخ: الرسم بيرجع صورة", r["source"] == "draw" and r["image"] and r["image"].startswith("https://image.pollinations.ai/prompt/"))
+check("المخ: الرسم الخارجي مقفول افتراضيًا (مفيش صورة من شركة تانية)",
+      r["source"] == "draw" and not r["image"] and r["fallback"], str(r))
+b.cfg.external_images = True
+r = b.reply("ارسم قرد بيغني")
+check("المخ: لو اتفتح، الصورة الخارجية مكتوب عليها إنها مش رسمه",
+      r["image"] and r["image"].startswith("https://image.pollinations.ai/prompt/")
+      and "pollinations" in r["response"] and r["source_label"] == "خدمة رسم خارجية", str(r))
+b.cfg.external_images = False
 r = b.reply("علمني: س: ايه هواية عمرو ج: البرمجة")
 check("المخ: التعلم اليدوي", r["source"] == "learn")
 r = b.reply("ايه هواية عمرو")
@@ -228,10 +235,37 @@ import numpy as np
 import vision
 
 rows = drawings.grid_for("heart", "R")
-check("شبكة الرسمة 12 × 12", len(rows) == 12 and all(len(x) == 12 for x in rows))
-check("parse_grid بيقرا البلوك", drawings.parse_grid("دي رسمة:\n" + drawings.block(rows)) == rows)
-check("parse_grid بيرفض رسمة ناقصة", drawings.parse_grid("```draw\nRR\n```") is None)
-check("what_was_asked", drawings.what_was_asked("ارسم قلب احمر") == ("heart", "R"))
+check("شبكة الرسمة 16 × 16", len(rows) == 16 and all(len(x) == 16 for x in rows))
+text = drawings.answer("cat", "K")
+check("الرسمة المكتوبة بتتفك لنفس الشبكة", drawings.parse_grid(text) == drawings.grid_for("cat", "K"))
+check("الرسمة المكتوبة أقصر من الشبكة (أقل من 60% من حروفها)",
+      len(drawings.encode(drawings.design("cat"), "K")) < 0.6 * 16 * 17)
+check("كل الرسومات بتتكتب وتتفك صح", all(
+    drawings.parse_grid(drawings.answer(k, c)) == drawings.grid_for(k, c)
+    for k, c in drawings.combos() + drawings.combos(True)))
+check("اللون الأساسي بيتغير من أول سطر بس",
+      drawings.encode(drawings.design("car"), "R").split("\n")[1:]
+      == drawings.encode(drawings.design("car"), "B").split("\n")[1:])
+check("عين القطة السودا بتبان (لون مختلف عن الجسم)", "W" in "".join(drawings.grid_for("cat", "K")))
+check("رسمة بايظة بتترفض", drawings.decode("```draw\n#=R\na3R\n```") is None
+      and drawings.decode("```draw\na16.\n```") is None)
+skipped = text.replace("\nc=", "", 1)
+check("سطر متكتبش: الباقي بيفضل في مكانه", drawings.parse_grid(skipped) is None
+      and drawings.parse_grid_loose(skipped)[0][3:] == drawings.grid_for("cat", "K")[3:])
+ragged = text.replace("5.6#5.", "5.6#4.", 1)
+check("القراية الصارمة بترفض سطر ناقص والمتسامحة بتكمله",
+      drawings.parse_grid(ragged) is None and drawings.parse_grid_loose(ragged)[1] == 1)
+check("فهم الطلب: رسمة ولون", drawings.what_was_asked("ارسم قلب احمر") == ("heart", "R"))
+check("فهم الطلب: كذا رسمة", drawings.find_objects("ارسم قطه سودا وشمس وعربيه زرقا")
+      == [("cat", "K"), ("sun", None), ("car", "B")])
+check("فهم الطلب: إنجليزي", drawings.find_objects("draw a black cat and a red car")
+      == [("cat", "K"), ("car", "R")])
+check("فهم الطلب: حاجة مش معروفة", drawings.find_objects("ارسم ديناصور") == [])
+check("مفيش تركيبة اختبار في التدريب", not set(drawings.combos()) & set(drawings.combos(True)))
+two = drawings.read_full(drawings.full_block([drawings.grid_for("cat"), drawings.grid_for("sun")]))
+check("رسمتين جنب بعض", len(two) == 16 and all(len(x) == 33 for x in two))
+r = seshat.draw("ارسم ديناصور")
+check("حاجة ماتعلمهاش: بيقول بيعرف يرسم إيه", r["fallback"] and "قطه" in r["response"], str(r))
 px = np.zeros((40, 60, 4), dtype=np.uint8)
 px[..., 3] = 255
 px[:20, :, :3] = (40, 110, 230)

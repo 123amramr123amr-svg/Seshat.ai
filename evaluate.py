@@ -97,37 +97,64 @@ def run_paraphrase(seshat, show):
         print()
 
 
-def run_draw(seshat, show):
+def run_draw(seshat, show, limit=0):
     """
-    الرسم بيتقاس من الطريق الكامل (reply): النموذج بيكتب الشبكة والمحرك بيراجعها.
-    "جديدة" = تركيبة شكل + لون متشالة من التدريب (drawings.HELD_OUT): النموذج شاف الشكل
-    بألوان تانية وشاف اللون على أشكال تانية، بس عمره ما شاف الاتنين مع بعض.
+    الرسم بيتقاس من الطريق الكامل (reply): النموذج بيكتب الرسمة والمحرك بيراجعها.
+      • اتدرب عليها: (رسمة، لون) موجودين في التدريب.
+      • تركيبات جديدة: (رسمة، لون) متشالين من التدريب (drawings.HELD_OUT) — النموذج شاف
+        الرسمة بألوان تانية وشاف اللون على رسومات تانية، بس عمره ما شاف الاتنين مع بعض.
+      • مشاهد: رسمتين مع بعض في طلب واحد (عمره ما اتدرب على طلب فيه رسمتين).
+    "مطابقة" = كل مربع في مكانه. "اتعرضت" = الغلط مش أكتر من DRAW_MAX_WRONG مربع.
     """
-    from engine import drawings
-    groups = {"اتدرب عليها": drawings.build(False), "تركيبات جديدة": drawings.build(True)}
+    from engine import drawings, DRAW_MAX_WRONG
+    rng = random.Random(11)
+    cells = drawings.N * drawings.N
     t0 = time.time()
-    for name, items in groups.items():
-        n = exact = shown = wrong_shown = cells = 0
-        for questions, answer in items:
-            want = drawings.parse_grid(answer)
-            for q in (questions[0], questions[len(questions) // 2]):
-                r = seshat.reply(q)
-                got = drawings.parse_grid(r["response"]) if not r["fallback"] else None
-                n += 1
-                same = got == want
-                exact += same
-                shown += got is not None
-                wrong_shown += got is not None and not same
+
+    def score(name, tests):
+        n = exact = shown = wrong = 0
+        for q, want in tests:
+            r = seshat.reply(q)
+            got = drawings.read_full(r["response"]) if not r["fallback"] else None
+            n += 1
+            if got is not None:
+                shown += 1
+                bad = sum(a != b for x, y in zip(got, want) for a, b in zip(x, y))
+                bad += abs(len(got) - len(want)) * len(want[0])
+                wrong += bad
+                exact += bad == 0
+            if show and (got is None or got != want):
+                print(f"  ✗ {q!r} → " + ("اترفضت" if got is None else "اتعرضت وفيها غلط"))
                 if got is not None:
-                    cells += sum(a == b for x, y in zip(got, want) for a, b in zip(x, y))
-                if show and not same:
-                    print(f"  ✗ {q!r} → " + ("اترفضت" if got is None else "اتعرضت غلط"))
-                    if got is not None:
-                        print("\n".join("      " + a + "   " + b for a, b in zip(got, want)))
-        total = drawings.N * drawings.N
-        print(f"  {name:<14} مطابقة بالمربع {exact}/{n} = {exact / n * 100:.1f}% | "
-              f"اتعرضت {shown} | اتعرضت وفيها غلط {wrong_shown} | "
-              f"مربعات صح في المعروض {cells / max(1, shown * total) * 100:.1f}%")
+                    print("\n".join("      " + a + "   " + b for a, b in zip(got, want)))
+        right = 100 - wrong / max(1, shown * len(tests[0][1]) * len(tests[0][1][0])) * 100
+        print(f"  {name:<16} مطابقة بالمربع {exact}/{n} = {exact / n * 100:.1f}% | "
+              f"اتعرضت {shown}/{n} = {shown / n * 100:.1f}% | مربعات صح في المعروض {right:.1f}%")
+
+    for name, held in (("اتدرب عليها", False), ("تركيبات جديدة", True)):
+        tests = []
+        for key, code in drawings.combos(held):
+            ar_qs, en_qs = drawings._questions(key, code)
+            want = drawings.grid_for(key, code)
+            tests += [(rng.choice(ar_qs), want), (rng.choice(en_qs), want)]
+        if limit and len(tests) > limit:
+            tests = rng.sample(tests, limit)
+        score(name, tests)
+
+    keys = list(drawings.OBJECTS)
+    scenes = []
+    for _ in range(min(limit or 40, 40)):
+        (k1, k2) = rng.sample(keys, 2)
+        c1, c2 = (rng.choice(drawings.COLORS)[0] if k not in drawings.FIXED_COLOR
+                  else drawings.OBJECTS[k][6] for k in (k1, k2))
+        arabic = rng.random() < 0.6
+        t1, t2 = drawings.title(k1, c1, arabic), drawings.title(k2, c2, arabic)
+        q = f"ارسم {t1} و{t2}" if arabic else f"draw a {t1} and a {t2}"
+        want = drawings.read_full(drawings.full_block([drawings.grid_for(k1, c1),
+                                                       drawings.grid_for(k2, c2)]))
+        scenes.append((q, want))
+    score("مشاهد (رسمتين)", scenes)
+    print(f"  (الرسمة = {cells} مربع، وبتتعرض لو الغلط ≤ {DRAW_MAX_WRONG})")
     print(f"الوقت: {time.time() - t0:.0f} ثانية")
 
 
@@ -232,7 +259,7 @@ def main():
     elif args.paraphrase:
         run_paraphrase(seshat, args.show)
     elif args.draw:
-        run_draw(seshat, args.show)
+        run_draw(seshat, args.show, args.limit)
     elif args.understand:
         run_understand(seshat, args.limit, args.show)
     else:
