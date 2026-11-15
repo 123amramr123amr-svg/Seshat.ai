@@ -4,14 +4,39 @@
 
 ## النماذج
 
-| النموذج | الوصف | الرابط |
+| النموذج | الوصف | المجلد |
 |---------|-------|--------|
-| **seshat 1.0** | نموذج محادثة (1.3M معامل) | هذا المستودع |
-| **خوفو** | نموذج توليد صور (1.96M معامل) | [Khufu](https://github.com/123amramr123amr-svg/Khufu) |
-| **نواة-1** | البنية التحتية المتقدمة | [Nawah-1](https://github.com/123amramr123amr-svg/Nawah-1) |
+| **seshat 1.0** | نموذج محادثة (1.3M معامل) | المجلد الرئيسي |
+| **خوفو** | نموذج توليد صور (1.96M معامل) | `khufu/` |
+| **نواة-1** | البنية التحتية المتقدمة | `nawah/` |
 
 - اسم المنصة: **seshat.chet**
 - المطوّر: **عمرو أحمد** (Amr Ahmed)
+
+## بنية المستودع
+
+```
+Seshat.ai/
+├── seshat 1.0 (المجلد الرئيسي)
+│   ├── app.py              # Flask web app
+│   ├── brain.py            # منطق المحادثة
+│   ├── engine.py           # النموذج المحلي
+│   └── ...
+├── khufu/                  # نموذج توليد الصور
+│   ├── app.py              # Flask web app
+│   ├── generate.py         # توليد من الكوماند لاين
+│   ├── khufu_model.py      # نموذج Diffusion
+│   ├── train_khufu.py     # كود التدريب
+│   └── data/               # البيانات والنماذج المدرّبة
+├── nawah/                  # البنية التحتية المتقدمة
+│   ├── token_analyzer.py   # تحليل الكلمات
+│   ├── attention.py        # نظام الانتباه
+│   ├── concepts.py         # استخراج المفاهيم
+│   ├── novelty.py          # قياس الأصالة
+│   ├── database.py         # قاعدة بيانات SQLite
+│   └── pipeline.py         # خط الاستنتاج الرئيسي
+└── README.md               # هذا الملف
+```
 
 البنية الأساسية مبنية بالكامل من الصفر — من غير أي نموذج جاهز: الـ Attention والـ LayerNorm
 والـ Transformer والـ Tokenizer والتوليد كلهم مكتوبين بالإيد. التدريب بـ PyTorch، والتشغيل بـ NumPy بس.
@@ -85,7 +110,7 @@ python train_model.py --size tiny --block-size 1024 --steps 1500 --out seshat_ct
 | بحث النت | ويكيبيديا (مع فلتر لكيان النتيجة تكون عن الموضوع فعلًا) و DuckDuckGo | لأ |
 | **نواة-1** | البنية التحتية المتقدمة: تحليل الكلمات، الانتباه الذاتي، استخراج المفاهيم، قياس الأصالة | لأ |
 
-### نواة-1: البنية التحتية المتقدمة (`../nawah/`)
+### نواة-1: البنية التحتية المتقدمة (`nawah/`)
 
 **نواة-1** هو محرك ذكاء اصطناعي متقدم مبني من الصفر لفهم الأسئلة العربية وتوليد ردود ذكية ومبتكرة.
 
@@ -274,7 +299,7 @@ SESHAT_LOCAL_ONLY=1 python app.py    # النموذج المحلي لوحده �
 (image.pollinations.ai). السيرفر هو اللي بيكلم الخدمة وبيخزن الصورة ويعرضها من عنوانه
 (`/generated/<id>.jpg`) — المتصفح مبيكلمش الخدمة، والرد في الشات مفيهوش اسمها.
 
-### خوفو: نموذج توليد الصور المحلي (`../khufu/`)
+### خوفو: نموذج توليد الصور المحلي (`khufu/`)
 
 **خوفو** هو نموذج توليد صور محلي مبني من الصفر (Diffusion Model) — بيولّد الصور من نفسه، من غير أي خدمة خارجية.
 
@@ -289,11 +314,11 @@ SESHAT_LOCAL_ONLY=1 python app.py    # النموذج المحلي لوحده �
 
 | قطة | شمس | هرم | عربية |
 |-----|-----|-----|-------|
-| ![قطة](../khufu/data/generated/readme_cat.png) | ![شمس](../khufu/data/generated/readme_sun.png) | ![هرم](../khufu/data/generated/readme_pyramid.png) | ![عربية](../khufu/data/generated/readme_car.png) |
+| ![قطة](khufu/data/generated/readme_cat.png) | ![شمس](khufu/data/generated/readme_sun.png) | ![هرم](khufu/data/generated/readme_pyramid.png) | ![عربية](khufu/data/generated/readme_car.png) |
 
 **التشغيل:**
 ```bash
-cd ../khufu
+cd khufu
 python3 generate.py --subject "ارسم قطة" --size 64 --steps 50 --out cat.png
 ```
 

@@ -27,7 +27,7 @@ from models import list_models
 # ---------------- خوفو (نموذج الصور) ----------------
 import sys
 import uuid
-KHUFU_DIR = os.path.join(os.path.dirname(__file__), "..", "khufu")
+KHUFU_DIR = os.path.join(os.path.dirname(__file__), "khufu")
 if os.path.exists(KHUFU_DIR):
     sys.path.insert(0, KHUFU_DIR)
     try:

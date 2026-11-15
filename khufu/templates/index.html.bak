@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>خوفو — مولّد الصور</title>
+<style>
+  :root { --bg:#0f1115; --card:#171b22; --line:#262c38; --txt:#e8ecf1; --mut:#9aa4b2; --acc:#e8b64c; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: system-ui, "Segoe UI", Tahoma, Arial, sans-serif; background:var(--bg); color:var(--txt); }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 28px; margin: 8px 0 2px; }
+  .sub { color: var(--mut); margin: 0 0 14px; font-size: 14px; }
+  .card { background: var(--card); border:1px solid var(--line); border-radius: 14px; padding: 16px; margin: 14px 0; }
+  .status { font-size: 13px; color: var(--mut); }
+  .status b { color: var(--acc); }
+  label { display:block; font-size:13px; color:var(--mut); margin: 12px 0 6px; }
+  input[type=text], input[type=number] { width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line); background:#0d1015; color:var(--txt); font-size:16px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+  .chip { padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:#0d1015; color:var(--txt); cursor:pointer; font-size:14px; }
+  .chip.on { border-color: var(--acc); color: var(--acc); }
+  .seg { display:flex; gap:8px; flex-wrap:wrap; }
+  .seg button { padding:9px 14px; border-radius:10px; border:1px solid var(--line); background:#0d1015; color:var(--txt); cursor:pointer; font-size:14px; }
+  .seg button.on { border-color: var(--acc); color: var(--acc); }
+  .hint { font-size:12px; color:var(--mut); margin-top:4px; }
+  #genBtn { margin-top:16px; width:100%; padding:13px; font-size:17px; border:none; border-radius:12px; background:var(--acc); color:#1a1405; font-weight:700; cursor:pointer; }
+  #genBtn:disabled { opacity:.5; cursor:wait; }
+  .err { color:#ff8a8a; font-size:14px; margin-top:10px; min-height:18px; }
+  .gallery { display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:14px; margin-top:8px; }
+  .item { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .item img { width:100%; display:block; background:#000; }
+  .item .cap { padding:8px 10px; font-size:12px; color:var(--mut); display:flex; justify-content:space-between; gap:8px; }
+  .item a { color:var(--acc); text-decoration:none; }
+  .wait { padding: 30px; text-align:center; color:var(--mut); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>خوفو <span style="color:var(--mut); font-size:15px;">khufu-1.0</span></h1>
+  <p class="sub">نموذج بيولّد الصور من نفسه — من غير أي خدمة خارجية. اكتب الحاجة، حدّد الأبعاد والجودة، وخوفو يرسمها.</p>
+
+  <div class="card status" id="statusLine">بيحمّل حالة التدريب…</div>
+
+  <div class="card">
+    <label for="subjectText">اكتب اللي عايز ترسمه (مثال: ارسم قطة)</label>
+    <input type="text" id="subjectText" placeholder="ارسم قطة…">
+    <label>أو اختار من القائمة</label>
+    <div class="chips" id="chips"></div>
+
+    <label>أبعاد الصورة (الدقة)</label>
+    <div class="seg" id="sizeSeg">
+      <button data-v="32">32×32</button>
+      <button data-v="64" class="on">64×64</button>
+      <button data-v="96">96×96</button>
+      <button data-v="128">128×128</button>
+    </div>
+    <div class="hint">64 هو حجم التدريب الأصلي — أكبر من كده أبطأ والنتائج أطرى.</div>
+
+    <label>جودة التوليد (عدد الخطوات)</label>
+    <div class="seg" id="stepsSeg">
+      <button data-v="20">20 — سريعة</button>
+      <button data-v="50" class="on">50 — متوازنة</button>
+      <button data-v="100">100 — عالية</button>
+    </div>
+    <div class="hint">خطوات أكتر = تفاصيل أدق، بس أبطأ.</div>
+
+    <label for="seedInput">البذرة (اختياري — نفس البذرة = نفس الصورة)</label>
+    <input type="number" id="seedInput" placeholder="عشوائي">
+
+    <button id="genBtn">ولّد الصورة</button>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="card">
+    <label>الصور المتولدة</label>
+    <div class="gallery" id="gallery"><div class="wait">لسه مفيش صور — ولّد أول صورة.</div></div>
+  </div>
+
+  <p class="sub">خوفو بيتعلم من مشاهد مرسومة برمجيًا (شمس، عربية، قطة، هرم…) وبيولّدها من أوزانه هو. مش صور واقعية — والجودة بتتحسن كل ما التدريب يطول.</p>
+</div>
+
+<script>
+const EMOJI = {sun:"☀️",moon:"🌙",star:"⭐",cloud:"☁️",bird:"🐦",tree:"🌳",palm:"🌴",house:"🏠",car:"🚗",cat:"🐱",dog:"🐶",horse:"🐴",camel:"🐫",pyramid:"🔺",mountain:"⛰️",sea:"🌊",boat:"⛵",fish:"🐟",flower:"🌸"};
+let size = 64, steps = 50, picked = null;
+
+async function loadStatus() {
+  try {
+    const st = await (await fetch("/status")).json();
+    const line = document.getElementById("statusLine");
+    if (st.ready) {
+      line.innerHTML = "التدريب: خطوة <b>" + (st.step||0).toLocaleString("en") + "</b>" +
+        (st.loss != null ? " — الخسارة <b>" + Number(st.loss).toFixed(4) + "</b>" : "") +
+        (st.elapsed_min ? " — " + st.elapsed_min + " دقيقة" : "");
+    } else {
+      line.textContent = "خوفو لسه بيتدرب — التوليد هيتفتح بعد أول حفظ للنموذج.";
+    }
+    const chips = document.getElementById("chips");
+    chips.innerHTML = "";
+    (st.classes || []).forEach(c => {
+      const b = document.createElement("button");
+      b.className = "chip"; b.textContent = (EMOJI[c.id] || "") + " " + c.ar;
+      b.onclick = () => { picked = c.id; document.getElementById("subjectText").value = c.ar;
+        chips.querySelectorAll(".chip").forEach(x => x.classList.remove("on")); b.classList.add("on"); };
+      chips.appendChild(b);
+    });
+  } catch (e) { /* ignore */ }
+}
+
+function seg(id, fn) {
+  const el = document.getElementById(id);
+  el.querySelectorAll("button").forEach(b => b.onclick = () => {
+    el.querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on"); fn(parseInt(b.dataset.v, 10));
+  });
+}
+seg("sizeSeg", v => size = v);
+seg("stepsSeg", v => steps = v);
+
+const gallery = document.getElementById("gallery");
+const errBox = document.getElementById("err");
+const genBtn = document.getElementById("genBtn");
+
+function addCard(url, cap) {
+  if (gallery.querySelector(".wait")) gallery.innerHTML = "";
+  const div = document.createElement("div"); div.className = "item";
+  div.innerHTML = '<img src="' + url + '" alt=""><div class="cap"><span>' + cap + '</span><a href="' + url + '" download>تحميل</a></div>';
+  gallery.prepend(div);
+}
+
+async function poll(id, cap) {
+  for (;;) {
+    const r = await fetch("/generated/" + id + ".png");
+    if (r.status === 200) { addCard("/generated/" + id + ".png", cap); return; }
+    if (r.status === 202) { await new Promise(s => setTimeout(s, 2000)); continue; }
+    const j = await r.json().catch(() => ({}));
+    throw new Error(j.error || "حصل خطأ");
+  }
+}
+
+genBtn.onclick = async () => {
+  errBox.textContent = "";
+  const subject = document.getElementById("subjectText").value.trim() || picked || "";
+  const seed = document.getElementById("seedInput").value.trim();
+  if (!subject) { errBox.textContent = "اكتب الحاجة الأول (مثال: قطة)"; return; }
+  genBtn.disabled = true; genBtn.textContent = "بيولّد…";
+  try {
+    const r = await fetch("/generate", { method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ subject, size, steps, seed: seed === "" ? null : parseInt(seed, 10) }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "حصل خطأ");
+    await poll(j.id, subject + " • " + size + "×" + size + " • " + steps + " خطوة" + (seed !== "" ? " • seed " + seed : ""));
+  } catch (e) { errBox.textContent = e.message; }
+  genBtn.disabled = false; genBtn.textContent = "ولّد الصورة";
+};
+
+loadStatus();
+setInterval(loadStatus, 30000);
+</script>
+</body>
+</html>

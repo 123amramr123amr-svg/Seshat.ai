@@ -14,7 +14,7 @@ import sys
 import os
 
 # Add nawah to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'nawah'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'nawah'))
 
 from pipeline import NawahPipeline, run_inference, InferenceResult
 from database import get_db, KnowledgeCorpus
