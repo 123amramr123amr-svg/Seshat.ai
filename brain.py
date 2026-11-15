@@ -429,14 +429,38 @@ def parse_teach(message):
 _MATH_ONE = re.compile(
     r"^\D*?(-?\d+(?:[.,]\d+)?)\s*([+\-*x×÷/])\s*(-?\d+(?:[.,]\d+)?)\D*$")
 
+# الحساب بالكلمات العربي: «احسب 17 في 24» / «15 على 3» / «8 زائد 2» / «10 ناقص 4»
+# الشرط: المسألة رقم + كلمة العملية + رقم من غير كلام كتير حواليها،
+# عشان «في» العادي في الجمل (زي «في 2024 حصلت حاجة») ما تتحسبش غلط.
+_MATH_WORDS = re.compile(
+    r"^\s*\D*?(-?\d+(?:[.,]\d+)?)\s*"
+    r"(مضروب\s*في|تقسيم\s*على|مقسوم\s*على|زائد|ناقص|ضرب|في|على)\s*"
+    r"(-?\d+(?:[.,]\d+)?)\s*\D*$")
+_MATH_WORD_SYM = {"مضروب في": "×", "تقسيم على": "÷", "مقسوم على": "÷",
+                  "ضرب": "×", "في": "×", "زائد": "+", "ناقص": "-", "على": "÷"}
+
+
+def _math_word_sym(sym):
+    """بتوحّد المسافات جوه كلمة العملية (مضروب  في → مضروب في)."""
+    return " ".join(sym.split())
+
 
 def try_math(message):
     m = _MATH_ONE.search(message)
-    if not m:
+    if m:
+        a, sym, b = m.group(1), m.group(2), m.group(3)
+    elif len(message.split()) <= 6:
+        mw = _MATH_WORDS.search(message)
+        if not mw:
+            return None
+        sym = _MATH_WORD_SYM.get(_math_word_sym(mw.group(2)))
+        if not sym:
+            return None
+        a, b = mw.group(1), mw.group(3)
+    else:
         return None
-    a = m.group(1).replace(",", ".")
-    b = m.group(3).replace(",", ".")
-    sym = m.group(2)
+    a = a.replace(",", ".")
+    b = b.replace(",", ".")
     try:
         x, y = float(a), float(b)
     except ValueError:
