@@ -38,7 +38,7 @@ def parse_args():
                    help="الرام المتاحة للتدريب تقريبًا (بتحدد حجم باتشات الأكواد الطويلة)")
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--dropout", type=float, default=0.05)
-    p.add_argument("--block-size", type=int, default=2048)
+    p.add_argument("--block-size", type=int, default=4096)
     p.add_argument("--eval-every", type=int, default=250)
     p.add_argument("--threads", type=int, default=0, help="عدد أنوية الـ CPU (0 = تلقائي)")
     p.add_argument("--resume", action="store_true", help="يكمل من الملف المحفوظ")
@@ -89,7 +89,7 @@ def main():
                      seed=args.seed + ckpt["step"])
         cfg = Config(**ckpt["config"])
         # السياق: بناخد الأكبر بين إعداد الملف والإعداد اللي المستخدم طربه —
-        # يعني resume عادي بعد كده بيكبر السياق تلقائيًا لـ 2048 (جدول المواقع
+        # يعني resume عادي بعد كده بيكبر السياق تلقائيًا لـ 4096 (جدول المواقع
         # بيتوسّع بتكرار الصفوف، شوف تحت). لو عايز تثبّت السياق القديم:
         # --block-size بنفس رقم الملف.
         cfg.block_size = max(cfg.block_size, args.block_size)

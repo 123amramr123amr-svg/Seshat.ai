@@ -8,7 +8,7 @@
 إعدادات النشر:
     SESHAT_ADMIN_TOKEN=<long-random-secret>  # مطلوب لتعديل /config
     SESHAT_CHAT_RATE_LIMIT=30                # طلبًا لكل IP خلال 60 ثانية
-    SESHAT_MAX_MESSAGE_CHARS=4000
+    SESHAT_MAX_MESSAGE_CHARS=8000            # أقصى طول للرسالة (السياق الاتسع)
 """
 
 import hmac
@@ -143,9 +143,9 @@ def chat():
         return jsonify({"error": "يجب أن تكون الرسالة نصًا."}), 400
     msg = raw_msg.strip()
     try:
-        max_chars = max(100, min(20000, int(os.environ.get("SESHAT_MAX_MESSAGE_CHARS", "4000"))))
+        max_chars = max(100, min(20000, int(os.environ.get("SESHAT_MAX_MESSAGE_CHARS", "8000"))))
     except ValueError:
-        max_chars = 4000
+        max_chars = 8000
     if len(msg) > max_chars:
         return jsonify({"error": f"الرسالة أطول من الحد المسموح ({max_chars} حرف)."}), 413
 

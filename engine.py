@@ -38,6 +38,11 @@ import understanding                               # noqa: E402  (فهم نوع 
 CONFIDENCE_THRESHOLD = 0.93
 CONFIDENCE_HEAD = 12
 
+# أقصى طول للجزء اللي بيوصل للنموذج من الرسالة الطويلة (آخر جزء منها) —
+# بتتبع السياق الاتسع: 4096 // 4 مع حد 1000 حرف، والتدريب بيغطي نفس الحد
+# بالأغلفة الطويلة في dataset.py.
+INPUT_CAP = 1000
+
 
 def _trim_memory():
     """بيرجّع للنظام الرام اللي اتستخدمت مؤقتًا في بناء الذاكرة (لينكس بس)"""
@@ -96,7 +101,7 @@ DRAW_HELP_EN = ("I can only draw simple shapes so far: circle, ring, square, rec
 #     مباشرة، وكلمات السؤال اللي بتيجي جوه السؤال (ايه/مين/كام/who…)
 #     بناخد شوية كلام قبلها عشان ما نتقطعش من أوله.
 #  2. مفيش كلمة سؤال → بناخد آخر جملة (تقسيم على السطور والترقيم) أو آخر
-#     400 حرف. الرسايل القصيرة بتتحول زي ما هي.
+#     1000 حرف (INPUT_CAP). الرسايل القصيرة بتتحول زي ما هي.
 _Q_STARTERS = {"عايز", "عاوز", "ممكن", "اكتب", "اكتبلي", "اعمللي", "قوللي", "قولى",
                "علمني", "احسب", "طب",
                "write", "give", "tell", "translate", "define", "print", "calculate", "how"}
@@ -123,18 +128,18 @@ def extract_question(message):
             start = message.rfind(" ", 0, max(0, last.start() - 12))
             seg = message[start + 1:] if start > 0 else message
         seg = seg.strip()
-        if len(seg) > 400:
-            seg = seg[-400:]
+        if len(seg) > INPUT_CAP:
+            seg = seg[-INPUT_CAP:]
         if len(seg) >= 8:                     # الجزء المنستخرج معقول؟
             return seg
-    # مفيش كلمة سؤال → آخر جملة (أو آخر 400 حرف لو مفيش تقسيم واضح)
+    # مفيش كلمة سؤال → آخر جملة (أو آخر 1000 حرف لو مفيش تقسيم واضح)
     parts = [p.strip() for p in re.split(r"[\n]+|[،؛,.!]+", message) if p.strip()]
     if len(parts) > 1:
         tail = parts[-1]
         if len(tail.split()) < 3 and len(parts) >= 2:
             tail = parts[-2] + " " + tail
-        return tail[-400:]
-    return message[-400:]
+        return tail[-INPUT_CAP:]
+    return message[-INPUT_CAP:]
 
 # سطر التفكير اللي النموذج بيكتبه لما يحس إن السؤال برّه اللي اتعلمه
 UNKNOWN_AR = "مش معروف | سؤال برّه اللي اتعلمته"
@@ -270,15 +275,16 @@ class BaseSeshat:
     def _max_input_chars(self):
         """أقصى طول للسؤال اللي بيدخل النموذج فعلاً — آخر جزء من الرسالة.
         الناس بيكتبوا الرسالة الطويلة والسؤال في آخرها، فبناخد الآخر مش الأول.
-        الحد متظبط مع التدريب: الأمثلة بأغلفة الكلام الزيادة بتوصل لحد ~٤٥٠ حرف.
-        (الرسالة كاملة بتتقرا في ذاكرة الأسئلة والمخ — الحد ده للنموذج بس،
-        والرد ليه غرفة كبيرة: block_size ناقص البرومبت)."""
-        return max(120, min(400, self.config["block_size"] // 4))
+        الحد متظبط مع التدريب: الأمثلة بأغلفة الكلام الزيادة بتوصل لحد ~١٠٠٠ حرف
+        (شوف الأغلفة الطويلة في dataset.py). (الرسالة كاملة بتتقرا في ذاكرة
+        الأسئلة والمخ — الحد ده للنموذج بس، والرد ليه غرفة كبيرة:
+        block_size ناقص البرومبت)."""
+        return max(120, min(INPUT_CAP, self.config["block_size"] // 4))
 
     # ------------------------------------------------------------
     # الرد = الذاكرة (أقرب سؤال) + النموذج (الفهم والحساب)
     # ------------------------------------------------------------
-    def reply(self, message, temperature=0.0, max_new_tokens=1000, use_fallback=True,
+    def reply(self, message, temperature=0.0, max_new_tokens=2000, use_fallback=True,
               use_memory=True):
         """
         بيرجع dict فيه: response, thinking, confidence, seconds, fallback, source, matched,
@@ -315,7 +321,7 @@ class BaseSeshat:
         # آخر جزء من الرسالة كلها — عشان السؤال ما يضيعش لو الاستخراج قصه
         best_q = question
         known, unknown_score = memory.lookup(question)
-        tail_full = normalize_question(message)[-400:]
+        tail_full = normalize_question(message)[-INPUT_CAP:]
         if tail_full and tail_full != question:
             known2, unknown2 = memory.lookup(tail_full)
             s1 = known.score if known else unknown_score
