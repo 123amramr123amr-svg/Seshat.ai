@@ -257,6 +257,23 @@ def parse_grid(text):
     return rows
 
 
+def parse_grid_loose(text):
+    """
+    زي parse_grid بس بيسامح في عدّ الخانات: النموذج بيقرا حروف ومبيعدّش كويس، فساعات السطر
+    بيطلع 11 أو 13 خانة بدل 12. هنا السطر الناقص بيتكمّل بخانات فاضية من اليمين والزايد
+    بيتقص من اليمين — من غير ما نغيّر أي خانة النموذج كتبها. بيرجع (الصفوف، عدد الصفوف اللي
+    اتظبط طولها) أو None لو الرسمة بايظة (عدد صفوف غلط، رمز غريب، أو سطر طوله بعيد عن 12).
+    """
+    if "```draw" not in text:
+        return None
+    body = text.split("```draw", 1)[1].split("```", 1)[0].strip("\n")
+    rows = body.split("\n")
+    if len(rows) != N or any(abs(len(r) - N) > 2 or set(r) - set(PALETTE) for r in rows):
+        return None
+    fixed = sum(len(r) != N for r in rows)
+    return [(r + "." * N)[:N] for r in rows], fixed
+
+
 def what_was_asked(question):
     """
     بيدوّر في الجملة على شكل ولون معروفين. بيرجع (الشكل أو None، رمز اللون أو None).

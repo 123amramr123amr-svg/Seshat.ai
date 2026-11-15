@@ -392,6 +392,27 @@ def detect(question):
     كشف بالقواعد (من غير النموذج): بيطابق السؤال المتنضف مع القوالب.
     بيرجع (النوع، الموضوع) أو None. المحرك بيستخدمه لما النموذج ميطلعش فهم سليم.
     """
+    plain = _plain(question)                   # من غير "ممكن / لو سمحت / اكتبلي → اكتب"
+    found = _detect(plain) if plain != question else None
+    return found or _detect(question)
+
+
+_LEAD = re.compile(r"^(ممكن|لو سمحت|من فضلك|معلش|طيب|عايزك|عاوزك|محتاجك|نفسي|ياريت|"
+                   r"please|can you|could you|would you|i want you to|hey)\s+")
+_TAIL = re.compile(r"\s+(لو سمحت|من فضلك|بليز|يا seshat|يا صاحبي|please|thanks)$")
+_VERB_ME = re.compile(r"^(اكتب|الف|احكي|قول|اشرح|كلم|عرف|اعمل)(لي|لى|ني)\s+")
+
+
+def _plain(question):
+    q = question
+    for _ in range(2):
+        q = _TAIL.sub("", _LEAD.sub("", q))
+    q = re.sub(r"^ت(كتب|حكي|شرح|كلم|عمل)(لي|لى|ني)?\s+", lambda m: "ا" + m.group(1) + " ", q)
+    q = _VERB_ME.sub(lambda m: m.group(1) + " ", q)
+    return q.replace("اكتب ليا ", "اكتب ").replace(" for me ", " ").strip()
+
+
+def _detect(question):
     for kind, _, _, rx in _DETECT:
         m = rx.match(question)
         if m:

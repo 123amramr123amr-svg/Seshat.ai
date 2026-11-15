@@ -719,7 +719,7 @@ class Brain:
             if drawings.what_was_asked(normalize_question(msg))[0] is None:
                 return None
             out = self.engine.reply(msg, temperature=temperature, max_new_tokens=max_new_tokens)
-            if out.get("fallback") or drawings.parse_grid(out.get("response", "")) is None:
+            if out.get("fallback") or drawings.parse_grid_loose(out.get("response", "")) is None:
                 return None
             return out
         except Exception:

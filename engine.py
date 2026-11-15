@@ -76,7 +76,7 @@ UNKNOWN_MARGIN = 0.15     # لو السؤال أقرب بكتير لموضوع �
 MATH_LABEL = "حساب"       # نوع السؤال في سطر التفكير لما يكون مسألة حساب
 DRAW_LABELS = ("رسم |", "drawing |")      # سطر التفكير لما يكون المطلوب رسمة
 DRAW_WORDS = ("ارسم", "ارسملي", "ارسمي", "draw")
-DRAW_MAX_WRONG = 3        # أقصى عدد مربعات غلط (من 144) عشان الرسمة تتعرض
+DRAW_MAX_WRONG = 20       # أقصى عدد مربعات غلط (من 144) عشان الرسمة تتعرض — وبنقول العدد
 DRAW_HELP_AR = ("لسه بعرف أرسم أشكال بسيطة بس: دايرة، حلقة، مربع، مستطيل، مثلث، معيّن، علامة زائد، "
                 "قلب، سهم، خط — بأي لون (أحمر، أخضر، أزرق، أصفر، برتقالي، بنفسجي، أسود، بمبي) — "
                 "وكمان: شمس، شجرة، بيت، علم مصر، وش مبتسم، هرم. جرب: ارسم قلب أحمر.")
@@ -287,16 +287,21 @@ class BaseSeshat:
                 suggestion = known.intent.canonical
             kind, topic, by = None, "", ""
             got = understanding.parse_think(model["thinking"]) if model else None
-            if got and (not got[1] or f" {got[1]} " in f" {question} "):
-                kind, topic, by = got[0], got[1], "model"
+            if got and got[1] and f" {got[1]} " not in f" {question} ":
+                got = None                     # الموضوع اللي كتبه مش موجود في السؤال → مرفوض
+            found = understanding.detect(question)
             fixed = (near_unknown is not None and near_unknown.intent.kind
                      and not near_unknown.intent.topic)       # شبه سؤال من نوع ملوش موضوع
+            # النموذج لسه بيغلط في النوع أكتر من القوالب (القياس في README)، فلو السؤال
+            # طابق قالب صريح والنموذج قال حاجة تانية → القالب هو اللي بيمشي.
+            if got and (found is None or tuple(got[:2]) == tuple(found)) \
+                    and not (found is None and fixed and near_unknown.score >= 0.72
+                             and got[0] != near_unknown.intent.kind):
+                kind, topic, by = got[0], got[1], "model"
             if kind is None and fixed and near_unknown.score >= 0.72:
                 kind, by = near_unknown.intent.kind, "memory"
-            if kind is None:
-                found = understanding.detect(question)
-                if found:
-                    kind, topic, by = found[0], found[1], "rules"
+            if kind is None and found:
+                kind, topic, by = found[0], found[1], "rules"
             if kind is None and fixed and near_unknown.score >= 0.5:
                 kind, by = near_unknown.intent.kind, "memory"
             if kind is None and understanding.is_fact_question(question):
@@ -391,9 +396,11 @@ class BaseSeshat:
         """
         بيراجع الرسمة اللي النموذج كتبها قبل ما تتعرض: شبكة سليمة 12 × 12، ونفس الشكل
         واللون المطلوبين، ومش بعيدة عن الشكل الصح بأكتر من DRAW_MAX_WRONG مربع.
-        الرسمة اللي بتتعرض هي اللي النموذج كتبها زي ما هي — من غير تصليح.
+        الرسمة اللي بتتعرض هي اللي النموذج كتبها: السطر الناقص بيتكمل فاضي والزايد بيتقص
+        (parse_grid_loose)، ومفيش خانة بتتغير. وعدد المربعات الغلط بيتكتب في الرد.
         """
-        grid = drawings.parse_grid(model["response"])
+        loose = drawings.parse_grid_loose(model["response"])
+        grid = loose[0] if loose else None
         thought = drawings.what_was_asked(model["thinking"].split("|", 1)[-1].strip())
         ok = grid is not None and not model["fallback"] and thought[0] == shape
         if ok:
@@ -402,7 +409,16 @@ class BaseSeshat:
             wrong = sum(a != b for x, y in zip(grid, want) for a, b in zip(x, y))
             ok = wrong <= DRAW_MAX_WRONG
         if ok:
-            model.update(source="model", matched="", suggestion="", wrong_cells=wrong)
+            head = model["response"].split("```draw", 1)[0].rstrip()
+            text = head + "\n" + drawings.block(grid)
+            if wrong:
+                # الرسمة بتتعرض زي ما النموذج كتبها (السطور بس بتتظبط على 12 خانة) وبنقول
+                # بصراحة فيها كام مربع مش في مكانه
+                text += (f"\n(دي رسمتي أنا مربع مربع، وفيها {wrong} مربع من 144 مش في مكانه — لسه بتعلم.)"
+                         if arabic else
+                         f"\n(I drew this cell by cell; {wrong} of 144 cells are off — still learning.)")
+            model.update(response=text, source="model", matched="", suggestion="",
+                         wrong_cells=wrong, rows_padded=loose[1])
             return model
         return {"response": ("حاولت أرسمها بس الرسمة طلعت مش مظبوطة، فمش هعرضها. جرب شكل أو لون تاني."
                              if arabic else
