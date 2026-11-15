@@ -231,9 +231,9 @@ check("صيغة تانية لنفس السؤال مش موضوع تاني",
 r = seshat.reply("كم عدد سكان الصين")
 check("مبيردش برد سؤال شبهه عن حاجة تانية",
       r["fallback"] and r["kind"] == "fact" and r["searchable"] and "مصر" not in r["response"], str(r))
-r = seshat.reply("مين اخترع التليفون")
+r = seshat.reply("مين اخترع الراديو")   # سؤال مش موجود في أي ملف معرفة (التليفون اتضاف في جولة 13)
 check("سؤال معلومة مش عنده: بيقول كده عن السؤال نفسه",
-      r["fallback"] and "مين اخترع التليفون" in r["response"], str(r))
+      r["fallback"] and "مين اخترع الراديو" in r["response"], str(r))
 
 print("\n9) الرسم والصور (data/drawings.py + vision.py)")
 import base64
