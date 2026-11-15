@@ -391,8 +391,46 @@
   </div>
 </main>
 
-<div id="khufu-section" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; z-index:100; background:var(--bg);">
-  <iframe id="khufu-frame" src="" sandbox="allow-scripts allow-same-origin allow-forms" style="width:100%; height:100%; border:none; padding-top:60px;"></iframe>
+<div id="khufu-section" style="display:none; position:absolute; top:60px; left:0; right:0; bottom:0; z-index:100; background:#0f1115; overflow-y:auto;">
+  <div class="wrap" style="max-width:880px; margin:0 auto; padding:20px 16px 60px; color:#e8ecf1; font-family:system-ui,sans-serif;">
+    <h1 style="font-size:28px; margin:8px 0 2px;">خوفو <span style="color:#9aa4b2; font-size:15px;">khufu-1.0</span></h1>
+    <p style="color:#9aa4b2; margin:0 0 14px; font-size:14px;">نموذج بيولّد الصور من نفسه — من غير أي خدمة خارجية. اكتب الحاجة، حدّد الأبعاد والجودة، وخوفو يرسمها.</p>
+
+    <div id="khufu-status" style="background:#171b22; border:1px solid #262c38; border-radius:14px; padding:16px; margin:14px 0; font-size:13px; color:#9aa4b2;">بيحمّل حالة التدريب…</div>
+
+    <div style="background:#171b22; border:1px solid #262c38; border-radius:14px; padding:16px; margin:14px 0;">
+      <label style="display:block; font-size:13px; color:#9aa4b2; margin:12px 0 6px;">اكتب اللي عايز ترسمه (مثال: ارسم قطة)</label>
+      <input type="text" id="khufu-subject" placeholder="ارسم قطة…" style="width:100%; padding:11px 12px; border-radius:10px; border:1px solid #262c38; background:#0d1015; color:#e8ecf1; font-size:16px;">
+      
+      <label style="display:block; font-size:13px; color:#9aa4b2; margin:12px 0 6px;">أو اختار من القائمة</label>
+      <div id="khufu-chips" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;"></div>
+
+      <label style="display:block; font-size:13px; color:#9aa4b2; margin:12px 0 6px;">أبعاد الصورة (الدقة)</label>
+      <div id="khufu-size" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button data-v="32" style="padding:9px 14px; border-radius:10px; border:1px solid #262c38; background:#0d1015; color:#e8ecf1; cursor:pointer;">32×32</button>
+        <button data-v="64" class="active" style="padding:9px 14px; border-radius:10px; border:1px solid #e8b64c; background:#0d1015; color:#e8b64c; cursor:pointer;">64×64</button>
+        <button data-v="96" style="padding:9px 14px; border-radius:10px; border:1px solid #262c38; background:#0d1015; color:#e8ecf1; cursor:pointer;">96×96</button>
+        <button data-v="128" style="padding:9px 14px; border-radius:10px; border:1px solid #262c38; background:#0d1015; color:#e8ecf1; cursor:pointer;">128×128</button>
+      </div>
+
+      <label style="display:block; font-size:13px; color:#9aa4b2; margin:12px 0 6px;">جودة التوليد (عدد الخطوات)</label>
+      <div id="khufu-steps" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button data-v="20" style="padding:9px 14px; border-radius:10px; border:1px solid #262c38; background:#0d1015; color:#e8ecf1; cursor:pointer;">20 — سريعة</button>
+        <button data-v="50" class="active" style="padding:9px 14px; border-radius:10px; border:1px solid #e8b64c; background:#0d1015; color:#e8b64c; cursor:pointer;">50 — متوازنة</button>
+        <button data-v="100" style="padding:9px 14px; border-radius:10px; border:1px solid #262c38; background:#0d1015; color:#e8ecf1; cursor:pointer;">100 — عالية</button>
+      </div>
+
+      <button id="khufu-gen" style="margin-top:16px; width:100%; padding:13px; font-size:17px; border:none; border-radius:12px; background:#e8b64c; color:#1a1405; font-weight:700; cursor:pointer;">ولّد الصورة</button>
+      <div id="khufu-err" style="color:#ff8a8a; font-size:14px; margin-top:10px; min-height:18px;"></div>
+    </div>
+
+    <div style="background:#171b22; border:1px solid #262c38; border-radius:14px; padding:16px; margin:14px 0;">
+      <label style="display:block; font-size:13px; color:#9aa4b2; margin:0 0 6px;">الصور المتولدة</label>
+      <div id="khufu-gallery" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; margin-top:8px;">
+        <div style="padding:30px; text-align:center; color:#9aa4b2;">لسه مفيش صور — ولّد أول صورة.</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <footer>
@@ -975,6 +1013,106 @@
       }
     });
   });
+  
+  // ---------------- خوفو (نموذج الصور) ----------------
+  var khufuSize = 64, khufuSteps = 50, khufuPicked = null;
+  var khufuGallery = document.getElementById("khufu-gallery");
+  var khufuErr = document.getElementById("khufu-err");
+  var khufuGen = document.getElementById("khufu-gen");
+
+  // Load status
+  function loadKhufuStatus() {
+    fetch("/khufu-status").then(function(r) { return r.json(); }).then(function(st) {
+      var line = document.getElementById("khufu-status");
+      if (st.ready) {
+        line.innerHTML = "التدريب: خطوة <b style='color:#e8b64c'>" + (st.step||0).toLocaleString("en") + "</b>" +
+          (st.loss != null ? " — الخسارة <b style='color:#e8b64c'>" + Number(st.loss).toFixed(4) + "</b>" : "") +
+          (st.elapsed_min ? " — " + st.elapsed_min + " دقيقة" : "");
+      } else {
+        line.textContent = "خوفو لسه بيتدرب — التوليد هيتفتح بعد أول حفظ للنموذج.";
+      }
+      var chips = document.getElementById("khufu-chips");
+      chips.innerHTML = "";
+      (st.classes || []).forEach(function(c) {
+        var b = document.createElement("button");
+        b.style.cssText = "padding:8px 12px; border-radius:999px; border:1px solid #262c38; background:#0d1015; color:#e8ecf1; cursor:pointer; font-size:14px;";
+        b.textContent = c.ar;
+        b.onclick = function() {
+          khufuPicked = c.id;
+          document.getElementById("khufu-subject").value = c.ar;
+          chips.querySelectorAll("button").forEach(function(x) { x.style.borderColor = "#262c38"; x.style.color = "#e8ecf1"; });
+          b.style.borderColor = "#e8b64c"; b.style.color = "#e8b64c";
+        };
+        chips.appendChild(b);
+      });
+    }).catch(function() {});
+  }
+
+  // Size & steps buttons
+  document.querySelectorAll("#khufu-size button").forEach(function(b) {
+    b.onclick = function() {
+      document.querySelectorAll("#khufu-size button").forEach(function(x) {
+        x.style.borderColor = "#262c38"; x.style.color = "#e8ecf1"; x.classList.remove("active");
+      });
+      b.style.borderColor = "#e8b64c"; b.style.color = "#e8b64c"; b.classList.add("active");
+      khufuSize = parseInt(b.dataset.v, 10);
+    };
+  });
+  document.querySelectorAll("#khufu-steps button").forEach(function(b) {
+    b.onclick = function() {
+      document.querySelectorAll("#khufu-steps button").forEach(function(x) {
+        x.style.borderColor = "#262c38"; x.style.color = "#e8ecf1"; x.classList.remove("active");
+      });
+      b.style.borderColor = "#e8b64c"; b.style.color = "#e8b64c"; b.classList.add("active");
+      khufuSteps = parseInt(b.dataset.v, 10);
+    };
+  });
+
+  // Add card
+  function addKhufuCard(url, cap) {
+    if (khufuGallery.querySelector("div[style*='text-align:center']")) khufuGallery.innerHTML = "";
+    var div = document.createElement("div");
+    div.style.cssText = "background:#171b22; border:1px solid #262c38; border-radius:12px; overflow:hidden;";
+    div.innerHTML = '<img src="' + url + '" style="width:100%; display:block; background:#000;">' +
+      '<div style="padding:8px 10px; font-size:12px; color:#9aa4b2; display:flex; justify-content:space-between;">' +
+      '<span>' + cap + '</span><a href="' + url + '" download style="color:#e8b64c; text-decoration:none;">تحميل</a></div>';
+    khufuGallery.prepend(div);
+  }
+
+  // Poll for image
+  function pollKhufu(id, cap) {
+    var attempts = 0;
+    var check = function() {
+      attempts++;
+      fetch("/khufu-generated/" + id + ".png").then(function(r) {
+        if (r.status === 200) { addKhufuCard("/khufu-generated/" + id + ".png", cap); return; }
+        if (r.status === 202 && attempts < 30) { setTimeout(check, 2000); return; }
+        throw new Error("فشل توليد الصورة");
+      }).catch(function(e) { khufuErr.textContent = e.message; });
+    };
+    check();
+  }
+
+  // Generate button
+  khufuGen.onclick = function() {
+    khufuErr.textContent = "";
+    var subject = document.getElementById("khufu-subject").value.trim() || khufuPicked || "";
+    if (!subject) { khufuErr.textContent = "اكتب الحاجة الأول (مثال: قطة)"; return; }
+    khufuGen.disabled = true; khufuGen.textContent = "بيولّد…";
+    fetch("/khufu-generate", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ subject: subject, size: khufuSize, steps: khufuSteps })
+    }).then(function(r) { return r.json(); }).then(function(j) {
+      if (j.error) throw new Error(j.error);
+      pollKhufu(j.id, subject + " • " + khufuSize + "×" + khufuSize + " • " + khufuSteps + " خطوة");
+    }).catch(function(e) { khufuErr.textContent = e.message; }).finally(function() {
+      khufuGen.disabled = false; khufuGen.textContent = "ولّد الصورة";
+    });
+  };
+
+  loadKhufuStatus();
+  setInterval(loadKhufuStatus, 30000);
   
   input.focus();
 </script>
