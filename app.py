@@ -264,10 +264,10 @@ def too_large(_):
 def khufu_app():
     if not KHUFU_READY:
         return "خوفو مش جاهز — تأكد إن مجلد khufu موجود", 500
-    khufu_html = os.path.join(KHUFU_DIR, "templates", "index.html")
+    khufu_html = os.path.join(app.static_folder, "khufu", "index.html")
     if not os.path.exists(khufu_html):
         return "ملف واجهة خوفو مش موجود", 404
-    return send_file(khufu_html)
+    return send_file(khufu_html, mimetype="text/html")
 
 
 @app.route("/khufu-generate", methods=["POST"])
