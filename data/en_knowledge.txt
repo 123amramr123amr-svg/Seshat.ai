@@ -337,3 +337,24 @@ a: The Nile is the longest river in Africa and the world, about 6,650 kilometers
 
 q: smallest bone in the human body
 a: The stapes in the middle ear is the smallest bone in the human body, about 3 millimeters.
+
+q: who invented the radio
+a: Guglielmo Marconi developed the first practical radio system and sent the first wireless signal in 1895, building on Heinrich Hertz's wave experiments.
+
+q: highest mountain in Africa
+a: Kilimanjaro in Tanzania is the highest mountain in Africa, about 5,895 meters tall. Toubkal is only the highest in Morocco and North Africa.
+
+q: who discovered penicillin
+a: Alexander Fleming discovered penicillin by accident in 1928 — the first antibiotic in history.
+
+q: difference between quantum and classical physics
+a: Classical physics describes large everyday motion with clear positions, while quantum physics describes tiny particles using probabilities, where a particle can be in several states at once.
+
+q: largest ocean in the world
+a: The Pacific Ocean is the largest, covering about 165 million square kilometers — bigger than all land combined.
+
+q: what is the speed of light
+a: Light travels at about 299,792 kilometers per second — roughly 300,000 km/s.
+
+q: i am a student working on a geography assignment about famous mountains and i need exact numbers for my report, my teacher wants the heights of the tallest peaks on each continent and i also want to compare africa's tallest mountain with the world's tallest one so i can explain the difference clearly in class tomorrow, please give me one clear answer with the exact names and heights because i keep finding different numbers on different websites and i am tired of guessing which one is right, so my final question is: what is the tallest mountain in the world and the tallest mountain in africa?
+a: The tallest mountain in the world is Mount Everest in the Himalayas, about 8,849 meters high. The tallest in Africa is Kilimanjaro in Tanzania, about 5,895 meters — the difference is roughly 3,000 meters.
