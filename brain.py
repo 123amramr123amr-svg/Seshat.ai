@@ -10,8 +10,9 @@ seshat.chet — المخ الجديد (brain.py)
      اللي اتعلمه بيتجاوب من النت بدل "لسه ماتعلمتش".
   3. تعلم ذاتي — أي معلومة جديدة بيجاوب عليها (من النت أو من المخ الخارجي)
      بتتخزن في data/learned.json، والمرة اللي جاية بيرد عليها من الذاكرة
-     على طول. وكمان يقدر تعلمه بيدويًا:
+     على طول. وكمان يقدر تعلمه بيدويًا بصيغتين:
          علمني: س: اللعبة المفضلة لعمرو ج: الشطرنج
+         علمني: ايه اللعبة المفضلة لعمرو؟ الشطرنج   (صيغة مرنة: سؤال؟ جواب)
   4. إنشاء صور — "ارسم لي قطة" بموقع مجاني من غير مفتاح (pollinations.ai).
   5. مخ خارجي اختياري — لو ضفت مفتاح API متوافق مع OpenAI (زرار الإعدادات
      ⚙ في الواجهة أو متغيرات البيئة)، الردود بتشتغل بشبكة عصبية ضخمة بترد
@@ -374,10 +375,38 @@ def parse_forget(message):
 
 
 _TEACH_RE = re.compile(r"^\s*(علمني|احفظ\s*لي|احفظ|تذكر|teach)\s*[:،]?\s*(.*)$",
-                       re.I)
+                       re.I | re.S)   # re.S: التعليم المرن ممكن يجي على سطرين
 _QA_RE = re.compile(
     r"^\s*(?:س:|السؤال:|سؤال:)?\s*(.+?)\s*(?:ج:|ج\s*:|الجواب:|جواب:|جواب\s*:|a:|answer:)\s*(.+)$",
     re.I | re.S)
+# الناس مش دايمًا بتحط س:/ج: — «علمني: ايه عاصمة تشاد؟ هي ندجامنا» صيغة طبيعية.
+_FLEX_ANS_PRONOUN_RE = re.compile(r"^(?:هي|هو|هما)\s+")
+_QWORD_RE = re.compile(
+    r"(?:^|\s)(ايه|اى|إيه|مين|من|فين|امتى|إمتى|ليه|لية|ازاي|إزاي|كام|كم|هل|اين|وين"
+    r"|who|what|where|when|why|how|which)\b", re.I)
+
+
+def _flex_teach(payload):
+    """صيغة تعليم مرنة من غير س:/ج: — «سؤال؟ جواب».
+    السؤال بيتحدد بعلامة الاستفهام (أول ؟/?) والباقي بيبقى الجواب،
+    ومفيش علامة استفهام بنتقبل newline أو شرطة بس لو الأول فيه كلمة سؤال.
+    شروط الأمان: الجواب مش فاضي ومش طويل (٤٠٠ حرف أقصى) عشان ما نلخبطش
+    رسالة سؤال عادي بتعليم."""
+    m = re.search(r"[؟?]", payload)
+    if m:
+        q = payload[:m.end()].strip(" \n-–—")
+        a = payload[m.end():].strip(" \n-–—،:؟?")
+    else:
+        parts = re.split(r"\n+|\s+[-–—]\s+", payload, maxsplit=1)
+        if len(parts) != 2:
+            return None
+        q, a = parts[0].strip(" \n-–—"), parts[1].strip(" \n-–—،:")
+        if not _QWORD_RE.search(q):
+            return None
+    a = _FLEX_ANS_PRONOUN_RE.sub("", a)
+    if len(q) < 4 or not a or len(a) > 400:
+        return None
+    return q, a
 
 
 def parse_teach(message):
@@ -386,7 +415,7 @@ def parse_teach(message):
         return None
     qa = _QA_RE.match(m.group(2).strip())
     if not qa:
-        return None
+        return _flex_teach(m.group(2).strip())    # صيغة مرنة: «سؤال؟ جواب»
     q = qa.group(1).strip(" -–—")
     a = qa.group(2).strip(" -–—")
     if q and a:
@@ -741,7 +770,7 @@ class Brain:
         except Exception:
             return None
 
-    def reply(self, message, temperature=0.0, max_new_tokens=1200, **kw):
+    def reply(self, message, temperature=0.0, max_new_tokens=2000, **kw):
         t0 = time.time()
         out = self._reply(message, temperature=temperature,
                           max_new_tokens=max_new_tokens)
@@ -749,7 +778,7 @@ class Brain:
             out["seconds"] = round(time.time() - t0, 2)
         return out
 
-    def _reply(self, message, temperature=0.0, max_new_tokens=1200, **kw):
+    def _reply(self, message, temperature=0.0, max_new_tokens=2000, **kw):
         t0 = time.time()
         msg = (message or "").strip()
         if not msg:

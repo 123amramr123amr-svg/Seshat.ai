@@ -127,6 +127,20 @@ check("تعليم سليم", parse_teach("علمني: س: لعبة عمرو ج: 
       ("لعبة عمرو", "الشطرنج"))
 check("تعليم غلط بيرفض", parse_teach("علمني حاجة كويسة") is None)
 
+# الصيغة المرنة: «علمني: سؤال؟ جواب» من غير س:/ج:
+check("تعليم مرن: سؤال وجواب", parse_teach("علمني: ايه هي عاصمة تشاد؟ هي ندجامنا") ==
+      ("ايه هي عاصمة تشاد؟", "ندجامنا"))
+check("تعليم مرن: سطرين", parse_teach("علمني: ايه عاصمة مالي؟\nهي باماكو") ==
+      ("ايه عاصمة مالي؟", "باماكو"))
+check("تعليم مرن: شرطة وكلمة سؤال", parse_teach("علمني: مين اخترع المصباح؟ - توماس اديسون") ==
+      ("مين اخترع المصباح؟", "توماس اديسون"))
+check("تعليم مرن: إنجليزي", parse_teach("teach: what is 2+2? it is 4") ==
+      ("what is 2+2?", "it is 4"))
+check("تعليم مرن: من غير علامة استفهام ولا كلمة سؤال بيرفض",
+      parse_teach("علمني: عاصمة مصر القاهرة") is None)
+check("تعليم مرن: من غير جواب بيرفض", parse_teach("علمني: ايه رأيك في الكود؟") is None)
+check("تعليم مرن: جواب طويل بيرفض", parse_teach("علمني: ايه ده؟ " + "كلمة " * 120) is None)
+
 check("حساب: 7 × 8", try_math("7 × 8") == "7 × 8 = 56")
 check("حساب أرقام كبيرة", try_math("1543 + 2991") == "1543 + 2991 = 4534")
 check("حساب بكسور", try_math("12.5 + 3.5") == "12.5 + 3.5 = 16")
@@ -263,7 +277,7 @@ r = seshat.reply(LONG * 3 + "عاصمة اليابان ايه")
 check("رسالة 900+ حرف: عاصمة اليابان", not r["fallback"] and "طوكيو" in r["response"], r["response"][:50])
 r = seshat.reply(LONG + "154 + 382")
 check("رسالة طويلة فيها حساب", not r["fallback"] and "536" in r["response"], r["response"][:50])
-check("السياق في الملف 2048", seshat.config["block_size"] == 2048, str(seshat.config["block_size"]))
+check("السياق في الملف 4096", seshat.config["block_size"] == 4096, str(seshat.config["block_size"]))
 
 print("\n" + "—" * 40)
 if FAILURES:
