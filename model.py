@@ -24,7 +24,7 @@ PRESETS = {
 
 class Config:
     def __init__(self, **kw):
-        self.block_size = 512      # أقصى عدد حروف (سؤال + رد) النموذج يشوفها
+        self.block_size = 1024     # إعداد افتراضي للنماذج الجديدة؛ checkpoints القديمة تحتفظ بسياقها
         self.n_layer = 4
         self.n_head = 4
         self.n_embd = 128
