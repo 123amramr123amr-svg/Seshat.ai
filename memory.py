@@ -25,7 +25,8 @@ import numpy as np
 
 from tokenizer import normalize_question
 
-SKIP_CATS = ("math",)          # الحساب مالوش "أقرب سؤال" — 15 + 27 مش قريبة من 15 + 2
+# الحساب مالوش "أقرب سؤال" (15 + 27 مش قريبة من 15 + 2)، والرسم النموذج هو اللي بيرسمه
+SKIP_CATS = ("math", "draw")
 WORD_WEIGHT = 1.5              # الكلمة الكاملة أهم من مقطع منها
 NGRAM = 3
 RERANK = 15                    # عدد الأسئلة اللي بنراجع كلماتها المهمة
@@ -76,7 +77,8 @@ class QuestionMemory:
         if intents is None:
             from dataset import build_intents          # من غير torch
             intents = build_intents(verbose=False)
-        self.intents = [it for it in intents if it.cat not in SKIP_CATS]
+        self.intents = [it for it in intents
+                        if it.cat not in SKIP_CATS and getattr(it, "mem", True)]
 
         self.questions, owner, self.exact = [], [], {}
         for idx, it in enumerate(self.intents):

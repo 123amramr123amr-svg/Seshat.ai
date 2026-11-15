@@ -69,7 +69,7 @@ from engine import Seshat
 seshat = Seshat()
 r = seshat.reply("اسمك ايه")
 check("سؤال الهوية", "seshat" in r["response"] or "عمرو" in r["response"], r["response"])
-check("سطر التفكير موجود", r["thinking"].startswith("أقرب سؤال أعرفه"))
+check("سطر التفكير موجود", r["thinking"].startswith("فهمت إنك بتسأل"))
 
 r = seshat.reply("7 + 8")
 check("حساب صغير", r["response"] == "7 + 8 = 15", r["response"])
@@ -80,7 +80,9 @@ r = seshat.reply("12 × 15")
 check("ضرب بأرقام كبيرة", r["response"] == "12 × 15 = 180" and not r["fallback"], r["response"])
 
 r = seshat.reply("ايه رايك في سعر الدولار النهارده")
-check("سؤال برّه التدريب بيترد عليه بصراحة", r["fallback"] and r["source"] == "none")
+check("سؤال برّه معلوماته: بيفهم نوعه وموضوعه ويكوّن رد",
+      r["fallback"] and r["source"] == "understand" and r["kind"] == "opinion"
+      and r["topic"] in r["response"], str(r))
 r = seshat.reply("asdf qwer zxcv")
 check("كلام ملخبط بيرفض", r["fallback"])
 
@@ -94,7 +96,7 @@ intents = build_intents(holdout=True, verbose=False)
 check("عدد الردود معقول", len(intents) > 2000, f"{len(intents)} رد")
 cats = {it.cat for it in intents}
 check("كل الأنواع موجودة", cats == {"chat", "knowledge", "programming", "code",
-                                    "translate", "capital", "math", "unknown"})
+                                    "translate", "capital", "math", "draw", "unknown"})
 check("كل Intent له سطر تفكير", all(it.think for it in intents))
 
 from checkpoint import save_checkpoint, load_checkpoint
@@ -176,7 +178,71 @@ check("المخ: لو مفيش حاجة بيقول الصراحة", r["fallback"
 r = b.reply("")
 check("المخ: رسالة فاضية", "اكتب حاجة" in r["response"])
 
-print("\n8) السياق الموسّع: الرسايل الطويلة والسؤال جواها (engine.extract_question)")
+print("\n8) فهم الأسئلة (data/understanding.py)")
+from engine import understanding as un, drawings
+
+check("كشف رأي + موضوع", un.detect("ايه رايك في القهوه") == ("opinion", "القهوه"))
+check("كشف شخص بالإنجليزي", un.detect("who is marie curie") == ("person", "marie curie"))
+check("سؤال عادي مش بيتكشف", un.detect("عامل ايه") is None)
+check("الرد فيه الموضوع", "القهوه" in un.compose("opinion", "القهوه", True))
+check("سطر التفكير بيتقرا تاني",
+      un.parse_think(un.think("price", "الدهب", True)) == ("price", "الدهب", True))
+check("نوع من غير موضوع", un.parse_think(un.think("future", "", False)) == ("future", "", False))
+check("مواضيع الاختبار مش في التدريب",
+      not {i[1] for i in un.build()} & {i[1] for i in un.build(True)})
+r = seshat.reply("افتحلي يوتيوب")
+check("طلب تنفيذ بيتفهم", r["source"] == "understand" and r["kind"] == "action", str(r))
+r = seshat.reply("who is marie curie")
+check("سؤال عن شخص: قابل للبحث", r["kind"] == "person" and r["searchable"], str(r))
+
+check("سعر: كلمة الوقت مش من الموضوع", un.detect("سعر الدهب النهارده كام") == ("price", "الدهب"))
+check("مين اخترع… مش سؤال عن شخص", un.detect("مين اخترع التليفون") is None)
+check("كلمة اتبدلت = موضوع تاني", un.other_subject("كم عدد سكان الصين", "عدد سكان مصر"))
+check("صيغة تانية لنفس السؤال مش موضوع تاني",
+      not un.other_subject("مين الشخص اللي برمجك وعملك", "مين طورك")
+      and not un.other_subject("ايه هي عاصمه فرنسا يا صاحبي", "عاصمه فرنسا ايه"))
+r = seshat.reply("كم عدد سكان الصين")
+check("مبيردش برد سؤال شبهه عن حاجة تانية",
+      r["fallback"] and r["kind"] == "fact" and r["searchable"] and "مصر" not in r["response"], str(r))
+r = seshat.reply("مين اخترع التليفون")
+check("سؤال معلومة مش عنده: بيقول كده عن السؤال نفسه",
+      r["fallback"] and "مين اخترع التليفون" in r["response"], str(r))
+
+print("\n9) الرسم والصور (data/drawings.py + vision.py)")
+import base64
+import numpy as np
+import vision
+
+rows = drawings.grid_for("heart", "R")
+check("شبكة الرسمة 12 × 12", len(rows) == 12 and all(len(x) == 12 for x in rows))
+check("parse_grid بيقرا البلوك", drawings.parse_grid("دي رسمة:\n" + drawings.block(rows)) == rows)
+check("parse_grid بيرفض رسمة ناقصة", drawings.parse_grid("```draw\nRR\n```") is None)
+check("what_was_asked", drawings.what_was_asked("ارسم قلب احمر") == ("heart", "R"))
+px = np.zeros((40, 60, 4), dtype=np.uint8)
+px[..., 3] = 255
+px[:20, :, :3] = (40, 110, 230)
+px[20:, :, :3] = (50, 160, 60)
+img = {"w": 60, "h": 40, "data": base64.b64encode(px.tobytes()).decode()}
+check("كل التعديلات بتشتغل", all(vision.apply_edit(px, op).shape[2] == 4
+                                 for op in vision.EDITS if op != "enlarge"))
+check("فهم أمر تعديل مركب", vision.find_edits("غبشها جدا واقلبها")[:2] == (["blur", "flip_h"], 2.0))
+check("ملف PNG سليم", vision.encode_png(px)[:8] == b"\x89PNG\r\n\x1a\n")
+r = vision.handle_image("خليها ابيض واسود ولفها يمين", img)
+check("تعديل صورة بيرجع صورة", r["edited"].startswith("data:image/png;base64,")
+      and (r["width"], r["height"]) == (40, 60))
+r = vision.handle_image("ايه ده", img)
+check("وصف صورة: الألوان", "أزرق" in r["response"] and "أخضر" in r["response"], r["response"])
+check("كلام ملوش علاقة بالصورة بيروح للشات", vision.handle_image("اسمك ايه", img) is None)
+check("سؤال عن الصورة × تعديل", vision.wants_look("ايه ده") and vision.wants_look("")
+      and not vision.wants_look("خليها ابيض واسود"))
+check("الصورة بتتحول PNG للمخ الخارجي",
+      vision.jpeg_free_data_url(img).startswith("data:image/png;base64,iVBOR"))
+from brain import BrainConfig, llm_vision
+cfg0 = BrainConfig()
+cfg0.api_key = ""
+check("من غير مفتاح مفيش مخ خارجي للصور", llm_vision("ايه ده", "data:image/png;base64,AA", cfg0) is None)
+
+print("\n10) السياق الموسّع: الرسايل الطويلة والسؤال جواها (engine.extract_question)")
 from engine import extract_question
 
 # الاستخراج نفسه

@@ -135,8 +135,15 @@ def _gibberish(rng, letters, n):
     return out
 
 
+def gibberish():
+    """كلام من حروف عشوائية (عربي، إنجليزي) — النموذج بيتعلم يرد عليه إنه مفهمش"""
+    rng = random.Random(2026)
+    return (_gibberish(rng, "ابتثجحخدذرزسشصضطظعغفقكلمنهوي", 120),
+            _gibberish(rng, "abcdefghijklmnopqrstuvwxyz", 120))
+
+
 def build():
-    """بيرجع (أسئلة عربي، أسئلة إنجليزي) للتدريب"""
+    """القوايم القديمة (سؤال → "مش عارف"). التدريب دلوقتي من data/understanding.py."""
     rng = random.Random(2026)
     ar = [t.format(x=x) for x in AR_TOPICS for t in AR_TOPIC_TEMPLATES]
     ar += [t.format(p=p) for p in AR_PEOPLE for t in AR_PEOPLE_TEMPLATES]

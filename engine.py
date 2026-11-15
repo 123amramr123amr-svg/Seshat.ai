@@ -14,6 +14,7 @@ seshat.chet — محرك الرد: بيحمّل النموذج المحفوظ و
 import math
 import os
 import re
+import sys
 import threading
 import time
 
@@ -24,6 +25,9 @@ from tokenizer import CharTokenizer, normalize_question, is_arabic
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_MODEL = os.path.join(HERE, "seshat_chet_model.npz")
+sys.path.insert(0, os.path.join(HERE, "data"))
+import drawings                                    # noqa: E402  (شكل الرسمة والتأكد منها)
+import understanding                               # noqa: E402  (فهم نوع السؤال وموضوعه)
 
 # لو ثقة النموذج في الرد أقل من الحد ده، بنعتبر إنه مش عارف الإجابة وبنقول كده
 # بصراحة بدل ما نطلّع كلام ملخبط.
@@ -70,6 +74,16 @@ MEMORY_AGREE = 0.30       # فوق كده بترد لو النموذج فهم ا
 MEMORY_SUGGEST = 0.35     # فوق كده (ومن غير اتفاق) بيسأل المستخدم "تقصد كذا؟"
 UNKNOWN_MARGIN = 0.15     # لو السؤال أقرب بكتير لموضوع برّه اللي اتعلمه → مش عارف
 MATH_LABEL = "حساب"       # نوع السؤال في سطر التفكير لما يكون مسألة حساب
+DRAW_LABELS = ("رسم |", "drawing |")      # سطر التفكير لما يكون المطلوب رسمة
+DRAW_WORDS = ("ارسم", "ارسملي", "ارسمي", "draw")
+DRAW_MAX_WRONG = 20       # أقصى عدد مربعات غلط (من 144) عشان الرسمة تتعرض — وبنقول العدد
+DRAW_HELP_AR = ("لسه بعرف أرسم أشكال بسيطة بس: دايرة، حلقة، مربع، مستطيل، مثلث، معيّن، علامة زائد، "
+                "قلب، سهم، خط — بأي لون (أحمر، أخضر، أزرق، أصفر، برتقالي، بنفسجي، أسود، بمبي) — "
+                "وكمان: شمس، شجرة، بيت، علم مصر، وش مبتسم، هرم. جرب: ارسم قلب أحمر.")
+DRAW_HELP_EN = ("I can only draw simple shapes so far: circle, ring, square, rectangle, triangle, "
+                "diamond, plus, heart, arrow, line — in red, green, blue, yellow, orange, purple, "
+                "black or pink — and also: sun, tree, house, flag of Egypt, smiley face, pyramid. "
+                "Try: draw a red heart.")
 
 # ============================================================
 # استخراج السؤال من رسالة طويلة
@@ -264,7 +278,7 @@ class BaseSeshat:
         source بيقول الرد جه منين:
           "memory"        سؤال قريب كفاية من سؤال متخزن
           "memory+model"  الذاكرة والنموذج اتفقوا على نفس السؤال
-          "model"         النموذج لوحده (الحساب، أو لما الذاكرة مش شغالة)
+          "model"         النموذج لوحده (الحساب والرسم، أو لما الذاكرة مش شغالة)
           "none"          مفيش رد — السؤال برّه اللي اتعلمه
         use_memory=False بيرجع رد النموذج لوحده (ده اللي evaluate.py بيقيسه).
         """
@@ -290,45 +304,108 @@ class BaseSeshat:
         arabic = is_arabic(message)
         # الذاكرة بتدور على السؤال المستخرج، ولو المطابقة ضعيفة بتجرب كمان
         # آخر جزء من الرسالة كلها — عشان السؤال ما يضيعش لو الاستخراج قصه
+        best_q = question
         known, unknown_score = memory.lookup(question)
-        best_known, best_unknown = known, unknown_score
         tail_full = normalize_question(message)[-400:]
         if tail_full and tail_full != question:
             known2, unknown2 = memory.lookup(tail_full)
             s1 = known.score if known else unknown_score
             s2 = known2.score if known2 else unknown2
             if s2 > s1:
-                best_known, best_unknown = known2, unknown2
-        known, unknown_score = best_known, best_unknown
+                known, unknown_score = known2, unknown2
+                best_q = tail_full
+        near = memory.search(best_q, top=1, cat="unknown")
+        near_unknown = near[0] if near else None
+        model = None
 
         def answer(match, source, agreed=False):
+            # سطر التفكير بيقول seshat فهم السؤال على إنه إيه (النوع + المعنى)
             pct = round(match.score * 100)
+            kind = match.intent.think.split(" | ", 1)[0]
             if arabic:
-                think = f"أقرب سؤال أعرفه: «{match.intent.canonical}» — تشابه {pct}%"
-                think += " — والنموذج فهمه بنفس المعنى" if agreed else ""
+                think = f"فهمت إنك بتسأل: «{match.intent.canonical}» — نوع السؤال: {kind}"
+                think += " — النموذج والذاكرة متفقين" if agreed else ""
             else:
-                think = f"closest question I know: “{match.intent.canonical}” — {pct}% similar"
-                think += " — the model read it the same way" if agreed else ""
+                think = f"I understood your question as: “{match.intent.canonical}” — type: {kind}"
+                think += " — the model and the memory agree" if agreed else ""
             return {"response": match.intent.answer, "thinking": think,
                     "confidence": round(match.score, 3), "fallback": False,
-                    "source": source, "matched": match.intent.canonical, "suggestion": ""}
+                    "source": source, "matched": match.intent.canonical, "suggestion": "",
+                    "match": pct}
 
         def dont_know():
-            # مش متأكد → منألّفش رد. لو فيه سؤال قريب شوية بنقترحه على المستخدم.
-            text, think, suggestion = (FALLBACK_AR if arabic else FALLBACK_EN), "", ""
+            """
+            السؤال برّه معلوماته. بدل جملة واحدة محفوظة، seshat بيفهم نوع السؤال وموضوعه
+            ويكوّن رد عليهم (شوف data/understanding.py). الترتيب:
+              1. فهم النموذج نفسه (سطر التفكير: النوع | الموضوع) — لو الموضوع فعلًا في السؤال
+              2. قواعد القوالب (understanding.detect)
+              3. نوع أقرب سؤال شبهه في الذاكرة
+              4. يقول إنه مفهمش ويطلب صيغة تانية
+            fallback=True معناها "مفيش معلومة" — المخ (brain.py) بيكمل منها بالبحث في النت.
+            """
+            suggestion = ""
             if (known is not None and known.score >= MEMORY_SUGGEST
-                    and known.score >= unknown_score - UNKNOWN_MARGIN):
+                    and known.score >= unknown_score - UNKNOWN_MARGIN
+                    and not understanding.other_subject(question, known.intent.canonical)):
                 suggestion = known.intent.canonical
+            kind, topic, by = None, "", ""
+            got = understanding.parse_think(model["thinking"]) if model else None
+            if got and got[1] and f" {got[1]} " not in f" {question} ":
+                got = None                     # الموضوع اللي كتبه مش موجود في السؤال → مرفوض
+            found = understanding.detect(question)
+            fixed = (near_unknown is not None and near_unknown.intent.kind
+                     and not near_unknown.intent.topic)       # شبه سؤال من نوع ملوش موضوع
+            # النموذج لسه بيغلط في النوع أكتر من القوالب (القياس في README)، فلو السؤال
+            # طابق قالب صريح والنموذج قال حاجة تانية → القالب هو اللي بيمشي.
+            if got and (found is None or tuple(got[:2]) == tuple(found)) \
+                    and not (found is None and fixed and near_unknown.score >= 0.72
+                             and got[0] != near_unknown.intent.kind):
+                kind, topic, by = got[0], got[1], "model"
+            if kind is None and fixed and near_unknown.score >= 0.72:
+                kind, by = near_unknown.intent.kind, "memory"
+            if kind is None and found:
+                kind, topic, by = found[0], found[1], "rules"
+            if kind is None and fixed and near_unknown.score >= 0.5:
+                kind, by = near_unknown.intent.kind, "memory"
+            if kind is None and understanding.is_fact_question(question):
+                kind, by = "fact", "rules"     # سؤال عن معلومة مش عنده: يقولها عن السؤال نفسه
+            if kind is None:
+                kind, by = "unclear", "none"
+            if kind == "fact":
+                asked = message.strip()[:120]
+                text = (f"فهمت إنك عايز معلومة: «{asked}». المعلومة دي مش ضمن اللي اتعلمته، "
+                        f"ومش هألف إجابة من عندي."
+                        if arabic else
+                        f"I understand you want a fact: “{asked}”. That is not among the things "
+                        f"I learned, and I will not make up an answer.")
+            else:
+                text = understanding.compose(kind, topic, arabic)
+            if by == "model" and model["response"] == text:
+                by = "model-text"              # الجملة نفسها طلعت من النموذج حرف حرف وسليمة
+            if kind == "unclear" and by == "none":
+                text = (f"مش قادر أحدد قصدك من «{message.strip()[:80]}». ممكن تقولها بكلمات تانية؟"
+                        if arabic else
+                        f"I cannot tell what you mean by “{message.strip()[:80]}”. Could you say it in other words?")
+            name = understanding.label(kind, arabic)
+            if arabic:
+                think = f"نوع السؤال: {name}" + (f" — الموضوع: «{topic}»" if topic else "")
+            else:
+                think = f"question type: {name}" + (f" — topic: “{topic}”" if topic else "")
+            if suggestion and kind in ("unclear", "about", "fact"):
+                # سؤال قريب من حاجة يعرفها → يسأل "تقصد كذا؟" (والمخ بيرد بيها لو البحث مجابش حاجة)
                 pct = round(known.score * 100)
                 if arabic:
                     text = f"مش متأكد إني فهمت سؤالك. تقصد: «{suggestion}»؟"
-                    think = f"أقرب سؤال أعرفه: «{suggestion}» — تشابه {pct}% بس، مش كفاية عشان أرد"
                 else:
                     text = f"I'm not sure I understood. Did you mean: “{suggestion}”?"
-                    think = f"closest question I know: “{suggestion}” — only {pct}% similar, not enough to answer"
+            elif kind != "unclear":
+                suggestion = ""
             return {"response": text, "thinking": think,
                     "confidence": round(known.score, 3) if known else 0.0, "fallback": True,
-                    "source": "none", "matched": "", "suggestion": suggestion}
+                    "source": "understand", "matched": "", "suggestion": suggestion,
+                    "kind": kind, "topic": topic, "understood_by": by,
+                    "searchable": kind in understanding.SEARCHABLE or kind == "fact"
+                                  or by == "none"}
 
         # 1) نفس السؤال موجود بالحرف → مش محتاجين النموذج
         if known is not None and known.score >= 0.999:
@@ -340,8 +417,24 @@ class BaseSeshat:
         model = self._model_reply(message, question, temperature, max_new_tokens, True)
         thinking = model["thinking"]
 
+        # 2.5) رسم: النموذج هو اللي بيرسم (بيكتب شبكة 12 × 12 رمز)، وإحنا بنتأكد إن
+        #      الرسمة سليمة وإنها الشكل واللون اللي اتطلبوا. لو لأ → بنقول كده بصراحة.
+        shape, color = drawings.what_was_asked(question)
+        wants_drawing = any(w in question.split() for w in DRAW_WORDS)
+        thinks_drawing = thinking.startswith(DRAW_LABELS)
+        if shape is not None and (thinks_drawing or wants_drawing):
+            return self._check_drawing(model, shape, color, arabic)
+        if wants_drawing or (thinks_drawing and (known is None or known.score < MEMORY_STRONG)):
+            return {"response": DRAW_HELP_AR if arabic else DRAW_HELP_EN,
+                    "thinking": "طلب رسمة لشكل لسه ماتعلمتوش" if arabic
+                    else "a drawing of a shape I have not learned",
+                    "confidence": 0.0, "fallback": True, "source": "none", "matched": "",
+                    "suggestion": ""}
+
         # 3) سؤال قريب جدًا من سؤال متخزن
-        if known is not None and known.score >= MEMORY_STRONG and known.score > unknown_score:
+        #    (بس مش لو السؤالين عن حاجتين مختلفتين: "سكان الصين" مش "سكان مصر")
+        if (known is not None and known.score >= MEMORY_STRONG and known.score > unknown_score
+                and not understanding.other_subject(question, known.intent.canonical)):
             agreed = thinking == known.intent.think
             return answer(known, "memory+model" if agreed else "memory", agreed=agreed)
 
@@ -353,12 +446,49 @@ class BaseSeshat:
             return model
 
         # 5) تشابه متوسط، بس النموذج فهم السؤال بنفس المعنى → الاتنين متفقين
+        #    (إلا لو السؤالين عن حاجتين مختلفتين: "مين اخترع التليفون" مش "مين اخترع الصفر")
         if (known is not None and thinking == known.intent.think
                 and known.score >= MEMORY_AGREE
-                and known.score >= unknown_score - UNKNOWN_MARGIN):
+                and known.score >= unknown_score - UNKNOWN_MARGIN
+                and not understanding.other_subject(question, known.intent.canonical)):
             return answer(known, "memory+model", agreed=True)
 
         return dont_know()
+
+    def _check_drawing(self, model, shape, color, arabic):
+        """
+        بيراجع الرسمة اللي النموذج كتبها قبل ما تتعرض: شبكة سليمة 12 × 12، ونفس الشكل
+        واللون المطلوبين، ومش بعيدة عن الشكل الصح بأكتر من DRAW_MAX_WRONG مربع.
+        الرسمة اللي بتتعرض هي اللي النموذج كتبها: السطر الناقص بيتكمل فاضي والزايد بيتقص
+        (parse_grid_loose)، ومفيش خانة بتتغير. وعدد المربعات الغلط بيتكتب في الرد.
+        """
+        loose = drawings.parse_grid_loose(model["response"])
+        grid = loose[0] if loose else None
+        thought = drawings.what_was_asked(model["thinking"].split("|", 1)[-1].strip())
+        ok = grid is not None and not model["fallback"] and thought[0] == shape
+        if ok:
+            want = (drawings.grid_for(shape, color or drawings.DEFAULT_COLOR)
+                    if shape in drawings.SHAPES else drawings.FIXED[shape][4])
+            wrong = sum(a != b for x, y in zip(grid, want) for a, b in zip(x, y))
+            ok = wrong <= DRAW_MAX_WRONG
+        if ok:
+            head = model["response"].split("```draw", 1)[0].rstrip()
+            text = head + "\n" + drawings.block(grid)
+            if wrong:
+                # الرسمة بتتعرض زي ما النموذج كتبها (السطور بس بتتظبط على 12 خانة) وبنقول
+                # بصراحة فيها كام مربع مش في مكانه
+                text += (f"\n(دي رسمتي أنا مربع مربع، وفيها {wrong} مربع من 144 مش في مكانه — لسه بتعلم.)"
+                         if arabic else
+                         f"\n(I drew this cell by cell; {wrong} of 144 cells are off — still learning.)")
+            model.update(response=text, source="model", matched="", suggestion="",
+                         wrong_cells=wrong, rows_padded=loose[1])
+            return model
+        return {"response": ("حاولت أرسمها بس الرسمة طلعت مش مظبوطة، فمش هعرضها. جرب شكل أو لون تاني."
+                             if arabic else
+                             "I tried to draw it but the drawing came out wrong, so I won't show it. "
+                             "Try another shape or color."),
+                "thinking": model["thinking"], "confidence": model["confidence"],
+                "fallback": True, "source": "none", "matched": "", "suggestion": ""}
 
     def _model_reply(self, message, question, temperature, max_new_tokens, use_fallback):
         """رد النموذج لوحده: بيكتب سطر التفكير وبعدين الرد"""
@@ -384,6 +514,12 @@ class BaseSeshat:
         fallback = lost or thinking in (UNKNOWN_AR, UNKNOWN_EN)   # النموذج نفسه قال مش عارف
         if fallback:
             text = FALLBACK_AR if is_arabic(message) else FALLBACK_EN
+        understood = None if fallback else understanding.parse_think(thinking)
+        if understood is not None:
+            # النموذج فهم إن السؤال برّه معلوماته وكوّن رد من نوعه وموضوعه
+            return {"response": text, "thinking": thinking,
+                    "confidence": round(float(confidence), 3), "fallback": True,
+                    "kind": understood[0], "topic": understood[1]}
         # فحص ثاني للحساب: لو المسألة اتقرت صح، المحرك بيحسب الناتج بنفسه وبيصلح
         # الرد — ساعتها الرد مضمون مهما كانت ثقة النموذج
         verified = False

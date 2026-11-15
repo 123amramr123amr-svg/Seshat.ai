@@ -39,8 +39,10 @@ CAT_WEIGHTS = {
     "translate": 0.5,
     "capital": 0.8,
     "math": 0.3,
-    "unknown": 120.0,     # ردّين بس (عربي/إنجليزي) لكن وراهم مئات الأسئلة
+    "draw": 6.0,          # الرسومات طويلة ولازم تتكتب صح رمز رمز
+    "unknown": 0.3,       # فهم سؤال برّه معلوماته: رد لكل (نوع، موضوع) — وهم كتير
 }
+UNKNOWN_FIXED_WEIGHT = 14.0     # الأنواع اللي من غير موضوع: رد واحد وراه عشرات الأسئلة
 
 # أسئلة الهوية (الاسم والمطوّر) لازم تتحفظ كويس جدًا → وزنها بيتضرب في الرقم ده
 IDENTITY_BOOST = 10.0
@@ -58,16 +60,20 @@ THINK_LABELS = {
     "translate": ("ترجمة", "translation"),
     "capital": ("عاصمة", "capital"),
     "math": ("حساب", "math"),
+    "draw": ("رسم", "drawing"),
 }
 
 
 class Intent:
     __slots__ = ("questions", "answer", "cat", "weight", "aug", "typo", "holdout",
-                 "canonical", "think")
+                 "canonical", "think", "kind", "topic", "mem")
 
     def __init__(self, questions, answer, cat, weight=1.0, aug=True, typo=True):
         self.canonical = questions[0].strip() if questions else ""   # الصيغة الأساسية للسؤال
         self.think = ""
+        self.kind = ""          # نوع الفهم (للأسئلة اللي برّه معلوماته): opinion, price, …
+        self.topic = ""         # الموضوع اللي السؤال عنه
+        self.mem = True         # يدخل ذاكرة الأسئلة ولا للتدريب بس
         seen, qs = set(), []
         for q in questions:
             q = normalize_question(q)
@@ -251,20 +257,34 @@ def make_math_intents():
 
 
 # ============================================================
-# 5) أسئلة برّه اللي اتعلمه
+# 5) الرسم — شبكة رموز 12 × 12
+# ============================================================
+def load_draw_intents(held_out=False):
+    """held_out=True: التركيبات اللي النموذج مبيتدربش عليها (للاختبار بس)"""
+    sys.path.insert(0, DATA_DIR)
+    import drawings
+    return [Intent(qs, answer, "draw", aug=False, typo=False)
+            for qs, answer in drawings.build(include_held_out=held_out)]
+
+
+# ============================================================
+# 6) أسئلة برّه اللي اتعلمه
 # ============================================================
 def make_unknown_intents():
+    """
+    أسئلة برّه معلومات النموذج. لكل واحد: النوع والموضوع (سطر التفكير) ورد متكوّن منهم.
+    شوف data/understanding.py.
+    """
     sys.path.insert(0, DATA_DIR)
+    import understanding as un
     import unknown_questions as uq
-    ar_qs, en_qs = uq.build()
+    test = {normalize_question(q) for q in uq.AR_TEST + uq.EN_TEST}
     out = []
-    for qs, answer, think, test in ((ar_qs, FALLBACK_AR, UNKNOWN_AR, uq.AR_TEST),
-                                    (en_qs, FALLBACK_EN, UNKNOWN_EN, uq.EN_TEST)):
-        it = Intent(qs, answer, "unknown")
-        it.think = think
-        test = {normalize_question(q) for q in test}
+    for kind, topic, arabic, qs, mem in un.build():
+        it = Intent(qs, un.compose(kind, topic, arabic), "unknown", typo=False)
+        it.think = un.think(kind, topic, arabic)
+        it.kind, it.topic, it.mem = kind, topic, mem
         it.questions = [q for q in it.questions if q not in test]
-        it.holdout = sorted(test)              # للاختبار بس، مبيتدربش عليها
         out.append(it)
     return out
 
@@ -287,7 +307,8 @@ def build_intents(holdout=True, verbose=True):
         if verbose:
             print(f"  {name:<22} {len(got):>5} رد")
     for label, loader in (("أكواد", load_code_intents), ("ترجمة وعواصم", load_wordlist_intents),
-                          ("حساب", make_math_intents), ("برّه اللي اتعلمه", make_unknown_intents)):
+                          ("حساب", make_math_intents), ("رسومات", load_draw_intents),
+                          ("برّه اللي اتعلمه", make_unknown_intents)):
         got = loader()
         intents += got
         if verbose:
@@ -307,6 +328,8 @@ def build_intents(holdout=True, verbose=True):
     intents = [it for it in intents if it.questions]
     for it in intents:
         it.weight = CAT_WEIGHTS.get(it.cat, 1.0)
+        if it.cat == "unknown" and not it.topic:
+            it.weight = UNKNOWN_FIXED_WEIGHT
         if normalize_question(it.canonical) in IDENTITY_QUESTIONS:
             it.weight *= IDENTITY_BOOST
         if not it.think:                       # سطر التفكير: النوع | السؤال بصيغته الأساسية

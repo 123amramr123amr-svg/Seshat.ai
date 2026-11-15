@@ -593,7 +593,9 @@ def _ddg(query):
                 break
         if not results:
             return None
-        lines = ["دي أقرب معلومات لقيتها على النت:"]
+        ar = _is_arabic_text(query)
+        lines = ["دي أقرب معلومات لقيتها على النت:" if ar
+                 else "Here is the closest information I found on the web:"]
         for i, (title, href) in enumerate(results):
             snip = ""
             if i < len(snippets):
@@ -601,9 +603,10 @@ def _ddg(query):
                 snip = re.sub(r"\s+", " ", snip)[:220]
             dom = urlparse(href).netloc.replace("www.", "")
             lines.append("• " + title + (" — " + snip if snip else "") +
-                         "\n  المصدر: " + dom)
+                         ("\n  المصدر: " if ar else "\n  Source: ") + dom)
         return {"text": "\n".join(lines),
-                "think": "دورت في DuckDuckGo على سؤالك",
+                "think": ("دورت في DuckDuckGo على سؤالك" if ar
+                          else "Searched DuckDuckGo for your question"),
                 "url": results[0][1]}
     except Exception:
         return None
@@ -657,6 +660,45 @@ def llm_answer(message, cfg):
         return None
 
 
+def _other_subject(question, suggestion):
+    """نفس شكل السؤال بس عن حاجة تانية؟ (شوف understanding.other_subject)"""
+    try:
+        from engine import understanding
+        from tokenizer import normalize_question as norm
+        return understanding.other_subject(norm(question), norm(suggestion))
+    except Exception:
+        return False
+
+
+def llm_vision(message, image_url, cfg):
+    """
+    فهم صورة بالمخ الخارجي (لو فيه مفتاح والموديل بيشوف صور، زي gpt-4o-mini).
+    image_url: الصورة data URL. بيرجع النص أو None لو مفيش مفتاح / الموديل مبيشوفش / حصل خطأ.
+    """
+    if not cfg.api_key:
+        return None
+    base = (cfg.api_base or "https://api.openai.com/v1").rstrip("/")
+    ask = message.strip() or "اوصف الصورة دي بالتفصيل: فيها إيه؟"
+    try:
+        r = requests.post(
+            base + "/chat/completions",
+            headers={"Authorization": "Bearer " + cfg.api_key,
+                     "Content-Type": "application/json"},
+            json={"model": cfg.api_model,
+                  "messages": [{"role": "system", "content": _LLM_SYSTEM},
+                               {"role": "user", "content": [
+                                   {"type": "text", "text": ask[:2000]},
+                                   {"type": "image_url", "image_url": {"url": image_url}}]}],
+                  "temperature": 0.4,
+                  "max_tokens": 700},
+            timeout=60)
+        r.raise_for_status()
+        text = r.json()["choices"][0]["message"]["content"].strip()
+        return text or None
+    except Exception:
+        return None
+
+
 # ============================================================
 # المخ الكامل — بيجاوب بالترتيب: أدب → حساب → رسم → تعلم →
 # النموذج المحلي → المخ الخارجي → البحث في النت → كلام صريح
@@ -682,6 +724,22 @@ class Brain:
                 "fallback": fallback, "source": source, "matched": matched,
                 "suggestion": suggestion, "image": image,
                 "source_label": source_label}
+
+    def _own_drawing(self, msg, temperature, max_new_tokens):
+        """رسمة النموذج المحلي نفسه (شبكة 12 × 12) لو المطلوب شكل اتعلمه، وإلا None"""
+        if self.engine is None:
+            return None
+        try:
+            from engine import drawings
+            from tokenizer import normalize_question
+            if drawings.what_was_asked(normalize_question(msg))[0] is None:
+                return None
+            out = self.engine.reply(msg, temperature=temperature, max_new_tokens=max_new_tokens)
+            if out.get("fallback") or drawings.parse_grid_loose(out.get("response", "")) is None:
+                return None
+            return out
+        except Exception:
+            return None
 
     def reply(self, message, temperature=0.0, max_new_tokens=1200, **kw):
         t0 = time.time()
@@ -712,12 +770,23 @@ class Brain:
         if math:
             return self._out(math, "math", "حساب", thinking="حسبتها بنفسي بدقة")
 
-        # 4) رسم صورة
+        # 4) رسم صورة. لو المطلوب شكل بسيط النموذج المحلي اتعلمه (قلب، دايرة، علم مصر…)
+        #    seshat بيرسمه بنفسه مربع مربع، ومعاه صورة كاملة من خدمة الرسم.
         draw = try_draw(msg)
         if draw:
+            own = self._own_drawing(msg, temperature, max_new_tokens)
+            arabic = _is_arabic_text(msg)
+            if own:
+                note = ("\n\nدي رسمتي أنا بالمربعات، وتحتها صورة كاملة لنفس الطلب من خدمة الرسم "
+                        "(ممكن تاخد شوية وتظهر)." if arabic else
+                        "\n\nThat is my own pixel drawing. Below it is a full image of the same "
+                        "request from the drawing service (it may take a moment).")
+                return self._out(own["response"] + note, "draw", "رسم seshat + خدمة الرسم",
+                                 thinking=own.get("thinking", ""), image=draw["url"],
+                                 confidence=own.get("confidence", 1.0))
             return self._out(
-                "اتفضل 🙂 رسمتلك «%s» — لو الصورة ماظهرتشن استنى دقيقة "
-                "واجرب تاني (خدمة الرسم المجانية بتسمح بصورة كل 45 ثانية)." % draw["prompt"],
+                "اتفضل 🙂 رسمتلك «%s» — لو الصورة مظهرتش استنى دقيقة "
+                "وجرب تاني (خدمة الرسم المجانية بتسمح بصورة كل 45 ثانية)." % draw["prompt"],
                 "draw", "رسم صورة", thinking="رسمت صورة عن: " + draw["prompt"],
                 image=draw["url"])
 
@@ -766,6 +835,10 @@ class Brain:
             local["seconds"] = round(time.time() - t0, 2)
             return local
 
+        # النموذج المحلي معندوش المعلومة، بس فهم نوع السؤال وموضوعه (engine.py + data/understanding.py)
+        understood = local if local and local.get("source") == "understand" else None
+        arabic = _is_arabic_text(msg)
+
         # 8) المخ الخارجي (لو فيه مفتاح): شبكة عصبية ضخمة بجاوب أي سؤال
         llm = llm_answer(msg, self.cfg)
         if llm:
@@ -773,24 +846,55 @@ class Brain:
             return self._out(llm, "llm", "شبكة عصبية خارجية",
                              thinking="المخ الخارجي جاوب، وخزنت الرد في الذاكرة")
 
-        # 9) بحث في النت — ويكيبيديا و DuckDuckGo
+        # 8.5) أسئلة ردّها معروف من نوعها (رأي، توقع، طلب تنفيذ، سعر النهارده…): البحث
+        #      فيها بيجيب كلام ملوش علاقة، فـ seshat بيرد بالجملة اللي كوّنها من فهمه.
+        if understood and not understood.get("searchable"):
+            return self._understood(understood, t0)
+
+        # 9) بحث في النت — ويكيبيديا و DuckDuckGo. لو seshat حدد موضوع السؤال بنبحث بيه
+        #    ("كلمني عن نابليون" → "نابليون") عشان النتيجة تبقى أدق.
         if self.cfg.search_enabled:
-            web = web_answer(msg)
+            topic = (understood or {}).get("topic") or ""
+            use_topic = topic and understood.get("kind") in ("about", "person")
+            web = (web_answer(topic) if use_topic else None) or web_answer(msg)
             if web:
                 self.learned.add(msg, web["text"], src="web")
+                think = web["think"]
+                if understood:
+                    think = understood.get("thinking", "") + " — " + think
                 return self._out(web["text"], "web", "بحث ويب",
-                                 thinking=web["think"], confidence=0.9)
+                                 thinking=think, confidence=0.9)
 
-        # 10) مفيش حاجة ناسعت → كلام صريح + اقتراح لو النموذج عنده واحد
+        # 10) البحث مجابش حاجة. لو السؤال قريب من سؤال يعرفه → يرد بيه ويقول إنه افترض كده.
         sug = (local or {}).get("suggestion") or ""
-        if sug:
-            text = "مش متأكد إني فهمت سؤالك. تقصد: «%s»؟" % sug
-        else:
-            text = ("لسه ماتعلمتش الرد على السؤال ده ومش قادر أوصل للنت "
-                    "دلوقتي. جرب تاني بعد شوية أو اسألني حاجة تانية.")
-        return self._out(text, "none", "", fallback=True, suggestion=sug,
-                         confidence=0.0)
+        if sug and _other_subject(msg, sug):
+            sug = ""          # نفس شكل السؤال بس عن حاجة تانية (سكان الصين ≠ سكان مصر)
+        if sug and self.engine is not None:
+            try:
+                near = self.engine.reply(sug, temperature=temperature,
+                                         max_new_tokens=max_new_tokens)
+            except Exception:
+                near = None
+            if near and not near.get("fallback"):
+                lead = ("لو قصدك «%s»:\n" if arabic else "If you mean “%s”:\n") % sug
+                return self._out(lead + near["response"], "memory", "أقرب سؤال",
+                                 thinking=(local or {}).get("thinking", ""),
+                                 confidence=(local or {}).get("confidence", 0.0),
+                                 matched=sug)
+        # 11) وإلا → الرد اللي seshat كوّنه من فهمه للسؤال (مش جملة ثابتة)
+        if understood:
+            return self._understood(understood, t0)
+        text = ("مش قادر أحدد قصدك من «%s». ممكن تقولها بكلمات تانية؟" if arabic else
+                "I cannot tell what you mean by “%s”. Could you say it in other words?") % msg[:80]
+        return self._out(text, "none", "", fallback=True, confidence=0.0)
 
+    def _understood(self, local, t0):
+        """رد متكوّن من فهم السؤال (نوعه وموضوعه) — بيتعرض كرد عادي مش كـ\"مش عارف\""""
+        out = dict(local)
+        out.update(fallback=False, source="understand", source_label="فهم السؤال",
+                   image=None, seconds=round(time.time() - t0, 2))
+        out["confidence"] = 1.0 if out.get("understood_by") in ("model", "model-text", "rules") else 0.5
+        return out
 
 if __name__ == "__main__":
     # اختبار سريع من التيرمنال:  python brain.py "انت اهبل"
