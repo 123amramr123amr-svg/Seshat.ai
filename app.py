@@ -247,6 +247,18 @@ def chat():
         return jsonify({"response": "حصلت مشكلة جوه السيرفر. جرب تاني بعد شوية.",
                         "thinking": "", "confidence": 0.0, "seconds": 0, "fallback": True,
                         "source": "none", "matched": "", "suggestion": ""}), 500
+    
+    # Optional: Enhance with Nawah (البنية التحتية المتقدمة)
+    if os.environ.get("SESHAT_USE_NAWAH", "0") == "1" and out.get("response"):
+        try:
+            from nawah_integration import get_nawah_brain
+            nawah_brain = get_nawah_brain()
+            enhanced = nawah_brain.enhance_reply(msg, out.get("response", ""), temperature)
+            out["response"] = enhanced["reply"]
+            out["nawah_analysis"] = enhanced["analysis"]
+        except Exception as e:
+            app.logger.warning(f"Nawah enhancement failed: {e}")
+    
     if isinstance(image, dict) and not last_image and out.get("source") == "none" \
             and not out.get("suggestion"):
         out["response"] = vision.help_text(vision.is_arabic(msg))
