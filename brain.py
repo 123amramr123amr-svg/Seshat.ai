@@ -13,7 +13,8 @@ seshat.chet — المخ الجديد (brain.py)
      على طول. وكمان يقدر تعلمه بيدويًا بصيغتين:
          علمني: س: اللعبة المفضلة لعمرو ج: الشطرنج
          علمني: ايه اللعبة المفضلة لعمرو؟ الشطرنج   (صيغة مرنة: سؤال؟ جواب)
-  4. إنشاء صور — "ارسم لي قطة" بموقع مجاني من غير مفتاح (pollinations.ai).
+  4. الرسم — "ارسم قطة سودا وشمس": النموذج المحلي بيرسم بنفسه (engine.draw). صور الخدمة
+     الخارجية مقفولة افتراضيًا (SESHAT_EXTERNAL_IMAGES=1 بيفتحها).
   5. مخ خارجي اختياري — لو ضفت مفتاح API متوافق مع OpenAI (زرار الإعدادات
      ⚙ في الواجهة أو متغيرات البيئة)، الردود بتشتغل بشبكة عصبية ضخمة بترد
      على أي سؤال في الدنيا — و seshat لسه بيحافظ على هويته (seshat من
@@ -64,6 +65,8 @@ class BrainConfig:
         self.api_base = os.environ.get("SESHAT_API_BASE", "https://api.openai.com/v1")
         self.api_model = os.environ.get("SESHAT_API_MODEL", "gpt-4o-mini")
         self.search_enabled = os.environ.get("SESHAT_SEARCH", "1") != "0"
+        # صور من خدمة خارجية للحاجات اللي seshat لسه مبيعرفش يرسمها (مقفولة افتراضيًا)
+        self.external_images = os.environ.get("SESHAT_EXTERNAL_IMAGES", "0") == "1"
         self.reload()
 
     def reload(self):
@@ -484,7 +487,7 @@ def try_math(message):
 
 
 # ============================================================
-# رسم صور — مجانًا ومن غير مفتاح (pollinations.ai)
+# طلب الرسم: استخراج الوصف (+ رابط الخدمة الخارجية الاختيارية pollinations.ai، مقفولة افتراضيًا)
 # ============================================================
 _DRAW_RE = re.compile(
     r"\b(ارسم|ارسمي|ارسمها?|ارسملي|ارسم\s*لي|اعمل\s*صوره|انشئ\s*صوره|"
@@ -779,18 +782,11 @@ class Brain:
                 "source_label": source_label}
 
     def _own_drawing(self, msg, temperature, max_new_tokens):
-        """رسمة النموذج المحلي نفسه (شبكة 12 × 12) لو المطلوب شكل اتعلمه، وإلا None"""
-        if self.engine is None:
+        """رسمة النموذج المحلي نفسه. بيرجع رد المحرك (ممكن يكون fallback) أو None لو مفيش محرك."""
+        if self.engine is None or not hasattr(self.engine, "draw"):
             return None
         try:
-            from engine import drawings
-            from tokenizer import normalize_question
-            if drawings.what_was_asked(normalize_question(msg))[0] is None:
-                return None
-            out = self.engine.reply(msg, temperature=temperature, max_new_tokens=max_new_tokens)
-            if out.get("fallback") or drawings.parse_grid_loose(out.get("response", "")) is None:
-                return None
-            return out
+            return self.engine.draw(msg, temperature=temperature, max_new_tokens=max_new_tokens)
         except Exception:
             return None
 
@@ -823,25 +819,33 @@ class Brain:
         if math:
             return self._out(math, "math", "حساب", thinking="حسبتها بنفسي بدقة")
 
-        # 4) رسم صورة. لو المطلوب شكل بسيط النموذج المحلي اتعلمه (قلب، دايرة، علم مصر…)
-        #    seshat بيرسمه بنفسه مربع مربع، ومعاه صورة كاملة من خدمة الرسم.
+        # 4) رسم صورة: seshat بيرسم بنفسه (النموذج بيكتب الرسمة مربع مربع والمحرك بيراجعها).
+        #    الصور اللي من خدمة خارجية (pollinations.ai) مقفولة افتراضيًا: دي مش رسمه،
+        #    وبتطلع ساعات حاجة غير المطلوب. تتفتح بـ SESHAT_EXTERNAL_IMAGES=1 وبتتكتب عليها
+        #    إنها من خدمة خارجية.
         draw = try_draw(msg)
         if draw:
             own = self._own_drawing(msg, temperature, max_new_tokens)
             arabic = _is_arabic_text(msg)
-            if own:
-                note = ("\n\nدي رسمتي أنا بالمربعات، وتحتها صورة كاملة لنفس الطلب من خدمة الرسم "
-                        "(ممكن تاخد شوية وتظهر)." if arabic else
-                        "\n\nThat is my own pixel drawing. Below it is a full image of the same "
-                        "request from the drawing service (it may take a moment).")
-                return self._out(own["response"] + note, "draw", "رسم seshat + خدمة الرسم",
-                                 thinking=own.get("thinking", ""), image=draw["url"],
+            external = self.cfg.external_images
+            if own and not own.get("fallback"):
+                return self._out(own["response"], "draw", "رسم seshat",
+                                 thinking=own.get("thinking", ""),
                                  confidence=own.get("confidence", 1.0))
-            return self._out(
-                "اتفضل 🙂 رسمتلك «%s» — لو الصورة مظهرتش استنى دقيقة "
-                "وجرب تاني (خدمة الرسم المجانية بتسمح بصورة كل 45 ثانية)." % draw["prompt"],
-                "draw", "رسم صورة", thinking="رسمت صورة عن: " + draw["prompt"],
-                image=draw["url"])
+            if external:
+                note = ("الصورة دي مش رسمي أنا — دي من خدمة خارجية (pollinations.ai) عن «%s»، "
+                        "وممكن تطلع مش زي الوصف بالظبط." if arabic else
+                        "This image is not my own drawing. It comes from an external service "
+                        "(pollinations.ai) for “%s” and may not match the description exactly.")
+                return self._out(note % draw["prompt"], "draw", "خدمة رسم خارجية",
+                                 thinking="طلب رسم لحاجة مش من اللي اتعلمت أرسمه → خدمة خارجية",
+                                 image=draw["url"], confidence=0.5)
+            if own:
+                return self._out(own["response"], "draw", "رسم seshat",
+                                 thinking=own.get("thinking", ""), fallback=True, confidence=0.0)
+            return self._out("الرسم محتاج النموذج المحلي، وهو مش شغال دلوقتي." if arabic else
+                             "Drawing needs the local model, which is not loaded right now.",
+                             "draw", "رسم seshat", fallback=True)
 
         # 5) تعليم يدوي: علمني: س: … ج: …
         teach = parse_teach(msg)

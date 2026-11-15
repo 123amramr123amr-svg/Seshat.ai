@@ -36,10 +36,10 @@ CAT_WEIGHTS = {
     "knowledge": 3.0,
     "programming": 3.0,
     "code": 1.2,
-    "translate": 0.5,
-    "capital": 0.8,
+    "translate": 0.8,
+    "capital": 1.5,
     "math": 0.3,
-    "draw": 6.0,          # الرسومات طويلة ولازم تتكتب صح رمز رمز
+    "draw": 2.5,          # 896 رد رسم (44 رسمة × 11 لون × لغتين) ≈ 38% من التدريب
     "unknown": 0.3,       # فهم سؤال برّه معلوماته: رد لكل (نوع، موضوع) — وهم كتير
 }
 UNKNOWN_FIXED_WEIGHT = 14.0     # الأنواع اللي من غير موضوع: رد واحد وراه عشرات الأسئلة
@@ -263,8 +263,17 @@ def load_draw_intents(held_out=False):
     """held_out=True: التركيبات اللي النموذج مبيتدربش عليها (للاختبار بس)"""
     sys.path.insert(0, DATA_DIR)
     import drawings
-    return [Intent(qs, answer, "draw", aug=False, typo=False)
-            for qs, answer in drawings.build(include_held_out=held_out)]
+    out = []
+    for key, code in drawings.combos(held_out):
+        ar_qs, en_qs = drawings._questions(key, code)
+        # الرسمة اللي ليها لون واحد (علم مصر) ليها ردّين بس والباقي 22، فبتتوزن أتقل
+        # عشان النموذج يشوفها قد أي رسمة تانية تقريبًا
+        weight = 6.0 if key in drawings.FIXED_COLOR else 1.0
+        out += [Intent(ar_qs, drawings.answer(key, code, True), "draw", weight=weight,
+                       aug=False, typo=False),
+                Intent(en_qs, drawings.answer(key, code, False), "draw", weight=weight,
+                       aug=False, typo=False)]
+    return out
 
 
 # ============================================================
@@ -327,7 +336,8 @@ def build_intents(holdout=True, verbose=True):
         it.questions = keep
     intents = [it for it in intents if it.questions]
     for it in intents:
-        it.weight = CAT_WEIGHTS.get(it.cat, 1.0)
+        # الوزن اللي اتحدد للرد نفسه (زي علم مصر في الرسم) بيتضرب في وزن الفئة
+        it.weight = CAT_WEIGHTS.get(it.cat, 1.0) * (it.weight if it.cat == "draw" else 1.0)
         if it.cat == "unknown" and not it.topic:
             it.weight = UNKNOWN_FIXED_WEIGHT
         if normalize_question(it.canonical) in IDENTITY_QUESTIONS:

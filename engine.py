@@ -81,14 +81,20 @@ UNKNOWN_MARGIN = 0.15     # لو السؤال أقرب بكتير لموضوع �
 MATH_LABEL = "حساب"       # نوع السؤال في سطر التفكير لما يكون مسألة حساب
 DRAW_LABELS = ("رسم |", "drawing |")      # سطر التفكير لما يكون المطلوب رسمة
 DRAW_WORDS = ("ارسم", "ارسملي", "ارسمي", "draw")
-DRAW_MAX_WRONG = 20       # أقصى عدد مربعات غلط (من 144) عشان الرسمة تتعرض — وبنقول العدد
-DRAW_HELP_AR = ("لسه بعرف أرسم أشكال بسيطة بس: دايرة، حلقة، مربع، مستطيل، مثلث، معيّن، علامة زائد، "
-                "قلب، سهم، خط — بأي لون (أحمر، أخضر، أزرق، أصفر، برتقالي، بنفسجي، أسود، بمبي) — "
-                "وكمان: شمس، شجرة، بيت، علم مصر، وش مبتسم، هرم. جرب: ارسم قلب أحمر.")
-DRAW_HELP_EN = ("I can only draw simple shapes so far: circle, ring, square, rectangle, triangle, "
-                "diamond, plus, heart, arrow, line — in red, green, blue, yellow, orange, purple, "
-                "black or pink — and also: sun, tree, house, flag of Egypt, smiley face, pyramid. "
-                "Try: draw a red heart.")
+DRAW_MAX_WRONG = 20       # أقصى عدد مربعات غلط (من 256) عشان الرسمة تتعرض — وبنقول العدد
+DRAW_MAX_OBJECTS = 3      # أقصى عدد رسومات جنب بعض في صورة واحدة
+
+
+def draw_help(arabic):
+    """لما المطلوب حاجة لسه ماتعلمش يرسمها: بيقول بصراحة هو بيعرف يرسم إيه"""
+    names = "، ".join(drawings.known_names(True)) if arabic else ", ".join(drawings.known_names(False))
+    if arabic:
+        return ("دي لسه ماتعلمتش أرسمها. أنا برسم بنفسي مربع مربع، واللي اتعلمته لحد دلوقتي: "
+                f"{names}. وأي واحدة فيهم بأي لون (أحمر، أخضر، أزرق، أصفر، برتقالي، بنفسجي، أسود، "
+                "بمبي، أبيض، بني، رمادي)، وينفع لحد 3 رسومات مع بعض. جرب: ارسم قطة سودا وشمس.")
+    return ("I have not learned to draw that yet. I draw by myself, cell by cell, and so far I know: "
+            f"{names}. Any of them in red, green, blue, yellow, orange, purple, black, pink, white, "
+            "brown or grey, and up to 3 drawings together. Try: draw a black cat and a sun.")
 
 # ============================================================
 # استخراج السؤال من رسالة طويلة
@@ -432,19 +438,15 @@ class BaseSeshat:
         model = self._model_reply(message, question, temperature, max_new_tokens, True)
         thinking = model["thinking"]
 
-        # 2.5) رسم: النموذج هو اللي بيرسم (بيكتب شبكة 12 × 12 رمز)، وإحنا بنتأكد إن
-        #      الرسمة سليمة وإنها الشكل واللون اللي اتطلبوا. لو لأ → بنقول كده بصراحة.
-        shape, color = drawings.what_was_asked(question)
+        # 2.5) رسم: النموذج هو اللي بيرسم (بيكتب الرسمة حرف حرف)، وإحنا بنتأكد إن الرسمة
+        #      سليمة وإنها الحاجة واللون اللي اتطلبوا. لو لأ → بنقول كده بصراحة.
+        objects = drawings.find_objects(question, DRAW_MAX_OBJECTS)
         wants_drawing = any(w in question.split() for w in DRAW_WORDS)
         thinks_drawing = thinking.startswith(DRAW_LABELS)
-        if shape is not None and (thinks_drawing or wants_drawing):
-            return self._check_drawing(model, shape, color, arabic)
+        if objects and (thinks_drawing or wants_drawing):
+            return self._draw(objects, arabic, temperature, max_new_tokens, first=model)
         if wants_drawing or (thinks_drawing and (known is None or known.score < MEMORY_STRONG)):
-            return {"response": DRAW_HELP_AR if arabic else DRAW_HELP_EN,
-                    "thinking": "طلب رسمة لشكل لسه ماتعلمتوش" if arabic
-                    else "a drawing of a shape I have not learned",
-                    "confidence": 0.0, "fallback": True, "source": "none", "matched": "",
-                    "suggestion": ""}
+            return self._cannot_draw(arabic)
 
         # 3) سؤال قريب جدًا من سؤال متخزن
         #    (بس مش لو السؤالين عن حاجتين مختلفتين: "سكان الصين" مش "سكان مصر")
@@ -470,40 +472,98 @@ class BaseSeshat:
 
         return dont_know()
 
-    def _check_drawing(self, model, shape, color, arabic):
+    def _cannot_draw(self, arabic):
+        return {"response": draw_help(arabic),
+                "thinking": "طلب رسمة لحاجة لسه ماتعلمتش أرسمها" if arabic
+                else "a drawing of something I have not learned to draw",
+                "confidence": 0.0, "fallback": True, "source": "none", "matched": "",
+                "suggestion": ""}
+
+    def draw(self, message, temperature=0.0, max_new_tokens=600):
         """
-        بيراجع الرسمة اللي النموذج كتبها قبل ما تتعرض: شبكة سليمة 12 × 12، ونفس الشكل
-        واللون المطلوبين، ومش بعيدة عن الشكل الصح بأكتر من DRAW_MAX_WRONG مربع.
-        الرسمة اللي بتتعرض هي اللي النموذج كتبها: السطر الناقص بيتكمل فاضي والزايد بيتقص
-        (parse_grid_loose)، ومفيش خانة بتتغير. وعدد المربعات الغلط بيتكتب في الرد.
+        طلب رسم صريح (المخ اتأكد إنه طلب رسم). بيرجع رد فيه الرسمة، أو رد بيقول بصراحة
+        إن المطلوب مش من اللي اتعلم يرسمه (fallback=True).
         """
-        loose = drawings.parse_grid_loose(model["response"])
-        grid = loose[0] if loose else None
-        thought = drawings.what_was_asked(model["thinking"].split("|", 1)[-1].strip())
-        ok = grid is not None and not model["fallback"] and thought[0] == shape
-        if ok:
-            want = (drawings.grid_for(shape, color or drawings.DEFAULT_COLOR)
-                    if shape in drawings.SHAPES else drawings.FIXED[shape][4])
-            wrong = sum(a != b for x, y in zip(grid, want) for a, b in zip(x, y))
-            ok = wrong <= DRAW_MAX_WRONG
-        if ok:
-            head = model["response"].split("```draw", 1)[0].rstrip()
-            text = head + "\n" + drawings.block(grid)
-            if wrong:
-                # الرسمة بتتعرض زي ما النموذج كتبها (السطور بس بتتظبط على 12 خانة) وبنقول
-                # بصراحة فيها كام مربع مش في مكانه
-                text += (f"\n(دي رسمتي أنا مربع مربع، وفيها {wrong} مربع من 144 مش في مكانه — لسه بتعلم.)"
-                         if arabic else
-                         f"\n(I drew this cell by cell; {wrong} of 144 cells are off — still learning.)")
-            model.update(response=text, source="model", matched="", suggestion="",
-                         wrong_cells=wrong, rows_padded=loose[1])
-            return model
-        return {"response": ("حاولت أرسمها بس الرسمة طلعت مش مظبوطة، فمش هعرضها. جرب شكل أو لون تاني."
-                             if arabic else
-                             "I tried to draw it but the drawing came out wrong, so I won't show it. "
-                             "Try another shape or color."),
-                "thinking": model["thinking"], "confidence": model["confidence"],
-                "fallback": True, "source": "none", "matched": "", "suggestion": ""}
+        from tokenizer import normalize_question
+        arabic = is_arabic(message)
+        objects = drawings.find_objects(normalize_question(message), DRAW_MAX_OBJECTS)
+        if not objects:
+            return self._cannot_draw(arabic)
+        return self._draw(objects, arabic, temperature, max_new_tokens)
+
+    def _draw_one(self, key, code, arabic, temperature, max_new_tokens, first=None):
+        """
+        النموذج بيرسم حاجة واحدة. بنراجع اللي كتبه: رسمة سليمة (16 سطر مجموع كل سطر 16)،
+        واللون الأساسي هو المطلوب، ومش بعيدة عن الشكل الصح بأكتر من DRAW_MAX_WRONG مربع.
+        بيرجع (الشبكة، عدد المربعات الغلط، عدد السطور اللي طولها اتظبط) أو None.
+        first = رد النموذج على رسالة المستخدم نفسها (لو موجود بنجربه الأول)، وبعده بنسأل
+        النموذج بالصيغة الأساسية ("ارسم قطه سودا").
+        """
+        want = drawings.grid_for(key, code)
+        tries = [first] if first is not None else []
+        for attempt in range(len(tries) + 1):
+            if attempt < len(tries):
+                out = tries[attempt]
+            else:
+                q = drawings.canonical(key, code, arabic)
+                out = self._model_reply(q, q, temperature, max_new_tokens, False)
+            if out.get("fallback"):
+                continue
+            got = drawings.decode(out["response"])
+            if got is None or got[1] != code:
+                continue
+            wrong = sum(a != b for x, y in zip(got[0], want) for a, b in zip(x, y))
+            if wrong <= DRAW_MAX_WRONG:
+                return got[0], wrong, got[2]
+        return None
+
+    def _draw(self, objects, arabic, temperature, max_new_tokens, first=None):
+        """
+        بيرسم المطلوب (رسمة أو أكتر جنب بعض). كل رسمة النموذج بيكتبها لوحدها، والمحرك
+        بيحطهم جنب بعض في صورة واحدة. الرسمة اللي بتتعرض هي اللي النموذج كتبها من غير
+        تصليح، وعدد المربعات اللي مش في مكانها بيتكتب في الرد.
+        """
+        done, failed, wrong_total, padded = [], [], 0, 0
+        for i, (key, color) in enumerate(objects):
+            code = color or drawings.OBJECTS[key][6]
+            got = self._draw_one(key, code, arabic, temperature, max_new_tokens,
+                                 first=first if (i == 0 and len(objects) == 1) else None)
+            name = drawings.title(key, code, arabic)
+            if got is None:
+                failed.append(name)
+                continue
+            done.append((name, got[0]))
+            wrong_total += got[1]
+            padded += got[2]
+        think = ("رسم | " if arabic else "drawing | ") + (" + ".join(
+            drawings.title(k, c or drawings.OBJECTS[k][6], arabic) for k, c in objects))
+        if not done:
+            return {"response": ("حاولت أرسم " + " و".join(failed) + " بس الرسمة طلعت مش مظبوطة، "
+                                 "فمش هعرضها. جرب تاني أو اطلب حاجة تانية."
+                                 if arabic else
+                                 "I tried to draw " + " and ".join(failed) + " but the drawing came "
+                                 "out wrong, so I will not show it. Try again or ask for something else."),
+                    "thinking": think, "confidence": 0.0, "fallback": True, "source": "none",
+                    "matched": "", "suggestion": ""}
+        names = [n for n, _ in done]
+        cells = drawings.N * drawings.N * len(done)
+        if arabic:
+            text = "دي رسمة " + " و".join(names) + ":\n" + drawings.full_block([g for _, g in done])
+            if wrong_total:
+                text += f"\n(رسمتها أنا مربع مربع، وفيها {wrong_total} مربع من {cells} مش في مكانه.)"
+            if failed:
+                text += "\nمعرفتش أظبط رسمة " + " و".join(failed) + "، فمعرضتهاش."
+        else:
+            text = "Here is a " + " and a ".join(names) + ":\n" + drawings.full_block([g for _, g in done])
+            if wrong_total:
+                text += f"\n(I drew it cell by cell; {wrong_total} of {cells} cells are off.)"
+            if failed:
+                text += "\nI could not get " + " and ".join(failed) + " right, so I left it out."
+        return {"response": text, "thinking": think,
+                "confidence": round(1.0 - wrong_total / cells, 3), "fallback": False,
+                "source": "model", "matched": "", "suggestion": "",
+                "wrong_cells": wrong_total, "rows_padded": padded,
+                "drawn": len(done), "not_drawn": len(failed)}
 
     def _model_reply(self, message, question, temperature, max_new_tokens, use_fallback):
         """رد النموذج لوحده: بيكتب سطر التفكير وبعدين الرد"""

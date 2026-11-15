@@ -137,7 +137,7 @@
   /* رسمة seshat: شبكة مربعات ملونة */
   .drawing { margin: 8px 0; display: inline-block; direction: ltr; }
   .drawing canvas {
-    display: block; width: 216px; height: 216px;
+    display: block; max-width: 100%; height: auto;
     border-radius: 10px; border: 1px solid var(--line);
     image-rendering: pixelated;
   }
@@ -345,7 +345,7 @@
   <div class="wrap" id="chat">
     <div class="welcome" id="welcome">
       <h1>أهلاً، أنا seshat</h1>
-      <p>بتكلم عربي وإنجليزي، بكتب أكواد، برسم أشكال بسيطة، وبعدّل الصور اللي تبعتهالي. جرب واحدة من دول:</p>
+      <p>بتكلم عربي وإنجليزي، بكتب أكواد، برسم بنفسي (قطة، بيت، عربية، شمس… بأي لون)، وبعدّل الصور اللي تبعتهالي. جرب واحدة من دول:</p>
       <div class="chips">
         <button class="chip">اسمك ايه</button>
         <button class="chip">مين طورك</button>
@@ -356,7 +356,7 @@
         <button class="chip">يعني ايه book</button>
         <button class="chip">7 × 8</button>
         <button class="chip">عاصمة اليابان ايه</button>
-        <button class="chip">ارسم لي قطة بتنظر للقمر</button>
+        <button class="chip">ارسم قطة سودا وشمس</button>
         <button class="chip">مين اكتشف امريكا</button>
         <button class="chip">علمني: س: لعبة عمرو المفضلة ج: الشطرنج</button>
         <button class="chip">علمني: ايه عاصمة تشاد؟ هي ندجامنا</button>
@@ -465,21 +465,27 @@
   var PALETTE = {{ palette|tojson }};
   var GRID = {{ grid|tojson }};
   function drawGrid(code) {
-    var rows = code.split("\n");
-    var cell = 24, size = GRID * cell;
+    // السطور = صفوف الرسمة. الحجم بييجي من الرسمة نفسها (رسمة واحدة 16 × 16، أو كذا رسمة جنب بعض)
+    var rows = code.replace(/\n+$/, "").split("\n");
+    var cols = 0;
+    for (var i = 0; i < rows.length; i++) cols = Math.max(cols, rows[i].length);
+    var done = rows.length >= GRID && cols >= GRID;
+    var nRows = Math.max(rows.length, GRID);
+    cols = Math.max(cols, GRID);
+    var cell = Math.max(6, Math.min(18, Math.floor(600 / cols)));
     var box = el("div", "drawing");
     var cv = document.createElement("canvas");
-    cv.width = size; cv.height = size;
+    cv.width = cols * cell; cv.height = nRows * cell;
     var g = cv.getContext("2d");
-    g.fillStyle = PALETTE["."]; g.fillRect(0, 0, size, size);
-    for (var y = 0; y < rows.length && y < GRID; y++) {
-      for (var x = 0; x < rows[y].length && x < GRID; x++) {
+    g.fillStyle = PALETTE["."]; g.fillRect(0, 0, cv.width, cv.height);
+    for (var y = 0; y < rows.length; y++) {
+      for (var x = 0; x < rows[y].length; x++) {
         var color = PALETTE[rows[y].charAt(x)];
         if (color) { g.fillStyle = color; g.fillRect(x * cell, y * cell, cell, cell); }
       }
     }
     box.appendChild(cv);
-    if (rows.length >= GRID) {                    // الرسمة كملت → زرار حفظ
+    if (done) {                                   // الرسمة كملت → زرار حفظ
       var a = el("a", "save", "حفظ PNG");
       a.download = "seshat-drawing.png";
       a.href = cv.toDataURL("image/png");
