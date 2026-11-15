@@ -296,3 +296,28 @@ A: The frontend is the part of a website the user sees. The backend is the serve
 
 Q: what is open source | open source
 A: Open source means the code of a program is available for anyone to read, change, and share.
+
+# ---------- Round 13 knowledge (manual) ----------
+q: how many planets are there | planets in the solar system
+a: There are 8 planets in the solar system; Pluto was reclassified as a dwarf planet in 2006.
+
+q: speed of light | how fast is light
+a: Light travels at about 299,792 kilometers per second in a vacuum.
+
+q: who discovered penicillin
+a: Alexander Fleming discovered penicillin in 1928, which opened the antibiotic era.
+
+q: first man on the moon | who walked on the moon first
+a: Neil Armstrong was the first person to walk on the Moon, on July 20, 1969, during Apollo 11.
+
+q: tallest mountain in the world | highest mountain
+a: Mount Everest is the highest mountain above sea level, about 8,849 meters.
+
+q: largest ocean in the world
+a: The Pacific Ocean is the largest ocean on Earth, covering about a third of the planet's surface.
+
+q: who wrote romeo and juliet
+a: William Shakespeare wrote Romeo and Juliet around 1595.
+
+q: smallest country in the world
+a: Vatican City is the smallest country in the world, with an area of about 0.44 square kilometers.
