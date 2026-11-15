@@ -24,6 +24,27 @@ from engine import Seshat, drawings, _trim_memory
 from brain import Brain
 from models import list_models
 
+# ---------------- خوفو (نموذج الصور) ----------------
+import sys
+import uuid
+KHUFU_DIR = os.path.join(os.path.dirname(__file__), "..", "khufu")
+if os.path.exists(KHUFU_DIR):
+    sys.path.insert(0, KHUFU_DIR)
+    try:
+        import scenes as khufu_scenes
+        from generate import generate as khufu_generate
+        KHUFU_READY = True
+    except Exception:
+        KHUFU_READY = False
+else:
+    KHUFU_READY = False
+
+KHUFU_GEN_DIR = os.path.join(KHUFU_DIR, "data", "generated") if KHUFU_READY else None
+if KHUFU_GEN_DIR:
+    os.makedirs(KHUFU_GEN_DIR, exist_ok=True)
+_khufu_jobs = {}
+_khufu_lock = threading.Lock()
+
 app = Flask(__name__)
 app.json.ensure_ascii = False
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
@@ -235,6 +256,84 @@ def chat():
 @app.errorhandler(413)
 def too_large(_):
     return jsonify({"error": "الملف أو الرسالة أكبر من الحد المسموح."}), 413
+
+
+# ---------------- routes لخوفو (نموذج الصور) ----------------
+
+@app.route("/khufu-app")
+def khufu_app():
+    if not KHUFU_READY:
+        return "خوفو مش جاهز — تأكد إن مجلد khufu موجود", 500
+    khufu_html = os.path.join(KHUFU_DIR, "templates", "index.html")
+    if not os.path.exists(khufu_html):
+        return "ملف واجهة خوفو مش موجود", 404
+    return send_file(khufu_html)
+
+
+@app.route("/khufu-generate", methods=["POST"])
+def khufu_gen():
+    if not KHUFU_READY:
+        return jsonify(error="خوفو مش جاهز"), 500
+    data = request.get_json(force=True)
+    subject = str(data.get("subject", "")).strip()
+    size = int(data.get("size", 64))
+    steps = int(data.get("steps", 50))
+    seed = data.get("seed")
+    seed = int(seed) if seed not in (None, "") else None
+    if size not in (32, 64, 96, 128):
+        return jsonify(error="الأبعاد لازم تكون 32 أو 64 أو 96 أو 128"), 400
+    if steps not in (20, 50, 100):
+        return jsonify(error="الجودة لازم تكون 20 أو 50 أو 100 خطوة"), 400
+    cid = subject if subject in khufu_scenes.CLASS_IDS else khufu_scenes.class_from_text(subject)
+    if cid is None:
+        return jsonify(error="مش عارف أرسم «" + subject + "» — اختار حاجة من القائمة"), 400
+    jid = uuid.uuid4().hex[:12]
+    with _khufu_lock:
+        _khufu_jobs[jid] = {"status": "running", "cid": cid, "size": size, "steps": steps, "seed": seed}
+
+    def run():
+        try:
+            img, _cid = khufu_generate(cid, size=size, steps=steps, seed=seed)
+            path = os.path.join(KHUFU_GEN_DIR, jid + ".png")
+            img.save(path)
+            with _khufu_lock:
+                _khufu_jobs[jid].update(status="done", path=path,
+                                         kb=max(1, os.path.getsize(path) // 1024))
+        except Exception as e:
+            with _khufu_lock:
+                _khufu_jobs[jid].update(status="error", error=str(e))
+
+    threading.Thread(target=run, daemon=True).start()
+    return jsonify(id=jid)
+
+
+@app.route("/khufu-generated/<jid>.png")
+def khufu_get_img(jid):
+    with _khufu_lock:
+        job = _khufu_jobs.get(jid)
+    if not job:
+        return "مش موجود", 404
+    if job["status"] == "running":
+        return jsonify(status="running"), 202
+    if job["status"] == "error":
+        return jsonify(error=job.get("error", "حصل خطأ")), 500
+    return send_file(job["path"])
+
+
+@app.route("/khufu-status")
+def khufu_status():
+    if not KHUFU_READY:
+        return jsonify(ready=False, error="خوفو مش جاهز")
+    status_path = os.path.join(KHUFU_DIR, "data", "status.json")
+    try:
+        import json as _json
+        with open(status_path, encoding="utf-8") as f:
+            st = _json.load(f)
+    except Exception:
+        st = {"step": 0, "loss": None}
+    st["ready"] = os.path.exists(os.path.join(KHUFU_DIR, "data", "khufu_latest.pt"))
+    st["classes"] = [{"id": c[0], "ar": c[1]} for c in khufu_scenes.CLASSES]
+    return jsonify(st)
 
 
 if __name__ == "__main__":
