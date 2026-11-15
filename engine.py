@@ -514,6 +514,15 @@ class BaseSeshat:
         fallback = lost or thinking in (UNKNOWN_AR, UNKNOWN_EN)   # النموذج نفسه قال مش عارف
         if fallback:
             text = FALLBACK_AR if is_arabic(message) else FALLBACK_EN
+        # شبكة أمان الحساب: لو السؤال نفسه فيه مسألة واحدة نضيفة (كل أرقامه هي
+        # أرقام المسألة)، المحرك بيحسبها بنفسه ويرد مضمون — سوا النموذج تاه أو
+        # فهم غلط أو قال مش مفهوم، وده مهم للرسايل الطويلة اللي فيها حساب في الآخر
+        m = _math_from_question(question)
+        if m:
+            a, sym, b = m
+            return {"response": f"{a} {sym} {b} = {_solve(a, sym, b)}",
+                    "thinking": f"{MATH_LABEL} | {a} {sym} {b}",
+                    "confidence": 1.0, "fallback": False}
         understood = None if fallback else understanding.parse_think(thinking)
         if understood is not None:
             # النموذج فهم إن السؤال برّه معلوماته وكوّن رد من نوعه وموضوعه
@@ -521,7 +530,7 @@ class BaseSeshat:
                     "confidence": round(float(confidence), 3), "fallback": True,
                     "kind": understood[0], "topic": understood[1]}
         # فحص ثاني للحساب: لو المسألة اتقرت صح، المحرك بيحسب الناتج بنفسه وبيصلح
-        # الرد — ساعتها الرد مضمون مهما كانت ثقة النموذج
+        # الرد — ساعتها الرد مضمون مهما كانت ثقة النموذج (لما النموذج فهمها فعلاً)
         verified = False
         if not fallback:
             fixed = _verify_math(question, thinking, text)
