@@ -1,4 +1,4 @@
-"""Central catalog for the C Chat model family.
+"""Central catalog for the seshat.chet model family.
 
 Only models that are actually wired to an inference backend should be marked active.
 Add future model versions here when their checkpoints and runtime adapters exist.
@@ -6,12 +6,12 @@ Add future model versions here when their checkpoints and runtime adapters exist
 
 MODEL_CATALOG = (
     {
-        "id": "khufu-1.0",
-        "name": "خوفو 1.0",
-        "family": "C Chat",
+        "id": "seshat-1.0",
+        "name": "seshat 1.0",
+        "family": "seshat.chet",
         "status": "active",
         "engine": "local",
-        "description": "أول نموذج محلي تجريبي ضمن منصة C Chat.",
+        "description": "أول نموذج محلي تجريبي ضمن منصة seshat.chet.",
     },
 )
 

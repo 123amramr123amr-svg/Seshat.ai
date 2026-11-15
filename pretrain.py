@@ -1,4 +1,4 @@
-"""Causal language-model pretraining for Khufu 1.0.
+"""Causal language-model pretraining for seshat.
 
 Put UTF-8 Arabic and English text files in data/corpus/ (or pass --corpus-dir).
 This trains next-character prediction, so the model learns language patterns instead
@@ -23,9 +23,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Khufu 1.0 Arabic/English language pretraining")
+    p = argparse.ArgumentParser(description="seshat Arabic/English language pretraining")
     p.add_argument("--corpus-dir", default=os.path.join(HERE, "data", "corpus"))
-    p.add_argument("--out", default=os.path.join(HERE, "khufu_1_0_ctx1024.npz"))
+    p.add_argument("--out", default=os.path.join(HERE, "seshat_ctx1024.npz"))
     p.add_argument("--size", choices=list(PRESETS), default="tiny")
     p.add_argument("--block-size", type=int, default=1024,
                    help="Context length in characters for the current character tokenizer")
@@ -144,7 +144,7 @@ def main():
     safe_batch = max(1, budget_bytes // max(1, bytes_per_cell * cfg.block_size * cfg.block_size))
     batch_size = max(1, min(args.batch_size, int(safe_batch)))
 
-    print(f"Khufu 1.0 | device={device} | params={model.num_params():,}")
+    print(f"seshat | device={device} | params={model.num_params():,}")
     print(f"Corpus files={len(paths)} | chars={len(all_ids):,} | vocab={tok.vocab_size}")
     print(f"Context={cfg.block_size} characters | batch={batch_size} | start_step={start_step}")
 

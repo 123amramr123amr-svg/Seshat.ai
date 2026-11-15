@@ -1,4 +1,4 @@
-# Khufu 1.0 language corpus
+# seshat language corpus
 
 Put UTF-8 plain-text `.txt` files in this folder (subfolders are supported).
 

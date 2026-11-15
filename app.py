@@ -93,7 +93,7 @@ def index():
 @app.route("/models")
 def models_route():
     """List only model versions that have a registered runtime."""
-    return jsonify({"models": list_models(), "default": "khufu-1.0"})
+    return jsonify({"models": list_models(), "default": "seshat-1.0"})
 
 
 @app.route("/info")
