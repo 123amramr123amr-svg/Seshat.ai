@@ -290,7 +290,7 @@ def khufu_gen():
     subject = str(data.get("subject", "")).strip()
     size = int(data.get("size", 128))
     target_size = data.get("target_size")
-    target_size = int(target_size) if target_size not in (None, "") else None
+    target_size = int(target_size) if target_size not in (None, "") else 750
     steps = int(data.get("steps", 50))
     seed = data.get("seed")
     seed = int(seed) if seed not in (None, "") else None

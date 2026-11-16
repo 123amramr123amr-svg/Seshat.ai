@@ -1,400 +1,429 @@
-# -*- coding: utf-8 -*-
-"""
-khufu/scenes.py — أصناف المشاهد ومولّد البيانات الإجرائي
-=========================================================
-خوفو لسه في البداية: مفيش صور حقيقية جاهزة للتدريب، فالبيانات بتتولد إجرائيًا
-بكود مكتوب بالإيد (تدرجات سماء، شمس/قمر، نجوم، دوالي رمال، سلاسل جبال، عمارات…)
-— آلاف العينات لكل صنف بألوان ومواقع عشوائية، والنموذج بيتعلم توزيع الصنف
-ويولّد تركيبات جديدة عمره ما شافها.
+"""Procedural scene renderer for Khufu.
 
-**جولة خ2 — الاستقلال عن الدقة:** كل المولدات بترسم بإحداثيات في فضاء 24×24
-وبتتضرب في معامل التكبير k = الدقة الفعلية / 24. نفس البذرة على نفس الدقة =
-نفس الصورة بالحرف، وعلى دقة أعلى = نفس التكوين بتفاصيل أكتر (أشعة سماء أنعم،
-عمارات بنوافذ أكتر، جبال بقمم أدق). ده اللي بيخلي رفع القاعدة 24→48 وانتاج
-750×720 ممكن من غير ما نعيد كتابة الرسمة الواحدة يدويًا.
-
-الأساس 48×48 RGB (اترفع من 24 في خ2) — والمقاسات الأكبر (حتى 750) بتتولد
-بنفس القاعدة وبتتكبّر بمكبّر Lanczos3 (resize.py).
+Khufu is trained on scenes rendered by this file — no downloads, no external data.
+Each class has a recipe: a background + a main subject + optional extras.
+Rendering happens at 128x128 (2x supersampling) and is downscaled to 64x64.
 """
+import math
+import random
 
 import numpy as np
+from PIL import Image, ImageDraw
 
-BASE = 48                      # دقة القاعدة اللي النموذج بيتدرب عليها (خ2: كانت 24)
-SIZES = (32, 64, 96, 128, 256, 512, 750)   # المقاسات المسموحة — 750 أعلى دقة (خ2)
-STEPS = (20, 50, 100)          # خطوات الجودة (سلاسل الانتشار)
+W = 128   # render canvas
+OUT = 64  # training size
 
-# الصنف: (المعرّف، الاسم بالعربي) — ده اللي الواجهة بتعرضه
 CLASSES = [
-    ("day", "نهار صحو"),
-    ("sunset", "غروب"),
-    ("night", "ليل بنجوم"),
-    ("dawn", "فجر"),
-    ("sea", "بحر"),
-    ("desert", "صحرا"),
-    ("mountains", "جبال"),
-    ("forest", "غابة"),
-    ("city", "مدينة بالليل"),
-    ("rain", "مطر"),
-    ("snow", "ثلج"),
-    ("flowers", "ورود"),
+    ("sun",      "شمس",   ["شمس", "sun"]),
+    ("moon",     "قمر",   ["قمر", "هلال", "moon"]),
+    ("star",     "نجمة",  ["نجمة", "نجوم", "star"]),
+    ("cloud",    "سحابة", ["سحابة", "سحاب", "غيوم", "cloud"]),
+    ("bird",     "طائر",  ["طائر", "طيور", "عصفور", "bird"]),
+    ("tree",     "شجرة",  ["شجرة", "شجر", "tree"]),
+    ("palm",     "نخلة",  ["نخلة", "نخل", "palm"]),
+    ("house",    "بيت",   ["بيت", "منزل", "house"]),
+    ("car",      "عربية", ["عربية", "عربيه", "سيارة", "car"]),
+    ("cat",      "قطة",   ["قطة", "قطه", "cat"]),
+    ("dog",      "كلب",   ["كلب", "dog"]),
+    ("horse",    "حصان",  ["حصان", "horse"]),
+    ("camel",    "جمل",   ["جمل", "camel"]),
+    ("pyramid",  "هرم",   ["هرم", "أهرامات", "اهرامات", "pyramid"]),
+    ("mountain", "جبل",   ["جبل", "جبال", "mountain"]),
+    ("sea",      "بحر",   ["بحر", "sea", "ocean"]),
+    ("boat",     "مركب",  ["مركب", "سفينة", "فلوكة", "boat"]),
+    ("fish",     "سمكة",  ["سمكة", "سمك", "fish"]),
+    ("flower",   "وردة",  ["وردة", "ورد", "زهرة", "flower"]),
 ]
-CLASS_IDS = tuple(c[0] for c in CLASSES)
-
-# مرادفات عربي/إنجليزي — class_from_text بيبتدي من هنا
-_SYNONYMS = {
-    "day": ("نهار", "صحو", "نهارداي", "صباح", "سماء زرقا", "day", "sunny", "morning"),
-    "sunset": ("غروب", "الغروب", "غروب الشمس", "غروب شمس", "المغيب", "sunset", "dusk"),
-    "night": ("ليل", "الليل", "بنجوم", "نجوم", "قمر", "سما بالليل", "night", "stars", "moon"),
-    "dawn": ("فجر", "الفجر", "سحر", "السحر", "بكور", "dawn", "sunrise", "twilight"),
-    "sea": ("بحر", "البحر", "محط", "مية", "مياه", "شاطئ", "الشاطئ", "ساحل", "sea", "ocean", "beach"),
-    "desert": ("صحرا", "الصحرا", "صحراء", "رمال", "الرمال", "desert", "dunes", "sand"),
-    "mountains": ("جبال", "جبل", "الجبل", "سلسلة جبال", "قمم", "mountains", "mountain", "hills"),
-    "forest": ("غابة", "الغابة", "غابا", "أشجار", "اشجار", "شجر", "forest", "trees", "jungle"),
-    "city": ("مدينة", "المدينة", "عمارات", "مبانى", "مباني", "building", "city", "skyline"),
-    "rain": ("مطر", "الشتا", "شتا", "امطار", "أمطار", "rain", "rainy", "storm"),
-    "snow": ("ثلج", "التلج", "تلج", "snow", "snowy", "winter"),
-    "flowers": ("ورود", "ورد", "الورد", "زهور", "فل", "flowers", "roses", "garden"),
-}
-
-_CLASS_BY_ID = dict(CLASSES)
+CLASS_IDS = [c[0] for c in CLASSES]
+ARABIC = {c[0]: c[1] for c in CLASSES}
 
 
 def class_from_text(text):
-    """نص حر عربي/إنجليزي → معرّف صنف، أو None لو مش عارفه."""
+    """Map free text (Arabic/English) to a class id, or None."""
     t = (text or "").strip().lower()
     if not t:
         return None
-    if t in _CLASS_BY_ID:
-        return t
-    for cid, words in _SYNONYMS.items():
-        for w in words:
-            if w == t or (len(w) >= 3 and w in t):
+    for cid, _ar, keys in CLASSES:
+        for k in keys:
+            if k.lower() in t:
                 return cid
     return None
 
 
-def class_name(cid):
-    return _CLASS_BY_ID.get(cid, cid)
-
-
-# ============================================================
-# أدوات رسم إجرائية (كل حاجة بأرقام — مفيش مكتبات صور)
-# كل أداة بتاخد الصورة وبتقرا دقتها منها، وk = معامل التكبير من فضاء 24
-# ============================================================
-def _v_gradient(rng, top, bottom, n):
-    """تدرج رأسي من لونين مع جيتر خفيف — أساس كل السما."""
-    ramp = np.linspace(0.0, 1.0, n)[:, None]
-    img = np.zeros((n, n, 3))
-    for c in range(3):
-        jitter = 1.0 + rng.normal(0.0, 0.015)
-        img[..., c] = (top[c] * (1 - ramp) + bottom[c] * ramp) * jitter
-    return img
-
-
-def _horizon(img, row, ground_top, ground_bottom, wobble=1.2, rng=None, k=1.0):
-    """الأرض من صف معين لتحت، بخط أفقي متموج خفيف."""
-    n = img.shape[0]
-    w = max(0.4, wobble * k)
-    for x in range(n):
-        r = int(row + rng.normal(0.0, w))
-        r = max(2, min(n - 1, r))
-        ramp = np.linspace(0.0, 1.0, max(1, n - r)).ravel()
-        for c in range(3):
-            img[r:, x, c] = ground_top[c] * (1 - ramp) + ground_bottom[c] * ramp
-
-
-def _disc(img, cx, cy, rad, color, glow=0.35, rng=None, k=1.0):
-    """قرص (شمس/قمر/وردة) بهالة ناعمة — الأنصاف والأبعاد بتتقاس مع الدقة."""
-    n = img.shape[0]
-    core_w = 1.2 * k
-    halo_w = 3.5 * k
-    yy, xx = np.mgrid[0:n, 0:n]
-    d = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
-    core = np.clip((rad + 0.6 * k - d) / core_w, 0, 1)
-    halo = np.clip((rad + halo_w - d) / halo_w, 0, 1) * glow
-    for c in range(3):
-        img[..., c] = img[..., c] * (1 - core) + color[c] * core
-        img[..., c] = np.clip(img[..., c] * (1 - halo) + color[c] * halo * 0.5, 0, 1)
-
-
-def _stars(img, rng, count, bright=0.95):
-    n = img.shape[0]
-    for _ in range(count):
-        x, y = rng.integers(0, n), rng.integers(0, max(1, n // 2))
-        img[y, x] = np.clip(img[y, x] * 0.2 + bright, 0, 1)
-
-
-def _rain_lines(img, rng, count, k=1.0):
-    n = img.shape[0]
-    for _ in range(count):
-        x, y = rng.integers(0, n), rng.integers(0, max(1, n - int(4 * k)))
-        L = int(rng.integers(3, 5) * k)
-        shade = 0.75 + rng.normal(0, 0.05)
-        for kk in range(L):
-            if y + kk < n:
-                img[y + kk, x] = img[y + kk, x] * 0.55 \
-                    + np.array([0.8, 0.85, 0.95]) * shade * 0.45
-
-
-def _snow_dots(img, rng, count, k=1.0):
-    n = img.shape[0]
-    pair = k >= 1.5                      # على الدقة العالية الثلج بيبقى نقطتين مش بيكسل واحد
-    for _ in range(count):
-        x, y = rng.integers(0, n), rng.integers(0, n)
-        img[y, x] = img[y, x] * 0.3 + 0.7
-        if pair and x + 1 < n and y + 1 < n and rng.random() < 0.5:
-            img[y, x + 1] = img[y, x + 1] * 0.3 + 0.7
-            img[y + 1, x] = img[y + 1, x] * 0.3 + 0.7
-
-
-def _skyline(img, rng, row, color_dark, color_win, k=1.0):
-    """عمارات من خط الأفق لفوق بسلول شباك منورة — العرض/الطول/الشباك بتتقاس."""
-    n = img.shape[0]
-    x = 0
-    while x < n:
-        w = max(2, int(rng.integers(3, 6) * k))
-        h = int(rng.integers(int(5 * k), max(int(6 * k) + 1, row - int(2 * k))))
-        top = row - h
-        for xx in range(x, min(n, x + w)):
-            img[top:, xx] = img[top:, xx] * 0.15 + np.array(color_dark) * 0.85
-        for _ in range(max(1, (w * h) // 6)):
-            wx = int(rng.integers(x, min(n, x + w)))
-            wy = int(rng.integers(top + 1, max(top + 2, row - 1)))
-            img[wy, wx] = np.array(color_win)
-        x += w + max(1, int(rng.integers(1, 3) * k))
-
-
-def _ridge(img, rng, base_row, height, color, sharp=2.2, k=1.0):
-    """سلسلة جبال/دوالي: silhouette بتقاطعات خطوط مائلة — الكثافة بتتقاس مع الدقة،
-    والقمم بتكبر مع العرض تلقائيًا (المسافة بين نقاط الكسر بتتضاعف)."""
-    n = img.shape[0]
-    step = max(2, int(rng.integers(3, 7) * k))
-    slopes = []
-    x0 = 0
-    while x0 < n:
-        slopes.append((x0, rng.normal(0.0, sharp)))
-        x0 += step
-    top = np.full(n, float(base_row))
-    for i in range(n):
-        for (sx, sl) in slopes:
-            top[i] = min(top[i], base_row - height * 0.5
-                         - abs((i - sx) * sl) * 0.5 + height * 0.5)
-        top[i] = max(2, min(base_row, top[i]))
-    for x in range(n):
-        r = int(top[x])
-        img[r:, x] = img[r:, x] * 0.2 + np.array(color) * 0.8
-
-
-def _trees(img, rng, ground_row, count, trunk=(0.28, 0.18, 0.08),
-           leaf_choices=((0.12, 0.42, 0.14), (0.18, 0.5, 0.16), (0.35, 0.55, 0.12)),
-           k=1.0):
-    n = img.shape[0]
-    tw = max(1, int(round(k)))           # جذع بعرض نسبي ثابت
-    for _ in range(count):
-        x = int(rng.integers(1, max(2, n - 2 - tw)))
-        h = int(rng.integers(int(4 * k), max(int(5 * k) + 1, ground_row - int(3 * k))))
-        top = max(1, ground_row - h)
-        img[top:ground_row, x:x + tw] = \
-            img[top:ground_row, x:x + tw] * 0.3 + np.array(trunk) * 0.7
-        leaf = np.array(leaf_choices[int(rng.integers(0, len(leaf_choices)))])
-        _disc(img, x + tw / 2.0 - 0.5, top - 1, 1.8 * k, leaf, glow=0.15, rng=rng, k=k)
-
-
-# ============================================================
-# مولّدات الأصناف — كل واحدة بترسم في فضاء 24 وبتتكبّر بk
-# ============================================================
-def _day(rng, n):
-    k = n / 24.0
-    sky_top = np.array([0.30, 0.55, 0.85]) + rng.normal(0, 0.04, 3)
-    sky_bot = np.array([0.62, 0.78, 0.95]) + rng.normal(0, 0.04, 3)
-    img = _v_gradient(rng, np.clip(sky_top, 0, 1), np.clip(sky_bot, 0, 1), n)
-    _disc(img, rng.uniform(4, 20) * k, rng.uniform(3, 8) * k,
-          rng.uniform(1.5, 2.5) * k, np.array([1.0, 0.97, 0.80]), glow=0.3, rng=rng, k=k)
-    _horizon(img, int(rng.integers(17, 20) * k), np.array([0.45, 0.62, 0.35]),
-             np.array([0.30, 0.45, 0.24]), rng=rng, k=k)
-    return np.clip(img, 0, 1)
-
-
-def _sunset(rng, n):
-    k = n / 24.0
-    top = np.array([0.35, 0.22, 0.42]) + rng.normal(0, 0.04, 3)
-    bot = np.array([0.98, 0.62, 0.25]) + rng.normal(0, 0.05, 3)
-    img = _v_gradient(rng, np.clip(top, 0, 1), np.clip(bot, 0, 1), n)
-    _disc(img, rng.uniform(6, 18) * k, rng.uniform(14, 17) * k,
-          rng.uniform(1.6, 2.4) * k, np.array([1.0, 0.85, 0.45]), glow=0.5, rng=rng, k=k)
-    _horizon(img, int(rng.integers(18, 21) * k), np.array([0.30, 0.18, 0.24]),
-             np.array([0.18, 0.10, 0.16]), rng=rng, k=k)
-    return np.clip(img, 0, 1)
-
-
-def _night(rng, n):
-    k = n / 24.0
-    top = np.array([0.04, 0.06, 0.16]) + rng.normal(0, 0.02, 3)
-    bot = np.array([0.10, 0.14, 0.30]) + rng.normal(0, 0.03, 3)
-    img = _v_gradient(rng, np.clip(top, 0, 1), np.clip(bot, 0, 1), n)
-    _disc(img, rng.uniform(5, 19) * k, rng.uniform(3, 8) * k,
-          rng.uniform(1.2, 1.8) * k, np.array([0.95, 0.95, 0.85]), glow=0.25, rng=rng, k=k)
-    _stars(img, rng, int(rng.integers(14, 30) * k))
-    _horizon(img, int(rng.integers(18, 21) * k), np.array([0.08, 0.12, 0.14]),
-             np.array([0.05, 0.08, 0.09]), rng=rng, k=k)
-    return np.clip(img, 0, 1)
-
-
-def _dawn(rng, n):
-    k = n / 24.0
-    top = np.array([0.45, 0.40, 0.62]) + rng.normal(0, 0.04, 3)
-    bot = np.array([0.95, 0.75, 0.70]) + rng.normal(0, 0.04, 3)
-    img = _v_gradient(rng, np.clip(top, 0, 1), np.clip(bot, 0, 1), n)
-    _disc(img, rng.uniform(6, 18) * k, rng.uniform(15, 18) * k,
-          rng.uniform(1.3, 2.0) * k, np.array([1.0, 0.92, 0.80]), glow=0.4, rng=rng, k=k)
-    _horizon(img, int(rng.integers(18, 21) * k), np.array([0.35, 0.28, 0.35]),
-             np.array([0.22, 0.18, 0.25]), rng=rng, k=k)
-    return np.clip(img, 0, 1)
-
-
-def _sea(rng, n):
-    k = n / 24.0
-    sky_kind = int(rng.integers(0, 3))
-    palettes = {
-        0: (np.array([0.35, 0.58, 0.88]), np.array([0.70, 0.82, 0.95])),
-        1: (np.array([0.55, 0.35, 0.45]), np.array([0.95, 0.60, 0.30])),
-        2: (np.array([0.06, 0.09, 0.20]), np.array([0.14, 0.18, 0.32])),
-    }
-    top, bot = palettes[sky_kind]
-    img = _v_gradient(rng, top + rng.normal(0, 0.03, 3), bot + rng.normal(0, 0.03, 3), n)
-    row = int(rng.integers(11, 14) * k)
-    water = np.array([0.10, 0.35, 0.55]) + rng.normal(0, 0.04, 3)
-    water2 = np.array([0.06, 0.25, 0.42]) + rng.normal(0, 0.03, 3)
-    _horizon(img, row, np.clip(water, 0, 1), np.clip(water2, 0, 1), wobble=0.6, rng=rng, k=k)
-    for _ in range(int(rng.integers(3, 7) * k)):
-        y = int(rng.integers(row + int(2 * k), n - 1))
-        x = int(rng.integers(int(2 * k), max(int(2 * k) + 1, n - int(6 * k))))
-        w = max(1, int(rng.integers(2, 5) * k))
-        img[y, x:x + w] = img[y, x:x + w] * 0.6 + 0.4
-    return np.clip(img, 0, 1)
-
-
-def _desert(rng, n):
-    k = n / 24.0
-    sky_top = np.array([0.45, 0.60, 0.85]) + rng.normal(0, 0.05, 3)
-    sky_bot = np.array([0.85, 0.78, 0.65]) + rng.normal(0, 0.05, 3)
-    img = _v_gradient(rng, np.clip(sky_top, 0, 1), np.clip(sky_bot, 0, 1), n)
-    row = int(rng.integers(12, 16) * k)
-    sand1 = np.array([0.90, 0.75, 0.48]) + rng.normal(0, 0.04, 3)
-    sand2 = np.array([0.72, 0.55, 0.30]) + rng.normal(0, 0.04, 3)
-    _ridge(img, rng, row, rng.uniform(1.5, 3.5) * k, np.clip(sand1, 0, 1), sharp=1.2, k=k)
-    _ridge(img, rng, int(row + 5 * k), rng.uniform(1.0, 2.5) * k,
-           np.clip(sand2, 0, 1), sharp=1.0, k=k)
-    return np.clip(img, 0, 1)
-
-
-def _mountains(rng, n):
-    k = n / 24.0
-    sky_kind = int(rng.integers(0, 2))
-    if sky_kind == 0:
-        top, bot = np.array([0.35, 0.55, 0.85]), np.array([0.75, 0.85, 0.95])
+def _rr(d, box, radius, **kw):
+    fn = getattr(d, "rounded_rectangle", None)
+    if fn:
+        fn(box, radius=radius, **kw)
     else:
-        top, bot = np.array([0.40, 0.30, 0.50]), np.array([0.95, 0.65, 0.35])
-    img = _v_gradient(rng, top + rng.normal(0, 0.04, 3), bot + rng.normal(0, 0.04, 3), n)
-    row = int(rng.integers(13, 16) * k)
-    shade = rng.uniform(0.55, 0.8)
-    _ridge(img, rng, row, rng.uniform(4, 7) * k,
-           np.array([shade * 0.75, shade * 0.72, shade * 0.80]), sharp=2.6, k=k)
-    _ridge(img, rng, int(row + 4 * k), rng.uniform(2, 4) * k,
-           np.array([0.25 * shade, 0.28 * shade, 0.22 * shade]), sharp=1.8, k=k)
-    return np.clip(img, 0, 1)
+        d.rectangle(box, **kw)
 
 
-def _forest(rng, n):
-    k = n / 24.0
-    sky_top = np.array([0.55, 0.72, 0.90]) + rng.normal(0, 0.05, 3)
-    sky_bot = np.array([0.80, 0.88, 0.92]) + rng.normal(0, 0.04, 3)
-    img = _v_gradient(rng, np.clip(sky_top, 0, 1), np.clip(sky_bot, 0, 1), n)
-    row = int(rng.integers(14, 17) * k)
-    _horizon(img, row, np.array([0.30, 0.50, 0.22]), np.array([0.18, 0.35, 0.14]),
-             rng=rng, k=k)
-    _trees(img, rng, row, int(rng.integers(3, 6) * k), k=k)
-    return np.clip(img, 0, 1)
+def _gradient(img, top, bottom, y0=0, y1=W):
+    h = max(1, y1 - y0)
+    col = np.zeros((h, 1, 3), dtype=np.uint8)
+    for i in range(h):
+        f = i / max(1, h - 1)
+        col[i, 0] = [int(top[c] + (bottom[c] - top[c]) * f) for c in range(3)]
+    grad = Image.fromarray(col, "RGB").resize((W, h), Image.BILINEAR)
+    img.paste(grad, (0, y0))
 
 
-def _city(rng, n):
-    k = n / 24.0
-    top = np.array([0.08, 0.10, 0.22]) + rng.normal(0, 0.03, 3)
-    bot = np.array([0.20, 0.16, 0.32]) + rng.normal(0, 0.04, 3)
-    img = _v_gradient(rng, np.clip(top, 0, 1), np.clip(bot, 0, 1), n)
-    _stars(img, rng, int(rng.integers(6, 14) * k))
-    _skyline(img, rng, int(rng.integers(15, 19) * k),
-             color_dark=(0.12, 0.10, 0.14), color_win=(0.95, 0.85, 0.45), k=k)
-    return np.clip(img, 0, 1)
+def _sky(img, mode):
+    palettes = {
+        "day":    ((58, 123, 213), (207, 232, 255)),
+        "sunset": ((64, 24, 110), (255, 140, 90)),
+        "night":  ((8, 10, 38), (27, 42, 74)),
+        "dawn":   ((90, 110, 180), (255, 190, 140)),
+    }
+    top, bottom = palettes[mode]
+    _gradient(img, top, bottom)
 
 
-def _rain(rng, n):
-    k = n / 24.0
-    top = np.array([0.35, 0.40, 0.45]) + rng.normal(0, 0.04, 3)
-    bot = np.array([0.55, 0.60, 0.65]) + rng.normal(0, 0.04, 3)
-    img = _v_gradient(rng, np.clip(top, 0, 1), np.clip(bot, 0, 1), n)
-    _horizon(img, int(rng.integers(17, 20) * k), np.array([0.22, 0.25, 0.28]),
-             np.array([0.15, 0.17, 0.20]), rng=rng, k=k)
-    _rain_lines(img, rng, int(rng.integers(10, 22) * k), k=k)
-    return np.clip(img, 0, 1)
+def _ground(img, top, bottom, frac=0.22):
+    _gradient(img, top, bottom, int(W * (1 - frac)), W)
 
 
-def _snow(rng, n):
-    k = n / 24.0
-    top = np.array([0.55, 0.65, 0.80]) + rng.normal(0, 0.04, 3)
-    bot = np.array([0.80, 0.85, 0.92]) + rng.normal(0, 0.04, 3)
-    img = _v_gradient(rng, np.clip(top, 0, 1), np.clip(bot, 0, 1), n)
-    _horizon(img, int(rng.integers(15, 18) * k), np.array([0.92, 0.94, 0.98]),
-             np.array([0.80, 0.84, 0.92]), rng=rng, k=k)
-    _ridge(img, rng, int(rng.integers(10, 13) * k), rng.uniform(2, 4) * k,
-           np.array([0.85, 0.88, 0.95]), sharp=2.0, k=k)
-    _snow_dots(img, rng, int(rng.integers(12, 26) * k), k=k)
-    return np.clip(img, 0, 1)
+GRASS = ((96, 170, 80), (52, 110, 44))
+SAND = ((238, 214, 150), (214, 178, 110))
+ROAD = ((112, 112, 118), (78, 78, 84))
+WATER = ((36, 116, 186), (10, 60, 120))
 
 
-def _flowers(rng, n):
-    k = n / 24.0
-    sky_top = np.array([0.50, 0.68, 0.88]) + rng.normal(0, 0.05, 3)
-    sky_bot = np.array([0.82, 0.85, 0.90]) + rng.normal(0, 0.04, 3)
-    img = _v_gradient(rng, np.clip(sky_top, 0, 1), np.clip(sky_bot, 0, 1), n)
-    row = int(rng.integers(14, 17) * k)
-    _horizon(img, row, np.array([0.25, 0.52, 0.20]), np.array([0.16, 0.38, 0.14]),
-             rng=rng, k=k)
-    choices = ((0.95, 0.35, 0.45), (0.98, 0.80, 0.30), (0.90, 0.45, 0.75), (0.98, 0.98, 0.95))
-    for _ in range(int(rng.integers(4, 9) * k)):
-        x = int(rng.integers(1, n - 1))
-        y = int(rng.integers(row, n - 1))
-        col = np.array(choices[int(rng.integers(0, len(choices)))])
-        _disc(img, x, y, rng.uniform(0.8, 1.4) * k, col, glow=0.2, rng=rng, k=k)
-    return np.clip(img, 0, 1)
+def _sun(d, cx, cy, r, color=(255, 205, 70)):
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=color)
+    for a in range(0, 360, 45):
+        x1 = cx + (r + 2) * math.cos(math.radians(a))
+        y1 = cy + (r + 2) * math.sin(math.radians(a))
+        x2 = cx + (r + 8) * math.cos(math.radians(a))
+        y2 = cy + (r + 8) * math.sin(math.radians(a))
+        d.line([x1, y1, x2, y2], fill=color, width=3)
 
 
-_GENERATORS = {
-    "day": _day, "sunset": _sunset, "night": _night, "dawn": _dawn,
-    "sea": _sea, "desert": _desert, "mountains": _mountains, "forest": _forest,
-    "city": _city, "rain": _rain, "snow": _snow, "flowers": _flowers,
-}
+def _moon(d, cx, cy, r):
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(242, 240, 214))
+    for dx, dy, cr in [(-0.3, -0.2, 0.22), (0.25, 0.15, 0.18), (0.05, -0.45, 0.14)]:
+        d.ellipse([cx + (dx - cr) * r, cy + (dy - cr) * r,
+                   cx + (dx + cr) * r, cy + (dy + cr) * r], fill=(222, 218, 188))
 
 
-def make_sample(cid, seed, res=None):
-    """عينة واحدة من صنف — نفس البذرة على نفس الدقة = نفس الصورة بالحرف
-    (مضمون للاختبارات). res اختيارية لو محتاج ترسم على دقة تانية."""
-    rng = np.random.default_rng(seed)
-    return _GENERATORS[cid](rng, int(res or BASE))
+def _star(d, cx, cy, r, color=(255, 240, 170)):
+    pts = [(cx, cy - r), (cx + r * 0.18, cy - r * 0.18), (cx + r, cy),
+           (cx + r * 0.18, cy + r * 0.18), (cx, cy + r), (cx - r * 0.18, cy + r * 0.18),
+           (cx - r, cy), (cx - r * 0.18, cy - r * 0.18)]
+    d.polygon(pts, fill=color)
 
 
-def make_dataset(n_per_class=600, seed=1234):
-    """الداتاسيت الكامل: (عدد الأصناف × n_per_class) عينة + اللابل — بالترتيب ثابت."""
-    imgs, labels = [], []
-    for i, cid in enumerate(CLASS_IDS):
-        s = np.random.default_rng(seed + i)
-        seeds = s.integers(0, 2**31 - 1, size=n_per_class)
-        for sd in seeds:
-            imgs.append(make_sample(cid, int(sd)))
-            labels.append(i)
-    return np.stack(imgs).astype(np.float32), np.array(labels, dtype=np.int64)
+def _stars(d, rng, n):
+    for _ in range(n):
+        x, y = rng.uniform(2, W - 2), rng.uniform(2, 70)
+        r = rng.uniform(1.5, 3.5)
+        if rng.random() < 0.4:
+            _star(d, x, y, r * 2.2)
+        else:
+            d.ellipse([x - r, y - r, x + r, y + r], fill=(255, 250, 220))
 
 
-def to_model_range(img01):
-    """[0,1] → [-1,1] (مدى التدريب) والعكس."""
-    return img01 * 2.0 - 1.0
+def _cloud(d, cx, cy, s, color=(255, 255, 255)):
+    for dx, dy, r in [(-0.45, 0.12, 0.3), (0, -0.05, 0.4), (0.45, 0.12, 0.3), (0.1, 0.2, 0.28)]:
+        d.ellipse([cx + (dx - r) * s, cy + (dy - r) * s,
+                   cx + (dx + r) * s, cy + (dy + r) * s], fill=color)
+
+
+def _bird(d, cx, cy, s, color=(40, 42, 52)):
+    d.arc([cx - s, cy - s * 0.45, cx, cy + s * 0.45], start=180, end=360, fill=color, width=3)
+    d.arc([cx, cy - s * 0.45, cx + s, cy + s * 0.45], start=180, end=360, fill=color, width=3)
+
+
+def _tree(d, cx, base, s, trunk=(122, 82, 52), leaf=(58, 138, 62)):
+    d.rectangle([cx - s * 0.06, base - s * 0.5, cx + s * 0.06, base], fill=trunk)
+    for dx, dy, r in [(0, -0.78, 0.32), (-0.22, -0.58, 0.23), (0.22, -0.58, 0.23)]:
+        d.ellipse([cx + (dx - r) * s, base + (dy - r) * s,
+                   cx + (dx + r) * s, base + (dy + r) * s], fill=leaf)
+
+
+def _palm(d, cx, base, s):
+    pts = [(cx, base), (cx + s * 0.07, base - s * 0.35), (cx + s * 0.15, base - s * 0.68)]
+    d.line(pts, fill=(140, 100, 60), width=max(2, int(s * 0.07)))
+    tx, ty = pts[-1]
+    for a in (-170, -135, -100, -65, -30, 5):
+        x2 = tx + s * 0.42 * math.cos(math.radians(a))
+        y2 = ty + s * 0.3 * math.sin(math.radians(a)) + s * 0.12
+        d.line([tx, ty, x2, y2], fill=(48, 128, 58), width=3)
+    d.ellipse([tx - 3, ty + 2, tx + 3, ty + 8], fill=(110, 80, 40))
+
+
+def _house(d, cx, base, s, wall=(242, 232, 212), roof=(182, 72, 58)):
+    w, h = s * 0.72, s * 0.46
+    d.rectangle([cx - w / 2, base - h, cx + w / 2, base], fill=wall)
+    d.polygon([(cx - w / 2 - 4, base - h), (cx + w / 2 + 4, base - h),
+               (cx, base - h - s * 0.34)], fill=roof)
+    d.rectangle([cx - s * 0.08, base - s * 0.22, cx + s * 0.08, base], fill=(122, 82, 52))
+    d.rectangle([cx - s * 0.29, base - h + s * 0.08, cx - s * 0.13, base - h + s * 0.24],
+                fill=(150, 200, 230))
+    d.rectangle([cx + s * 0.13, base - h + s * 0.08, cx + s * 0.29, base - h + s * 0.24],
+                fill=(150, 200, 230))
+
+
+def _car(d, cx, base, s, color):
+    w, h = s * 0.92, s * 0.3
+    y = base - h
+    _rr(d, [cx - w / 2, y, cx + w / 2, base - s * 0.07], int(s * 0.06), fill=color)
+    _rr(d, [cx - w * 0.27, y - s * 0.2, cx + w * 0.27, y + 2], int(s * 0.05), fill=color)
+    d.rectangle([cx - w * 0.23, y - s * 0.15, cx - w * 0.02, y - 2], fill=(170, 212, 236))
+    d.rectangle([cx + w * 0.02, y - s * 0.15, cx + w * 0.23, y - 2], fill=(170, 212, 236))
+    for wx in (cx - w * 0.3, cx + w * 0.3):
+        r = s * 0.095
+        d.ellipse([wx - r, base - 2 * r, wx + r, base], fill=(28, 28, 34))
+        d.ellipse([wx - r * 0.45, base - r * 1.55, wx + r * 0.45, base - r * 0.45],
+                  fill=(185, 185, 190))
+
+
+def _cat(d, cx, base, s, color=(45, 40, 50)):
+    d.ellipse([cx - s * 0.22, base - s * 0.42, cx + s * 0.22, base], fill=color)
+    d.ellipse([cx - s * 0.16, base - s * 0.72, cx + s * 0.16, base - s * 0.4], fill=color)
+    d.polygon([(cx - s * 0.15, base - s * 0.66), (cx - s * 0.04, base - s * 0.66),
+               (cx - s * 0.1, base - s * 0.86)], fill=color)
+    d.polygon([(cx + s * 0.04, base - s * 0.66), (cx + s * 0.15, base - s * 0.66),
+               (cx + s * 0.1, base - s * 0.86)], fill=color)
+    d.arc([cx + s * 0.08, base - s * 0.32, cx + s * 0.46, base + s * 0.04],
+          start=270, end=90, fill=color, width=max(2, int(s * 0.06)))
+    d.ellipse([cx - s * 0.09, base - s * 0.6, cx - s * 0.04, base - s * 0.55],
+              fill=(255, 222, 120))
+    d.ellipse([cx + s * 0.04, base - s * 0.6, cx + s * 0.09, base - s * 0.55],
+              fill=(255, 222, 120))
+
+
+def _dog(d, cx, base, s, color=(112, 76, 46)):
+    d.ellipse([cx - s * 0.3, base - s * 0.46, cx + s * 0.3, base - s * 0.16], fill=color)
+    d.ellipse([cx + s * 0.16, base - s * 0.64, cx + s * 0.42, base - s * 0.38], fill=color)
+    d.ellipse([cx + s * 0.32, base - s * 0.5, cx + s * 0.48, base - s * 0.38], fill=color)
+    d.ellipse([cx + s * 0.14, base - s * 0.64, cx + s * 0.3, base - s * 0.42], fill=(70, 45, 25))
+    for lx in (cx - s * 0.2, cx - s * 0.06, cx + s * 0.08, cx + s * 0.2):
+        d.rectangle([lx, base - s * 0.2, lx + s * 0.06, base], fill=color)
+    d.line([(cx - s * 0.28, base - s * 0.42), (cx - s * 0.44, base - s * 0.56)],
+           fill=color, width=max(2, int(s * 0.05)))
+
+
+def _horse(d, cx, base, s, color=(132, 86, 50)):
+    d.ellipse([cx - s * 0.32, base - s * 0.56, cx + s * 0.28, base - s * 0.26], fill=color)
+    d.polygon([(cx + s * 0.16, base - s * 0.5), (cx + s * 0.4, base - s * 0.8),
+               (cx + s * 0.5, base - s * 0.72), (cx + s * 0.3, base - s * 0.42)], fill=color)
+    for lx in (cx - s * 0.24, cx - s * 0.12, cx + s * 0.08, cx + s * 0.2):
+        d.line([(lx, base - s * 0.3), (lx, base)], fill=color, width=max(2, int(s * 0.05)))
+    d.line([(cx - s * 0.3, base - s * 0.52), (cx - s * 0.44, base - s * 0.3)],
+           fill=(60, 40, 25), width=max(2, int(s * 0.06)))
+    d.line([(cx + s * 0.18, base - s * 0.54), (cx + s * 0.38, base - s * 0.78)],
+           fill=(60, 40, 25), width=max(2, int(s * 0.05)))
+
+
+def _camel(d, cx, base, s, color=(192, 152, 96)):
+    d.ellipse([cx - s * 0.32, base - s * 0.56, cx + s * 0.3, base - s * 0.28], fill=color)
+    d.ellipse([cx - s * 0.08, base - s * 0.74, cx + s * 0.14, base - s * 0.46], fill=color)
+    d.polygon([(cx + s * 0.2, base - s * 0.5), (cx + s * 0.4, base - s * 0.82),
+               (cx + s * 0.48, base - s * 0.76), (cx + s * 0.32, base - s * 0.42)], fill=color)
+    for lx in (cx - s * 0.24, cx - s * 0.1, cx + s * 0.1, cx + s * 0.22):
+        d.line([(lx, base - s * 0.32), (lx, base)], fill=color, width=max(2, int(s * 0.05)))
+    d.line([(cx - s * 0.3, base - s * 0.5), (cx - s * 0.37, base - s * 0.3)], fill=color, width=2)
+
+
+def _pyramid(d, cx, base, s, color=(222, 192, 122)):
+    w, h = s * 0.85, s * 0.62
+    d.polygon([(cx - w / 2, base), (cx + w / 2, base), (cx, base - h)], fill=color)
+    d.polygon([(cx, base - h), (cx + w / 2, base), (cx, base)], fill=(192, 162, 96))
+
+
+def _mountain(d, cx, base, s, color=(112, 122, 142)):
+    d.polygon([(cx - s * 0.5, base), (cx - s * 0.08, base - s * 0.66), (cx + s * 0.34, base)],
+              fill=color)
+    d.polygon([(cx - s * 0.08, base - s * 0.66), (cx - s * 0.02, base - s * 0.52),
+               (cx + s * 0.04, base - s * 0.66)], fill=(242, 246, 250))
+    d.polygon([(cx - s * 0.02, base), (cx + s * 0.3, base - s * 0.46), (cx + s * 0.56, base)],
+              fill=(96, 106, 126))
+    d.polygon([(cx + s * 0.3, base - s * 0.46), (cx + s * 0.34, base - s * 0.38),
+               (cx + s * 0.38, base - s * 0.46)], fill=(242, 246, 250))
+
+
+def _boat(d, cx, water_y, s, hull=(152, 82, 52), sail=(246, 246, 240)):
+    w = s * 0.72
+    d.polygon([(cx - w / 2, water_y), (cx + w / 2, water_y),
+               (cx + w * 0.35, water_y + s * 0.18), (cx - w * 0.35, water_y + s * 0.18)],
+              fill=hull)
+    d.line([(cx, water_y), (cx, water_y - s * 0.55)], fill=(102, 72, 42), width=3)
+    d.polygon([(cx + 3, water_y - s * 0.5), (cx + 3, water_y - 2), (cx + s * 0.34, water_y - 2)],
+              fill=sail)
+    d.polygon([(cx - 3, water_y - s * 0.4), (cx - 3, water_y - 2), (cx - s * 0.27, water_y - 2)],
+              fill=(232, 122, 92))
+
+
+def _fish(d, cx, cy, s, color=(240, 140, 60)):
+    d.ellipse([cx - s * 0.3, cy - s * 0.16, cx + s * 0.2, cy + s * 0.16], fill=color)
+    d.polygon([(cx - s * 0.3, cy), (cx - s * 0.5, cy - s * 0.17), (cx - s * 0.5, cy + s * 0.17)],
+              fill=color)
+    d.ellipse([cx + s * 0.07, cy - s * 0.05, cx + s * 0.14, cy + s * 0.02], fill=(20, 20, 26))
+
+
+def _flower(d, cx, base, s, petal=(232, 92, 142)):
+    d.line([(cx, base), (cx, base - s * 0.42)], fill=(58, 138, 62), width=3)
+    cy = base - s * 0.52
+    for a in range(0, 360, 72):
+        x = cx + s * 0.13 * math.cos(math.radians(a))
+        y = cy + s * 0.13 * math.sin(math.radians(a))
+        d.ellipse([x - s * 0.09, y - s * 0.09, x + s * 0.09, y + s * 0.09], fill=petal)
+    d.ellipse([cx - s * 0.07, cy - s * 0.07, cx + s * 0.07, cy + s * 0.07], fill=(255, 212, 82))
+
+
+def _waves(d, y, color=(205, 232, 252), amp=3, width=3):
+    pts = [(x, y + amp * math.sin(x / 9.0)) for x in range(0, W, 4)]
+    d.line(pts, fill=color, width=width)
+
+
+def render(cid, rng=None):
+    """Render one scene of class cid. Returns uint8 array (64, 64, 3)."""
+    rng = rng or random.Random()
+    img = Image.new("RGB", (W, W))
+    d = ImageDraw.Draw(img)
+    j = lambda a: rng.uniform(-a, a)
+    day = rng.random() < 0.6
+
+    if cid == "sun":
+        _sky(img, "day" if day else "sunset")
+        _ground(img, *GRASS)
+        _sun(d, 64 + j(20), 34 + j(8), rng.uniform(11, 15))
+        _cloud(d, 30 + j(10), 26 + j(6), rng.uniform(26, 36))
+        _cloud(d, 96 + j(10), 20 + j(6), rng.uniform(22, 30))
+    elif cid == "moon":
+        _sky(img, "night")
+        _ground(img, (20, 26, 44), (10, 14, 26))
+        _stars(d, rng, 26)
+        _moon(d, 84 + j(14), 30 + j(8), rng.uniform(11, 14))
+    elif cid == "star":
+        _sky(img, "night")
+        _ground(img, (20, 26, 44), (10, 14, 26))
+        _stars(d, rng, 14)
+        _star(d, 64 + j(16), 44 + j(10), rng.uniform(13, 18))
+        _star(d, 34 + j(8), 26 + j(6), rng.uniform(7, 10))
+        _star(d, 96 + j(8), 24 + j(6), rng.uniform(7, 10))
+    elif cid == "cloud":
+        _sky(img, "day" if day else "dawn")
+        _cloud(d, 64 + j(10), 52 + j(8), rng.uniform(44, 56))
+        _cloud(d, 34 + j(8), 38 + j(6), rng.uniform(26, 34))
+        _cloud(d, 96 + j(8), 34 + j(6), rng.uniform(24, 32))
+        if day:
+            _sun(d, 104, 18, 9)
+    elif cid == "bird":
+        _sky(img, "day" if day else "sunset")
+        _cloud(d, 30, 24, 26)
+        _cloud(d, 98, 30, 22)
+        _bird(d, 64 + j(10), 56 + j(8), rng.uniform(26, 34))
+        _bird(d, 38 + j(6), 40 + j(6), rng.uniform(16, 20))
+        _bird(d, 92 + j(6), 44 + j(6), rng.uniform(14, 18))
+        _ground(img, *GRASS, frac=0.16)
+    elif cid == "tree":
+        _sky(img, "day" if day else "sunset")
+        _ground(img, *GRASS)
+        _tree(d, 64 + j(8), 106, rng.uniform(52, 62))
+        _tree(d, 30 + j(6), 106, rng.uniform(34, 42))
+        _tree(d, 98 + j(6), 106, rng.uniform(30, 38))
+        if day:
+            _sun(d, 100, 20, 9)
+    elif cid == "palm":
+        _sky(img, "sunset" if rng.random() < 0.7 else "day")
+        _ground(img, *SAND)
+        _palm(d, 64 + j(8), 108, rng.uniform(56, 66))
+        _palm(d, 28 + j(5), 108, rng.uniform(36, 44))
+        _palm(d, 102 + j(5), 108, rng.uniform(32, 40))
+    elif cid == "house":
+        _sky(img, "day" if day else "sunset")
+        _ground(img, *GRASS)
+        _house(d, 64 + j(6), 106, rng.uniform(58, 68))
+        _tree(d, 26, 106, 34)
+        _tree(d, 104, 106, 30)
+        if day:
+            _sun(d, 102, 20, 9)
+    elif cid == "car":
+        _sky(img, "day" if day else "sunset")
+        _ground(img, *ROAD, frac=0.3)
+        _house(d, 24, 92, 30)
+        _house(d, 104, 92, 26)
+        color = rng.choice([(200, 60, 50), (60, 110, 200), (240, 180, 40),
+                            (70, 170, 90), (230, 230, 235), (150, 80, 180)])
+        _car(d, 64 + j(6), 112, rng.uniform(72, 82), color)
+    elif cid == "cat":
+        _sky(img, "day" if day else "sunset")
+        _ground(img, *GRASS)
+        _cat(d, 64 + j(6), 108, rng.uniform(54, 62),
+             rng.choice([(45, 40, 50), (200, 140, 70), (120, 120, 125), (60, 60, 70)]))
+        _flower(d, 30, 108, 26)
+        _flower(d, 100, 108, 22)
+        if day:
+            _sun(d, 102, 20, 9)
+    elif cid == "dog":
+        _sky(img, "day" if day else "sunset")
+        _ground(img, *GRASS)
+        _dog(d, 64 + j(6), 108, rng.uniform(56, 64))
+        _tree(d, 26, 108, 36)
+        if day:
+            _sun(d, 102, 20, 9)
+    elif cid == "horse":
+        _sky(img, "day" if day else "sunset")
+        _ground(img, *GRASS)
+        _horse(d, 64 + j(6), 108, rng.uniform(60, 68))
+        _tree(d, 24, 108, 34)
+        _tree(d, 106, 108, 30)
+        if day:
+            _sun(d, 100, 20, 9)
+    elif cid == "camel":
+        _sky(img, "sunset" if rng.random() < 0.6 else "day")
+        _ground(img, *SAND)
+        _camel(d, 64 + j(6), 108, rng.uniform(60, 68))
+        _pyramid(d, 26, 104, 34)
+        _sun(d, 100, 22, 10)
+    elif cid == "pyramid":
+        _sky(img, "day" if rng.random() < 0.7 else "sunset")
+        _ground(img, *SAND)
+        _pyramid(d, 64 + j(4), 110, rng.uniform(66, 76))
+        _pyramid(d, 24, 106, 36)
+        _sun(d, 102, 20, 10)
+    elif cid == "mountain":
+        _sky(img, "day" if day else "sunset")
+        _ground(img, (220, 228, 238), (190, 200, 215), frac=0.18)
+        _mountain(d, 64 + j(6), 108, rng.uniform(80, 92))
+        _tree(d, 20, 108, 30)
+        _tree(d, 108, 108, 26)
+    elif cid == "sea":
+        _sky(img, "day" if day else "sunset")
+        _ground(img, *WATER, frac=0.42)
+        _waves(d, 84)
+        _waves(d, 96)
+        _sun(d, 64 + j(10), 30 + j(6), rng.uniform(11, 14))
+        _boat(d, 92 + j(8), 78, rng.uniform(34, 42))
+    elif cid == "boat":
+        _sky(img, "day" if day else "sunset")
+        _ground(img, *WATER, frac=0.42)
+        _waves(d, 86)
+        _waves(d, 98)
+        _boat(d, 64 + j(6), 80, rng.uniform(52, 62))
+        _sun(d, 30, 22, 9)
+    elif cid == "fish":
+        _gradient(img, (40, 130, 190), (8, 50, 100))
+        _waves(d, 30, color=(180, 225, 250))
+        _fish(d, 64 + j(8), 66 + j(6), rng.uniform(52, 60),
+              rng.choice([(240, 140, 60), (240, 90, 90), (250, 200, 60)]))
+        _fish(d, 30, 44, 26, (240, 140, 60))
+        _fish(d, 100, 88, 22, (250, 200, 60))
+        for x in (14, 112):
+            d.line([(x, 128), (x + 4, 104), (x - 2, 88)], fill=(40, 120, 70), width=4)
+    elif cid == "flower":
+        _sky(img, "day" if day else "sunset")
+        _ground(img, *GRASS)
+        _flower(d, 64 + j(4), 110, rng.uniform(52, 60),
+                rng.choice([(230, 90, 140), (240, 120, 60), (200, 90, 220), (240, 90, 90)]))
+        _flower(d, 30, 110, 30)
+        _flower(d, 100, 110, 26)
+        if day:
+            _sun(d, 102, 20, 9)
+    else:
+        raise ValueError(cid)
+
+    img = img.resize((OUT, OUT), Image.LANCZOS)
+    return np.asarray(img)

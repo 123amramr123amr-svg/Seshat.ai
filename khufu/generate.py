@@ -98,7 +98,7 @@ def enhance_image(img, sharpness=1.5, contrast=1.1, saturation=1.1):
 
 
 def generate(subject, size=128, steps=50, seed=None, ckpt=None, 
-             target_size=None, enhance=True):
+             target_size=750, enhance=True):
     """Generate an image.
     
     Args:
