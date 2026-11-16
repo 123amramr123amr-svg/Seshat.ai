@@ -36,7 +36,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>خوفو <span style="color:var(--mut); font-size:15px;">khufu-1.0</span></h1>
+  <h1>خوفو <span style="color:var(--mut); font-size:15px;">khufu-1.1</span></h1>
   <p class="sub">نموذج بيولّد الصور من نفسه — من غير أي خدمة خارجية. اكتب الحاجة، حدّد الأبعاد والجودة، وخوفو يرسمها.</p>
 
   <div class="card status" id="statusLine">بيحمّل حالة التدريب…</div>
@@ -51,10 +51,12 @@
     <div class="seg" id="sizeSeg">
       <button data-v="32">32×32</button>
       <button data-v="64" class="on">64×64</button>
-      <button data-v="96">96×96</button>
       <button data-v="128">128×128</button>
+      <button data-v="256">256×256</button>
+      <button data-v="512">512×512</button>
+      <button data-v="750" style="border-color:var(--acc); color:var(--acc); font-weight:700;">750×750</button>
     </div>
-    <div class="hint">64 هو حجم التدريب الأصلي — أكبر من كده أبطأ والنتائج أطرى.</div>
+    <div class="hint">التدريب على دقة قاعدة 48×48 (جولة خ2) — المقاسات الأكبر بتتكبّر بمكبّر Lanczos حاد. 750 أعلى دقة متاحة.</div>
 
     <label>جودة التوليد (عدد الخطوات)</label>
     <div class="seg" id="stepsSeg">

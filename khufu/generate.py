@@ -1,63 +1,120 @@
-"""Generate an image with Khufu from the command line.
-
-Examples:
-    python3 generate.py --subject cat --size 128 --steps 100 --seed 7 --out cat.png
-    python3 generate.py --subject "ارسم قطة" --out out.png
+# -*- coding: utf-8 -*-
 """
-import argparse
+khufu/generate.py — التوليد من نموذج خوفو + كائن الصورة
+=======================================================
+generate(cid, size, steps, seed) → (KhufuImage, cid)
+  • cid: معرّف صنف من scenes.CLASS_IDS (أو نص عربي/إنجليزي بيتفسر).
+  • size: 32/64/96/128/256/512/750 — القاعدة بتتولد 48×48 (جولة خ2) وبتتكبّر
+    بمكبّر Lanczos3 (resize.py) — 750×750 أعلى دقة متاحة.
+  • steps: 20/50/100 — خطوات شيل الضجيج (أكتر = أنعم وأدق).
+  • seed: نفس البذرة = نفس الصورة بالحرف (على نفس الدقة).
+
+KhufuImage.save(path) بتكتب PNG بالإيد (png.py) — app.py بيستدعيها زي ما هي
+(ده العقد اللي اتوصّل من ناحية seshat)، ومفيش PIL ولا مكتبات صور.
+"""
+
 import os
+import secrets
 
 import numpy as np
 import torch
-from PIL import Image
 
+import png
+import resize
 import scenes
-from khufu_model import UNet, sample_ddim
 
-# Use absolute paths relative to this file's directory
-KHUFU_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_CKPT = os.path.join(KHUFU_DIR, "data", "khufu_latest.pt")
+HERE = os.path.dirname(os.path.abspath(__file__))
+CKPT = os.path.join(HERE, "data", "khufu_latest.pt")
 
-
-def load_model(path=None):
-    if path is None:
-        path = DEFAULT_CKPT
-    ck = torch.load(path, map_location="cpu", weights_only=False)
-    cfg = ck.get("config", {})
-    model = UNet(base=cfg.get("base", 32),
-                 n_classes=cfg.get("n_classes", len(scenes.CLASSES)),
-                 blocks=cfg.get("blocks", 1))
-    model.load_state_dict(ck["ema"])
-    model.eval()
-    return model, cfg
+T_TOTAL = 1000
+BETA_START, BETA_END = 1e-4, 0.02
+_model_cache = {}
 
 
-def generate(subject, size=64, steps=50, seed=None, ckpt=None):
-    cid = subject if subject in scenes.CLASS_IDS else scenes.class_from_text(subject)
-    if cid is None:
-        raise ValueError("مش عارف أرسم «" + str(subject) + "» — المتاح: "
-                         + "، ".join(scenes.ARABIC.values()))
-    model, _cfg = load_model(ckpt)
-    y = torch.tensor([scenes.CLASS_IDS.index(cid)])
-    with torch.no_grad():
-        out = sample_ddim(model, y, size=size, steps=steps, seed=seed)
-    img = (out[0].permute(1, 2, 0).clamp(0, 1).numpy() * 255).astype(np.uint8)
-    return Image.fromarray(img), cid
+class KhufuImage:
+    """صورة خوفو — مصفوفة uint8 (H, W, 3) + حفظ PNG من غير مكتبات."""
+
+    def __init__(self, arr):
+        self.arr = np.ascontiguousarray(arr, dtype=np.uint8)
+
+    @property
+    def size(self):
+        return self.arr.shape[1], self.arr.shape[0]      # (عرض، طول) زي PIL
+
+    def save(self, path):
+        with open(path, "wb") as f:
+            f.write(png.encode_png(self.arr))
+        return path
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--subject", required=True)
-    ap.add_argument("--size", type=int, default=64, choices=[32, 64, 96, 128])
-    ap.add_argument("--steps", type=int, default=50, choices=[20, 50, 100])
-    ap.add_argument("--seed", type=int, default=None)
-    ap.add_argument("--out", default="out.png")
-    ap.add_argument("--ckpt", default=None, help="Path to checkpoint (default: data/khufu_latest.pt)")
-    a = ap.parse_args()
-    img, cid = generate(a.subject, size=a.size, steps=a.steps, seed=a.seed, ckpt=a.ckpt)
-    img.save(a.out)
-    print(f"{cid} -> {a.out} ({a.size}x{a.size}, {a.steps} steps)")
+def _tables():
+    betas = torch.linspace(BETA_START, BETA_END, T_TOTAL)
+    alphas = 1.0 - betas
+    abar = torch.cumprod(alphas, dim=0)
+    return alphas, abar
 
 
-if __name__ == "__main__":
-    main()
+def load_model(path=CKPT):
+    """تحميل النموذج المتدرب (مع كاش بسيط) — لو مفيش ملف بيشتغل بنموذج عشوائي صغير."""
+    from model import KhufuNet
+    key = path + ":" + str(int(os.path.getmtime(path)) if os.path.exists(path) else 0)
+    if key in _model_cache:
+        return _model_cache[key]
+    net = KhufuNet()
+    ema = None
+    if os.path.exists(path):
+        d = torch.load(path, map_location="cpu", weights_only=True)
+        ema = d.get("ema") or d["weights"]
+        net.load_state_dict({k: torch.as_tensor(v) for k, v in ema.items()})
+    net.eval()
+    _model_cache.clear()
+    _model_cache[key] = net
+    return net
+
+
+def _resolve(cid):
+    if cid in scenes.CLASS_IDS:
+        return cid
+    got = scenes.class_from_text(str(cid))
+    if got is None:
+        raise ValueError("مش عارف أرسم «%s» — اختار حاجة من القايمة" % cid)
+    return got
+
+
+def generate(cid, size=64, steps=50, seed=None, _model=None):
+    """العقد اللي app.py بيستدعيه: (KhufuImage, cid)."""
+    cid = _resolve(cid)
+    if int(size) not in scenes.SIZES:
+        raise ValueError("الأبعاد لازم تكون %s" % (scenes.SIZES,))
+    if int(steps) not in scenes.STEPS:
+        raise ValueError("الخطوات لازم تكون %s" % (scenes.STEPS,))
+    size, steps = int(size), int(steps)
+    seed = int(seed) if seed not in (None, "") else secrets.randbelow(2**31)
+
+    model = _model or load_model()
+    alphas, abar = _tables()
+    g = torch.Generator().manual_seed(seed)
+    x = torch.randn((1, 3, scenes.BASE, scenes.BASE), generator=g)
+    cls = torch.tensor([scenes.CLASS_IDS.index(cid)])
+    # انتبه: torch.unique بيرتب تصاعدي — فبنعمل flip عشان المسير يمشي تنازلي
+    # (من 999 = ضوضاء كاملة → لـ 0 = صورة نضيفة)، مش العكس.
+    ts = torch.linspace(0, T_TOTAL - 1, steps).round().long().unique().flip(0)
+    for i, t in enumerate(ts):
+        with torch.no_grad():
+            eps = model(x, torch.full((1,), int(t)), cls)
+        a = abar[int(t)]
+        # خ2: تقييد تقدير الصورة النضيفة في المدى (clip denoised — هو et al. 2020).
+        # من غيره خطوة تقدير وحشة في الضوضاء العالية بتخلي التوليد ينفجر
+        # لأسود/أبيض كامل — كان بيحصل مع بذور معينة على 20 خطوة.
+        x0 = ((x - (1 - a).sqrt() * eps) / a.sqrt()).clamp(-1, 1)
+        if i < len(ts) - 1:
+            anext = abar[int(ts[i + 1])]
+            x = anext.sqrt() * x0 \
+                + (1 - anext).sqrt() * torch.randn(x.shape, generator=g)
+        else:
+            x = x0                                      # آخر خطوة من غير ضجيج
+
+    img01 = ((x.clamp(-1, 1) + 1) / 2).numpy()[0].transpose(1, 2, 0)
+    if size != scenes.BASE:
+        img01 = resize.resize_lanczos(img01, size)   # تكبير حاد بيحافظ على الحواف
+    return KhufuImage(np.clip(img01 * 255 + 0.5, 0, 255)), cid

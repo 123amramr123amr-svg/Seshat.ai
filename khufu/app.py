@@ -30,8 +30,9 @@ def gen():
     steps = int(data.get("steps", 50))
     seed = data.get("seed")
     seed = int(seed) if seed not in (None, "") else None
-    if size not in (32, 64, 96, 128):
-        return jsonify(error="الأبعاد لازم تكون 32 أو 64 أو 96 أو 128"), 400
+    if size not in scenes.SIZES:            # خ2: المقاسات حتى 750 من scenes نفسها
+        return jsonify(error="الأبعاد لازم تكون واحدة من "
+                             + " أو ".join(str(s) for s in scenes.SIZES)), 400
     if steps not in (20, 50, 100):
         return jsonify(error="الجودة لازم تكون 20 أو 50 أو 100 خطوة"), 400
     cid = subject if subject in scenes.CLASS_IDS else scenes.class_from_text(subject)
