@@ -820,6 +820,107 @@ def what_was_asked(question):
     return found[0] if found else (None, None)
 
 
+# ============================================================
+# خ4 — "مش عارف أرسم" اتلغت: أي طلب رسم لازم يطلع منه رسمة.
+# لو find_objects مالقاش اسم معروف، nearest_objects بيرجع أقرب رسمة
+# (تطبيق أبجدي لطيف → دلو دلالي → دايره كأبسط شكل)، وبيقول كلمة الطلب
+# عشان الرد يوضح إنها أقرب حاجة مش الرسمة الأصلية.
+# ============================================================
+_DRAW_STOP = {
+    "ارسم", "ارسمي", "ارسملي", "رسم", "رسمه", "صوره", "صورة", "لوحه", "لوحة", "شكل",
+    "اعمل", "اعملي", "انشئ", "عايز", "عاوز", "ممكن", "لي", "ليا", "ولي", "من", "فضلك",
+    "لو", "سمحت", "وتاني", "كمان", "draw", "please", "make", "create", "generate",
+    "want", "need", "give", "me", "picture", "image", "drawing", "paint", "one",
+}
+
+_DRAW_BUCKETS = (
+    ("cat", ("قرد", "نمر", "اسد", "أسد", "فيل", "جمل", "حصان", "ارنب", "أرنب", "فار",
+     "دب", "ذئب", "حيوان", "ديناصور", "تمساح", "monkey", "lion", "tiger", "elephant",
+     "camel", "horse", "bear", "wolf", "rabbit", "animal", "zebra", "dinosaur",
+     "crocodile", "جيراف", "زرافه")),
+    ("bird", ("طير", "عصفور", "بط", "فراشه", "نحله", "حمامه", "duck", "goose", "fly",
+     "butterfly", "bee", "eagle", "hawk", "نسر", "بجعه")),
+    ("fish", ("حوت", "دلفين", "قرش", "سلطعون", "whale", "shark", "dolphin", "crab",
+     "octopus", "اخطبوط")),
+    ("apple", ("موز", "برتقان", "عنب", "بطيخ", "فراوله", "اكل", "طعام", "خبز", "جبنه",
+     "بيض", "food", "banana", "orange", "grapes", "cheese", "bread", "egg", "mango")),
+    ("carrot", ("خضار", "خيار", "طماطم", "بطاطس", "vegetable", "potato", "tomato", "onion")),
+    ("icecream", ("كيك", "شوكولاته", "حلويات", "سكر", "بسكوت", "cake", "chocolate",
+     "candy", "sweets", "donut", "cookie")),
+    ("cup", ("شاي", "قهوه", "جواه", "عصير", "لبن", "tea", "coffee", "juice", "milk",
+     "drink", "water", "bottle", "زجاجه")),
+    ("tree", ("شجره", "غابه", "نخل", "غرس", "jungle", "forest", "wood", "leaf", "palm")),
+    ("flower", ("ورد", "زهره", "توليب", "petal", "rose", "tulip", "garden")),
+    ("sun", ("شمس", "ضهر", "نهار", "sun", "noon", "daylight")),
+    ("moon", ("هلال", "بدر", "ليل", "ظلام", "crescent", "night", "dark")),
+    ("star", ("نجمه", "نجم", "مجره", "كوكب", "برج", "star", "galaxy", "planet", "zodiac")),
+    ("cloud", ("سحاب", "غيم", "غيوم", "مطر", "شتا", "رعد", "cloud", "storm", "thunder", "fog")),
+    ("car", ("عربيه", "سياره", "دراجه", "شاحنه", "اوتوبيس", "تاكسي", "motor", "bus",
+     "bike", "truck", "taxi", "train", "wheel")),
+    ("boat", ("سفينه", "مركب", "فلوكه", "شراع", "يخت", "ship", "sail", "yacht", "canoe")),
+    ("rocket", ("فضاء", "صاروخ", "مكوك", "فضائي", "طياره", "جت", "space", "shuttle",
+     "spaceship", "alien", "plane", "airplane", "aircraft", "jet", "helicopter", "هليكوبتر")),
+    ("robot", ("انسان", "بنت", "راجل", "ولد", "ست", "وحش", "كائن", "تنين", "تنانين",
+     "حاسوب", "كمبيوتر", "لابتوب", "person", "human", "girl", "boy", "man", "woman",
+     "people", "face", "zombie", "computer", "laptop", "dragon")),
+    ("ball", ("كره", "لعب", "قدمه", "تنس", "سله", "football", "soccer", "tennis",
+     "basketball", "toy", "game")),
+    ("house", ("بيت", "منزل", "شقه", "عماره", "فيلا", "قلعه", "قصر", "home", "building",
+     "apartment", "villa", "castle", "palace", "cabin", "church", "كنيسه", "مدرسه", "school")),
+    ("crown", ("ملك", "ملكه", "امير", "تاج الملوك", "king", "queen", "prince",
+     "princess", "royal")),
+    ("book", ("كتاب", "دفتر", "مجله", "قراءه", "قصه", "book", "notebook", "magazine",
+     "story", "novel", "read")),
+    ("key", ("قفل", "باب", "door", "lock", "unlock")),
+    ("bulb", ("لمبه", "نور", "مصباح", "كهربا", "light", "lamp", "torch", "lantern")),
+    ("heart", ("حب", "عشقه", "قلب", "غرام", "love", "romance", "valentine")),
+    ("balloon", ("عيد", "حفله", "فرح", "زفه", "party", "festival", "birthday", "wedding")),
+    ("umbrella", ("مطر", "شتا", "مظله", "rain", "shade", "canopy")),
+    ("pyramid", ("مصر", "فرعون", "اهرامات", "egipt", "egypt", "pharaoh", "sphinx", "ابو الهول")),
+    ("mountain", ("جبل", "وادى", "هضبه", "صخور", "بركان", "valley", "hill", "cliff",
+     "volcano", "cave", "كهف")),
+    ("smiley", ("ضحك", "بصه", "وجه", "سعيد", "فرحان", "happy", "smile", "laugh", "emotion")),
+    ("diamond", ("الماس", "الماسي", "جواهر", "خاتم", "diamond", "gem", "jewel")),
+)
+
+
+def _norm_word(s):
+    for a, b in (("ة", "ه"), ("أ", "ا"), ("إ", "ا"), ("آ", "ا"), ("ى", "ي")):
+        s = s.replace(a, b)
+    return s
+
+
+def nearest_objects(question, limit=1):
+    """
+    خ4: آخر خطوة قبل "مش عارف أرسم" — دي مبقاش موجودة خالص. بياخد الطلب
+    (نفس التنضيف اللي find_objects بيقراه) وبرجّع (رسومات، الكلمة اللي اتطلبت):
+    أول كلمة مش معروفة بتتجرب أبجديًا على كل الأسماء، ولو فشلت بتنزل للأدلة
+    الدلالية، ولو مفيش حاجة خالص بترجع دايره — الرد دايمًا بيتوضح بـ«أقرب حاجة».
+    """
+    import difflib
+
+    words = [_norm_word(w) for w in (question or "").split()]
+    unknown = [w for w in words if len(w) >= 3 and w not in _DRAW_STOP]
+    names = {}
+    for key, (fn, ar, fem, ar_alt, en, en_alt, default) in OBJECTS.items():
+        for nm in [ar] + ar_alt + [en] + en_alt:
+            nm = _norm_word(nm.lower())
+            if len(nm) >= 3:
+                names[nm] = key
+    asked = unknown[0] if unknown else None
+    for w in unknown:                              # تطبيق أبجدي على أول كلمة غريبة
+        if len(w) >= 4:
+            near = difflib.get_close_matches(w, names.keys(), n=1, cutoff=0.75)
+            # لازم نفس أول حرف وطول قريب — عشان «طياره» ما تروحش «سياره»
+            if near and near[0][0] == w[0] and abs(len(w) - len(near[0])) <= 2:
+                return [(names[near[0]], None)], asked
+    for key, ws in _DRAW_BUCKETS:                  # دلالي: نفس كلمة الطلب أو غيرها
+        for b in ws:
+            if b in [w for w in words if len(w) >= 3] or b in (question or "").lower():
+                return [(key, None)], asked
+    return [("circle", None)], asked               # أبسط شكل — برضه من غير رفض
+
+
 def known_names(arabic=True):
     return [obj[1] if arabic else obj[4] for obj in OBJECTS.values()]
 

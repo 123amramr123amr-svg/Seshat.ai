@@ -35,9 +35,8 @@ def gen():
                              + " أو ".join(str(s) for s in scenes.SIZES)), 400
     if steps not in (20, 50, 100):
         return jsonify(error="الجودة لازم تكون 20 أو 50 أو 100 خطوة"), 400
-    cid = subject if subject in scenes.CLASS_IDS else scenes.class_from_text(subject)
-    if cid is None:
-        return jsonify(error="مش عارف أرسم «" + subject + "» — اختار حاجة من القائمة"), 400
+    # خ4: مفيش رفض تاني — أي نص بيتفسر لأقرب صنف (nearest_class)
+    cid = subject if subject in scenes.CLASS_IDS else scenes.nearest_class(subject)
     if not os.path.exists(CKPT):
         return jsonify(error="خوفو لسه بيتدرب — مفيش نموذج جاهز بعد"), 400
     jid = uuid.uuid4().hex[:12]

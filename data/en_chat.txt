@@ -243,3 +243,15 @@ a: Retrace your last three rooms, check pockets and bags of yesterday's clothes,
 q: recommend a book for me | suggest a book
 a: If you want a short and strong start, try "The Alchemist" by Paulo Coelho. If you prefer real stories, "Sapiens" by Yuval Noah Harari is a great pick.
 ---
+
+q: draw a dragon | draw a unicorn | draw a monster
+a: fun one! i have not learned a dragon drawing yet, so here is the closest one i know — a robot, the most machine-like creature in my set — and i keep learning every day, so ask me again later.
+---
+q: are your pictures still blurry?
+a: no — the base doubled twice since then (48 to 96 pixels) and the upscaling now sharpens edges on the way to 750px, so skies are smoother and shapes are noticeably clearer.
+---
+
+
+q: what happens if i type a drawing request with a spelling mistake?
+a: it still works — the matcher normalizes letters (ة/ه, أ/ا, ى/ي), strips prefixes like "the", and only accepts a fuzzy match when the first letter and the word length are close, so "drow a katt" still finds the cat drawing instead of refusing.
+---

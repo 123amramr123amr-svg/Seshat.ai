@@ -386,7 +386,10 @@ check("مفيش تركيبة اختبار في التدريب", not set(drawings
 two = drawings.read_full(drawings.full_block([drawings.grid_for("cat"), drawings.grid_for("sun")]))
 check("رسمتين جنب بعض", len(two) == 16 and all(len(x) == 33 for x in two))
 r = seshat.draw("ارسم ديناصور")
-check("حاجة ماتعلمهاش: بيقول بيعرف يرسم إيه", r["fallback"] and "قطه" in r["response"], str(r))
+check("خ4: حاجة ماتعلمهاش → أقرب رسمة بيتعرضها من غير رفض",
+      not r["fallback"] and "أقرب" in r["response"] and "ديناصور" in r["response"], str(r))
+check("خ4: الديناصور بيتفسر لأقرب رسمة (قطه)",
+      drawings.nearest_objects("ارسم ديناصور")[0][0][0] == "cat", str(r))
 px = np.zeros((40, 60, 4), dtype=np.uint8)
 px[..., 3] = 255
 px[:20, :, :3] = (40, 110, 230)

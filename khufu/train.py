@@ -42,7 +42,7 @@ def parse_args():
     p = argparse.ArgumentParser(description="تدريب خوفو")
     p.add_argument("--minutes", type=float, default=8.0, help="حد الوقت بالدقايق (0 = من غير حد)")
     p.add_argument("--steps", type=int, default=100000, help="أقصى خطوات تدريب")
-    p.add_argument("--batch", type=int, default=24)   # خ2: الدقة 48×48 — باتش أصغر أسرع خطوة أكتر
+    p.add_argument("--batch", type=int, default=16)   # خ4: الدقة 96×96 — باتش أصغر أسرع خطوة أكتر
     p.add_argument("--lr", type=float, default=2e-4)
     p.add_argument("--n-per-class", type=int, default=500)
     p.add_argument("--seed", type=int, default=1234)
@@ -94,13 +94,17 @@ def main():
     torch.manual_seed(args.seed)
 
     print("🎨 خوفو — تجهيز البيانات الإجرائية…", flush=True)
-    imgs, labels = scenes.make_dataset(args.n_per_class, seed=args.seed)
-    x_all = torch.from_numpy(scenes.to_model_range(imgs)).permute(0, 3, 1, 2).contiguous()  # HWC→CHW
+    imgs_u8, labels = scenes.make_dataset_u8(args.n_per_class, seed=args.seed)   # خ4: uint8 لتوفير الرام
+    x_all = torch.from_numpy(imgs_u8)                              # NHWC uint8 — التحويل لكل باتش
     y_all = torch.from_numpy(labels)
     n = x_all.shape[0]
     perm = torch.randperm(n, generator=torch.Generator().manual_seed(args.seed))
     hold = perm[: max(1, n // 20)]                                 # 5% للاختبار
     train_idx = perm[n // 20:]
+
+    def batch_u8(sel):
+        """تحويل باتش uint8 NHWC → float CHW في مدى [-1،1] — خ4"""
+        return x_all[sel].permute(0, 3, 1, 2).float() / 127.5 - 1.0
     print(f"   عينات تدريب: {len(train_idx)} | اختبار: {len(hold)} | "
           f"أصناف: {len(scenes.CLASS_IDS)} | دقة القاعدة: {scenes.BASE}×{scenes.BASE}", flush=True)
 
@@ -145,7 +149,7 @@ def main():
             print("⏱️  خلص وقت الجولة — بحفظ", flush=True)
             break
         idx = torch.randint(0, len(train_idx), (args.batch,), generator=gen)
-        xb = x_all[train_idx[idx]]
+        xb = batch_u8(train_idx[idx])
         yb = y_all[train_idx[idx]]
         t = torch.randint(0, T_TOTAL, (args.batch,), generator=gen)
         noise = torch.randn(xb.shape, generator=gen)
@@ -167,8 +171,8 @@ def main():
             with torch.no_grad():
                 hb = hold[: args.batch]
                 tn = torch.randint(0, T_TOTAL, (len(hb),), generator=gen)
-                hn = torch.randn(x_all[hb].shape, generator=gen)
-                hx = abar[tn][:, None, None, None] * x_all[hb] \
+                hn = torch.randn((len(hb), 3, scenes.BASE, scenes.BASE), generator=gen)
+                hx = abar[tn][:, None, None, None] * batch_u8(hb) \
                     + (1 - abar[tn])[:, None, None, None].sqrt() * hn
                 hloss = float(F.mse_loss(model(hx, tn, y_all[hb]), hn))
             last_reported = {"train": run_loss / run_n, "holdout": hloss}

@@ -23,14 +23,22 @@ import scenes
 check("١٦ صنف ومعاها أسماء عربي (خ3: +قارب طيور بالونات طريق)", len(scenes.CLASSES) == 16
       and all(isinstance(c, tuple) and c[1] for c in scenes.CLASSES))
 check("CLASS_IDS متطابق مع CLASSES", scenes.CLASS_IDS == tuple(c[0] for c in scenes.CLASSES))
-check("دقة القاعدة 48×48 (جولة خ2)", scenes.BASE == 48)
+check("دقة القاعدة 96×96 (جولة خ4 — كانت 48)", scenes.BASE == 96)
 check("المقاسات فيها 750 (أعلى دقة)", 750 in scenes.SIZES
       and scenes.SIZES[-1] == 750 and list(scenes.SIZES) == sorted(scenes.SIZES))
 check("«غروب» → sunset", scenes.class_from_text("غروب") == "sunset")
 check("«البحر» → sea", scenes.class_from_text("البحر") == "sea")
 check("«سلسلة جبال» → mountains", scenes.class_from_text("سلسلة جبال") == "mountains")
 check("إنجليزي «city» → city", scenes.class_from_text("city") == "city")
-check("حاجة غلط → None", scenes.class_from_text("يا نبى سيدي") is None)
+check("حاجة غلط → None (الصارم لسه بيشتغل)", scenes.class_from_text("يا نبى سيدي") is None)
+print("1خ4) أقرب صنف — الرفض اتلغى")
+check("أي نص → صنف صحيح (مبربعش None)", all(scenes.nearest_class(t) in scenes.CLASS_IDS
+      for t in ("يا نبى سيدي", "حاسوب", "ارسم قرد بيغني", "xyzzzz", "تنين", "خوخة", "")))
+check("«قرد» → birds و«حاسوب» → city", scenes.nearest_class("ارسم قرد بيغني") == "birds"
+      and scenes.nearest_class("حاسوب") == "city")
+check("«غروب الشمس» مازلت sunset مش day (أطول مرادف الأول)",
+      scenes.class_from_text("غروب الشمس") == "sunset")
+check("«الشمس» → day (تطبيع + مرادف جديد)", scenes.nearest_class("الشمس") == "day")
 check("نفس البذرة = نفس الصورة بالحرف",
       (scenes.make_sample("sunset", 42) == scenes.make_sample("sunset", 42)).all()
       and not (scenes.make_sample("sunset", 42) == scenes.make_sample("sunset", 43)).all())
@@ -65,8 +73,12 @@ imgs16, labels16 = scenes.make_dataset(2, seed=9)
 check("الداتاسيت بتتكلم مع 16 صنف (32 عينة)", imgs16.shape == (32, scenes.BASE, scenes.BASE, 3)
       and labels16.max() == 15)
 imgs, labels = scenes.make_dataset(3, seed=9)
-check("الداتاسيت (12×3) على دقة القاعدة (48×48×3) — الثوابت القديمة ما اتكسرت",
+check("الداتاسيت (12×3) على دقة القاعدة (96×96×3) — الثوابت القديمة ما اتكسرت",
       imgs.dtype == np.float32 and imgs.min() >= 0 and imgs.max() <= 1)
+imgs_u8, labels_u8 = scenes.make_dataset_u8(2, seed=9)
+check("خ4: الداتاسيت uint8 للتدريب على 96 (توفير رام)", imgs_u8.dtype == np.uint8
+      and imgs_u8.shape == (32, 96, 96, 3)
+      and abs(float(imgs_u8[0].mean()) / 255.0 - float(imgs[0].mean())) < 0.02)
 
 print("\n2) كاتب PNG (png.py)")
 import png
@@ -81,23 +93,32 @@ check("الأبعاد من IHDR: عرض 7 طول 5", ihdr == {"width": 7, "heigh
 print("\n2مكرر) مكبّر Lanczos (resize.py) — جولة خ2")
 import resize
 im0 = scenes.make_sample("sea", 3)
-same = resize.resize_lanczos(im0, 48)
+same = resize.resize_lanczos(im0, scenes.BASE)
 check("نفس المقاس = نفس المحتوى", np.abs(same - im0).max() < 1e-5)
 big = resize.resize_lanczos(im0, 750)
-check("48 → 750 بالشكل الصح (750×750×3)", big.shape == (750, 750, 3)
+check("96 → 750 بالشكل الصح (750×750×3)", big.shape == (750, 750, 3)
       and big.dtype == np.float32 and big.min() >= 0 and big.max() <= 1)
 big2 = resize.resize_lanczos(im0, 750)
 check("حتمية: نفس المدخل = نفس المخرج", (big == big2).all())
 small = resize.resize_lanczos(im0, 32)
-check("التصغير شغال (48 → 32)", small.shape == (32, 32, 3))
+check("التصغير شغال (96 → 32)", small.shape == (32, 32, 3))
 u8 = (im0 * 255).astype(np.uint8)
 from_u8 = resize.resize_lanczos(u8, 750)
 check("يقبل uint8 ويرجّع float [0،1]", from_u8.dtype == np.float32
       and from_u8.min() >= 0 and from_u8.max() <= 1)
-g = np.linspace(0, 1, 48)[:, None, None] * np.ones((48, 48, 3))
+g = np.linspace(0, 1, scenes.BASE)[:, None, None] * np.ones((scenes.BASE, scenes.BASE, 3))
 gb = resize.resize_lanczos(g, 750)
 check("تدرج السما بيفضل مونوتوني بعد التكبير (من غير خطوط)",
       bool(np.all(np.diff(gb.mean(axis=(1, 2))) >= -1e-3)))
+print("\n2خ4) ترويس الحواف بعد التكبير — الصور تطلع أوضح")
+plain = resize.resize_lanczos(im0, 750, sharpen=False)
+sharp = resize.resize_lanczos(im0, 750)
+_g = lambda a: float(np.abs(np.diff(a.mean(axis=2), axis=1)).mean())
+check("الترويس بيزوّد حدّة الحواف فعلاً (مقارنة بالمكبّر العادي)", _g(sharp) > _g(plain))
+check("الترويس حتمي (نفس المدخل = نفس المخرج)", (sharp == resize.resize_lanczos(im0, 750)).all())
+small2 = resize.resize_lanczos(im0, 32)
+check("التصغير بيمرو من غير ترويس (مفيش ripple)",
+      np.abs(small2 - resize.resize_lanczos(im0, 32, sharpen=False)).max() < 1e-6)
 
 print("\n3) الشبكة (model.py)")
 import torch
@@ -136,15 +157,13 @@ check("الصورة طلعت 32×32×3", img.arr.shape == (32, 32, 3))
 img2, _ = generate.generate("sunset", size=32, steps=20, seed=7, _model=net)
 check("نفس البذرة = نفس الصورة بالحرف", (img.arr == img2.arr).all())
 try:
-    generate.generate("يا نبى سيدي", size=32, steps=20, _model=net)
-    check("صنف غلط بيرفض باحترام", False)
-except ValueError:
-    check("صنف غلط بيرفض باحترام", True)
-try:
     generate.generate("sea", size=40, steps=20, _model=net)
     check("مقاس غلط بيرفض", False)
 except ValueError:
     check("مقاس غلط بيرفض", True)
+img_g, got_g = generate.generate("يا نبى سيدي", size=32, steps=20, seed=7, _model=net)
+check("** خ4: نص غلط عمره ما بيرفض — بيتفسر لأقرب صنف **",
+      got_g in scenes.CLASS_IDS and img_g.arr.shape == (32, 32, 3))
 
 img750, _ = generate.generate("غروب", size=750, steps=20, seed=7, _model=net)
 check("** جولة خ2: توليد 750×750 بالحرف **", img750.arr.shape == (750, 750, 3))

@@ -439,14 +439,15 @@ class BaseSeshat:
         thinking = model["thinking"]
 
         # 2.5) رسم: النموذج هو اللي بيرسم (بيكتب الرسمة حرف حرف)، وإحنا بنتأكد إن الرسمة
-        #      سليمة وإنها الحاجة واللون اللي اتطلبوا. لو لأ → بنقول كده بصراحة.
+        #      سليمة وإنها الحاجة واللون اللي اتطلبوا. ولو الاسم مش معروف → أقرب رسمة
+        #      معروفة (خ4: مفيش "مش عارف أرسم" ولا "اختار من قايمة").
         objects = drawings.find_objects(question, DRAW_MAX_OBJECTS)
         wants_drawing = any(w in question.split() for w in DRAW_WORDS)
         thinks_drawing = thinking.startswith(DRAW_LABELS)
         if objects and (thinks_drawing or wants_drawing):
             return self._draw(objects, arabic, temperature, max_new_tokens, first=model)
         if wants_drawing or (thinks_drawing and (known is None or known.score < MEMORY_STRONG)):
-            return self._cannot_draw(arabic)
+            return self._draw_nearest(question, arabic, temperature, max_new_tokens, first=model)
 
         # 3) سؤال قريب جدًا من سؤال متخزن
         #    (بس مش لو السؤالين عن حاجتين مختلفتين: "سكان الصين" مش "سكان مصر")
@@ -479,16 +480,31 @@ class BaseSeshat:
                 "confidence": 0.0, "fallback": True, "source": "none", "matched": "",
                 "suggestion": ""}
 
+    def _draw_nearest(self, question, arabic, temperature, max_new_tokens, first=None):
+        """خ4: أي طلب رسم لازم يطلع منه رسمة — أقرب رسمة معروفة للمطلوب،
+        والرد بيتوضح إنها أقرب حاجة مش الرسمة الأصلية. الرفض اتلغى."""
+        objects, asked = drawings.nearest_objects(question, 1)
+        res = self._draw(objects, arabic, temperature, max_new_tokens, first=first)
+        if asked and not res.get("fallback"):
+            if arabic:
+                res["response"] += ("\n(مفيش رسمة باسم «%s» عندي لسه، فدي أقرب حاجة عندي للمطلوب — "
+                                    "وبكمل تعلم كل يوم.)" % asked)
+            else:
+                res["response"] += ("\n(I don't have a drawing named '%s' yet, so this is the "
+                                    "closest one I know — I keep learning every day.)" % asked)
+        return res
+
     def draw(self, message, temperature=0.0, max_new_tokens=600):
         """
-        طلب رسم صريح (المخ اتأكد إنه طلب رسم). بيرجع رد فيه الرسمة، أو رد بيقول بصراحة
-        إن المطلوب مش من اللي اتعلم يرسمه (fallback=True).
+        طلب رسم صريح (المخ اتأكد إنه طلب رسم). بيرجع رد فيه الرسمة دايمًا —
+        لو الاسم مش من اللي اتعلمها بيرسم أقرب حاجة وبيقول كده (خ4: مفيش رفض).
         """
         from tokenizer import normalize_question
         arabic = is_arabic(message)
-        objects = drawings.find_objects(normalize_question(message), DRAW_MAX_OBJECTS)
+        q = normalize_question(message)
+        objects = drawings.find_objects(q, DRAW_MAX_OBJECTS)
         if not objects:
-            return self._cannot_draw(arabic)
+            return self._draw_nearest(q, arabic, temperature, max_new_tokens)
         return self._draw(objects, arabic, temperature, max_new_tokens)
 
     def _draw_one(self, key, code, arabic, temperature, max_new_tokens, first=None):

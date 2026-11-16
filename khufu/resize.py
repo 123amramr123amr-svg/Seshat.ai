@@ -24,11 +24,8 @@ def _lanczos(x, a=_A):
     inside = x < a
     xi = x[inside]
     pi_x = np.pi * xi
-    out[inside] = np.where(
-        xi < 1e-8,
-        1.0,
-        (a * np.sin(pi_x) * np.sin(pi_x / a)) / (pi_x * pi_x),
-    )
+    den = np.where(xi < 1e-8, 1.0, pi_x * pi_x)     # مقام آمن — عشان 0/0 ما يعملش nan
+    out[inside] = np.where(xi < 1e-8, 1.0, (a * np.sin(pi_x) * np.sin(pi_x / a)) / den)
     return out
 
 
@@ -51,10 +48,23 @@ def _axis_matrix(src, dst, a=_A):
     return W / s
 
 
-def resize_lanczos(arr, size, a=_A):
+def _unsharp(img, amount=0.35):
+    """ترويس حواف خفيف (unsharp mask): الصورة + amount × (الصورة − نسخة ناعمة منها).
+    بيبرز الحواف والتفاصيل بعد التكبير الكبير — خ4: عشان الصور ما تطلعش "مش واضحة".
+    ناعم بمصفوفة 3×3 حتمية بـ numpy خالص، والحدود بيتعامل معاها بالتكرار."""
+    pad = np.pad(img, ((1, 1), (1, 1), (0, 0)), mode="edge")
+    blur = (pad[:-2, :-2] + pad[:-2, 1:-1] + pad[:-2, 2:]
+            + pad[1:-1, :-2] + pad[1:-1, 1:-1] + pad[1:-1, 2:]
+            + pad[2:, :-2] + pad[2:, 1:-1] + pad[2:, 2:]) / 9.0
+    return img + amount * (img - blur)
+
+
+def resize_lanczos(arr, size, a=_A, sharpen=True):
     """
     صورة (H, W, 3) — float في [0,1] أو uint8 — → (size, size, 3) float32 في [0,1].
     نفس المقاس = نفس المحتوى (بتحويل آمن للنوع). حتمية 100% لنفس المدخلات.
+    sharpen=True (الافتراضي): التكبير بس بييجي بعده ترويس حواف خفيف — خ4 —
+    والتصغير ونفس المقاس بيمروا زي ما هم عشان ما يتعملوش ripple.
     """
     src = np.asarray(arr)
     img = src.astype(np.float64)
@@ -67,4 +77,6 @@ def resize_lanczos(arr, size, a=_A):
     hy = _axis_matrix(h, size, a)          # تكبير رأسي
     tmp = np.einsum("hwc,xw->hxc", img, wx)
     out = np.einsum("hxc,yh->yxc", tmp, hy)
+    if size > max(h, w) and sharpen:       # التكبير بس بيتروش — خ4
+        out = _unsharp(out)
     return np.clip(out, 0.0, 1.0).astype(np.float32)

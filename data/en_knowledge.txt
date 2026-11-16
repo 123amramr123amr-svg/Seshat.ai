@@ -382,3 +382,20 @@ a: Mandarin Chinese has the most native speakers in the world — around 900 mil
 q: i am a marine biology teacher preparing a lesson about coral reefs for my senior class, and the curriculum requires me to name the largest coral reef system on earth with accurate figures, because my students always ask me how big it is compared to a country and whether it is visible from space, and i also want to mention which country hosts it and roughly how many species live there, since our school project requires each student to pick one species from that reef and write one page about it, so i need one clear factual answer with exact numbers that i can write on the whiteboard in a single line and have the students copy it correctly, and my final question is: what is the largest coral reef system in the world and where is it?
 a: The Great Barrier Reef off the coast of Queensland, Australia, is the largest coral reef system in the world — about 2,300 kilometers long and visible from space, hosting thousands of species (around 1,500 fish species and 400 coral types).
 ---
+
+q: do you refuse to draw things you have not learned? | what if i ask for an unknown drawing?
+a: never. every drawing request produces an image: if the name is not among the drawings i learned, i draw the closest match i know and say so clearly ("i don't have a drawing named X yet, so this is the closest one") — no refusals, no "pick from a list".
+---
+q: what resolution does khufu draw at now? | how sharp are khufu images after the update?
+a: after round kh4 the base is 96x96 pixels (four times the old 48x48), and when the picture is enlarged up to 750x750 it passes through a light unsharp-mask edge filter, so the result comes out crisp instead of mushy.
+---
+q: how do you understand a drawing request with unusual words?
+a: in stages: exact match first, then the longest synonym found inside the sentence (so "sunset of the sun" beats "sun"), then a letter-similarity match that must keep the same first letter and a similar length, and finally broad meaning buckets — animals to the cat or birds, computers to the city, spaceships to rockets, lakes to the sea.
+---
+q: why were your generated pictures blurry before?
+a: because the base was only 48x48 pixels and it was stretched 15 times to reach 750 — small details vanished. the new 96x96 base plus lanczos resampling with edge sharpening keeps the composition but renders it much cleaner.
+---
+
+q: describe in detail what changed in your latest image and drawing training round, why it was needed, and what the measurable results were, including how unknown requests are handled now and how the resolution and sharpening work together, because i want the full technical picture in one answer.
+a: the round fixed two real complaints: refusals like "i don't know how to draw that, pick from my list" and blurry 48x48-based images stretched to 750. now a pixel drawing request never returns empty: unknown words go through exact match, longest-synonym match, first-letter-preserving fuzzy match, then semantic buckets (animals to cat, birds for flying things, computers to city, spaceships to rocket, lakes to sea), and the final fallback is the simplest shape — with an honest note saying it is the closest match. khufu's base moved to 96x96 (4x the pixels), the dataset is stored as uint8 to fit memory, training resumed from the old weights, and the lanczos upscaler to 750x750 now applies a light unsharp mask (amount 0.35) only when enlarging, never when shrinking — all tests passed after training.
+---

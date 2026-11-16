@@ -3,9 +3,10 @@
 khufu/generate.py — التوليد من نموذج خوفو + كائن الصورة
 =======================================================
 generate(cid, size, steps, seed) → (KhufuImage, cid)
-  • cid: معرّف صنف من scenes.CLASS_IDS (أو نص عربي/إنجليزي بيتفسر).
-  • size: 32/64/96/128/256/512/750 — القاعدة بتتولد 48×48 (جولة خ2) وبتتكبّر
-    بمكبّر Lanczos3 (resize.py) — 750×750 أعلى دقة متاحة.
+  • cid: أي نص عربي/إنجليزي بيتفسر لأقرب صنف (خ4: مفيش رفض — nearest_class)،
+    والأصناف نفسها في scenes.CLASS_IDS.
+  • size: 32/64/96/128/256/512/750 — القاعدة بتتولد 96×96 (جولة خ4) وبتتكبّر
+    بمكبّر Lanczos3 + ترويس حواف خفيف (resize.py) — 750×750 أعلى دقة متاحة.
   • steps: 20/50/100 — خطوات شيل الضجيج (أكتر = أنعم وأدق).
   • seed: نفس البذرة = نفس الصورة بالحرف (على نفس الدقة).
 
@@ -95,10 +96,8 @@ def load_model(path=CKPT):
 def _resolve(cid):
     if cid in scenes.CLASS_IDS:
         return cid
-    got = scenes.class_from_text(str(cid))
-    if got is None:
-        raise ValueError("مش عارف أرسم «%s» — اختار حاجة من القايمة" % cid)
-    return got
+    # خ4: مفيش رفض تاني — أي نص بيتفسر لأقرب صنف (خوفو عمره ما يقول "مش عارف أرسم")
+    return scenes.nearest_class(str(cid))
 
 
 def generate(cid, size=64, steps=50, seed=None, _model=None):

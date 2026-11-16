@@ -483,7 +483,10 @@ class Dataset:
             a = ([self.tok.think_id] + self.tok.encode(intent.think) + [self.tok.end_think_id]
                  + self.tok.encode(intent.answer) + [self.tok.end_id])
             self._answer_ids[id(intent)] = a
-        max_q = block_size - len(a) - 1
+        max_q = block_size - min(len(a), block_size // 2) - 1
+        # خ4: الإجابات الأضخم من نص البلوك بتتقص — عشان ما تعملش باتشات انتباه
+        # بحجم جيجا (كانت بتقتل التدريب بالرام: OOM killer)
+        a = a[:block_size // 2]
         q = self.tok.encode(question)[:max(1, max_q - 1)]
         seq = [self.tok.user_id] + q + [self.tok.bot_id] + a
         seq = seq[:block_size + 1]
@@ -521,6 +524,8 @@ class Dataset:
             chunks, cur = [], []
             for p in pairs:
                 T = len(p[0])
+                if T * T > max_cells:            # خ4: مثال ضخم لوحده → تجاهله (حماية رام)
+                    continue
                 if cur and (len(cur) >= batch_size or (len(cur) + 1) * T * T > max_cells):
                     chunks.append(cur)
                     cur = []

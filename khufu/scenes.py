@@ -10,16 +10,17 @@ khufu/scenes.py — أصناف المشاهد ومولّد البيانات ال
 **جولة خ2 — الاستقلال عن الدقة:** كل المولدات بترسم بإحداثيات في فضاء 24×24
 وبتتضرب في معامل التكبير k = الدقة الفعلية / 24. نفس البذرة على نفس الدقة =
 نفس الصورة بالحرف، وعلى دقة أعلى = نفس التكوين بتفاصيل أكتر (أشعة سماء أنعم،
-عمارات بنوافذ أكتر، جبال بقمم أدق). ده اللي بيخلي رفع القاعدة 24→48 وانتاج
-750×720 ممكن من غير ما نعيد كتابة الرسمة الواحدة يدويًا.
+عمارات بنوافذ أكتر، جبال بقمم أدق). ده اللي بيخلي رفع القاعدة ممكن من غير ما
+نعيد كتابة الرسمة الواحدة يدويًا.
 
-الأساس 48×48 RGB (اترفع من 24 في خ2) — والمقاسات الأكبر (حتى 750) بتتولد
-بنفس القاعدة وبتتكبّر بمكبّر Lanczos3 (resize.py).
+الأساس 96×96 RGB (خ4: اترفع من 48 في خ2، ومن 24 قبل كده) — صور أنظف وأوضح
+بأربعة أضعاف البكسلات، والمقاسات الأكبر (حتى 750) بتتولد بنفس القاعدة
+وبتتكبّر بمكبّر Lanczos3 مع ترويس حواف خفيف (resize.py).
 """
 
 import numpy as np
 
-BASE = 48                      # دقة القاعدة اللي النموذج بيتدرب عليها (خ2: كانت 24)
+BASE = 96                      # دقة القاعدة اللي النموذج بيتدرب عليها (خ4: كانت 48 في خ2)
 SIZES = (32, 64, 96, 128, 256, 512, 750)   # المقاسات المسموحة — 750 أعلى دقة (خ2)
 STEPS = (20, 50, 100)          # خطوات الجودة (سلاسل الانتشار)
 
@@ -46,7 +47,7 @@ CLASS_IDS = tuple(c[0] for c in CLASSES)
 
 # مرادفات عربي/إنجليزي — class_from_text بيبتدي من هنا
 _SYNONYMS = {
-    "day": ("نهار", "صحو", "نهارداي", "صباح", "سماء زرقا", "day", "sunny", "morning"),
+    "day": ("نهار", "صحو", "نهارداي", "صباح", "سماء زرقا", "شمس", "الشمس", "شمسية", "day", "sunny", "morning", "sun"),
     "sunset": ("غروب", "الغروب", "غروب الشمس", "غروب شمس", "المغيب", "sunset", "dusk"),
     "night": ("ليل", "الليل", "بنجوم", "نجوم", "قمر", "سما بالليل", "night", "stars", "moon"),
     "dawn": ("فجر", "الفجر", "سحر", "السحر", "بكور", "dawn", "sunrise", "twilight"),
@@ -68,21 +69,110 @@ _CLASS_BY_ID = dict(CLASSES)
 
 
 def class_from_text(text):
-    """نص حر عربي/إنجليزي → معرّف صنف، أو None لو مش عارفه."""
+    """نص حر عربي/إنجليزي → معرّف صنف، أو None لو مش عارفه.
+    مرحلتين: تطابق تام الأول، وبعدين أطول مرادف جوا النص (عشان «غروب الشمس»
+    ما يتلخبطش مع «شمس» و«sunrise» ما يتلخبطش مع «sun»)."""
     t = (text or "").strip().lower()
     if not t:
         return None
     if t in _CLASS_BY_ID:
         return t
-    for cid, words in _SYNONYMS.items():
-        for w in words:
-            if w == t or (len(w) >= 3 and w in t):
-                return cid
-    return None
+    flat = [(w, cid) for cid, ws in _SYNONYMS.items() for w in ws]
+    for w, cid in flat:                                  # تطابق تام
+        if w == t:
+            return cid
+    best, best_cid = 0, None
+    for w, cid in flat:                                  # أطول جملة جوا النص
+        if len(w) >= 3 and w in t and len(w) > best:
+            best, best_cid = len(w), cid
+    return best_cid
 
 
 def class_name(cid):
     return _CLASS_BY_ID.get(cid, cid)
+
+
+# جولة خ4 — "مش عارف أرسم" اتلغت: أي طلب لازم يترسم أقرب صنف محدد.
+# الدلوّات الدلالية: كلمات مش في المرادفات بتتوجه لأقرب صنف بمعنى مش بأبجدية.
+_BUCKETS = (
+    ("birds", ("قرد", "نمر", "أسد", "اسد", "فار", "أرنب", "ارنب", "حصان", "فيل",
+     "جمل", "بقرة", "بقره", "فراشه", "فراشة", "بطة", "بط", "ديناصور", "تمساح",
+     "duck", "monkey", "lion", "elephant", "camel", "horse", "rabbit", "butterfly",
+     "animal", "حيوان", "dinosaur", "crocodile")),
+    ("sea", ("نهر", "بحيره", "موج", "غرق", "شلال", "river", "lake", "wave", "water", "waterfall")),
+    ("city", ("عماره", "بيت", "منزل", "قلعه", "برج", "قرية", "حاسوب", "كمبيوتر",
+     "تليفون", "موبايل", "روبوت", "house", "tower", "castle", "village", "town",
+     "computer", "phone", "laptop", "robot", "wifi")),
+    ("forest", ("غاب", "نخل", "زرع", "حقل", "عشب", "field", "grass", "nature", "طبيعه")),
+    ("night", ("سما", "سماء", "مجره", "كواكب", "تنين", "وحش", "شبح", "خيال",
+     "sky", "galaxy", "planet", "space", "dragon", "monster", "ghost", "fantasy")),
+    ("rain", ("سحاب", "غيم", "رعد", "برق", "طوفان", "cloud", "thunder", "storm")),
+    ("snow", ("برد", "صقيع", "جليد", "تلج", "cold", "ice", "frost")),
+    ("day", ("صيف", "جو جميل", "هواء", "weather", "summer")),
+    ("flowers", ("حديقة", "حدايق", "غرس", "عباد الشمس", "garden", "park", "spring", "ربيع")),
+    ("desert", ("حر", "نار", "صيف حار", "heat", "fire")),
+    ("road", ("جسر", "عربة", "سياره", "عربيه", "سرعة", "bridge", "car", "traffic")),
+    ("boat", ("شراعي", "يخت", "نجاة", "yacht", "sail")),
+    ("balloons", ("طيران", "سفر", "flight", "fly", "travel")),
+    ("mountains", ("وادي", "هضبة", "صخور", "valley", "rock", "cliff")),
+)
+
+
+_STOP_WORDS = {
+    "ارسم", "ارسمي", "ارسملي", "رسم", "صورة", "صوره", "لوحه", "لوحة", "اعمل", "انشئ",
+    "ولد", "عايز", "عاوز", "ممكن", "فقط", "شكل", "draw", "please", "make", "create",
+    "generate", "paint", "image", "picture", "want", "need", "give",
+}
+
+
+def _norm_ar(s):
+    """تطبيع خفيف: ة→ه، أ/إ/آ→ا، ى→ي — عشان البحث ما يفوتش على الصيغ."""
+    for a, b in (("ة", "ه"), ("أ", "ا"), ("إ", "ا"), ("آ", "ا"), ("ى", "ي")):
+        s = s.replace(a, b)
+    return s
+
+
+_NEAREST_BUCKETS = tuple((cid, tuple(_norm_ar(b) for b in ws)) for cid, ws in _BUCKETS)
+
+
+def nearest_class(text):
+    """أي نص حر → صنف من الأصناف المعلومة (مبربعش None على نص مش فاضي).
+    الترتيب: تطابق تام → مرادف جوا النص → أقرب كلمة أبجديًا (difflib) →
+    دلو دلالي → "نهار صحو" كاحتياطي أخير. ده عشان خوفو عمره ما يقول
+    "مش عارف أرسم" — بيطلع أقرب حاجة للمطلوب دايمًا."""
+    import difflib
+
+    t = _norm_ar((text or "").strip().lower())
+    if not t:
+        return CLASS_IDS[0]
+    strict = class_from_text(t)
+    if strict is not None:
+        return strict
+    words = set()
+    for w in t.split():
+        for p in ("وال", "بال", "لل", "ال", "و", "ب", "ل"):
+            if w.startswith(p) and len(w) - len(p) >= 3:
+                w = w[len(p):]
+                break
+        if len(w) >= 3 and w not in _STOP_WORDS:
+            words.add(w)
+    all_names = {}
+    for cid, ws in _SYNONYMS.items():
+        for w in ws:
+            w = _norm_ar(w)
+            if len(w) >= 3:
+                all_names[w] = cid
+    for w in words:
+        if len(w) < 4:                                   # الكلمات القصار الأبجدية بتحير
+            continue
+        near = difflib.get_close_matches(w, all_names.keys(), n=1, cutoff=0.75)
+        if near:
+            return all_names[near[0]]
+    for cid, ws in _NEAREST_BUCKETS:
+        for b in ws:
+            if b in t:
+                return cid
+    return CLASS_IDS[0]
 
 
 # ============================================================
@@ -589,6 +679,21 @@ def make_dataset(n_per_class=600, seed=1234):
             imgs.append(make_sample(cid, int(sd)))
             labels.append(i)
     return np.stack(imgs).astype(np.float32), np.array(labels, dtype=np.int64)
+
+
+def make_dataset_u8(n_per_class=500, seed=1234):
+    """نفس الداتاسيت بس uint8 (0..255) — خ4: على دقة 96 الداتاسيت float كامل
+    بياخد ~880 ميجا رام. بنحوّل كل عينة لوحدها فالذروة ~220 ميجا بس
+    (كان التحويل الكلي بيتقتل بالرام: OOM killer)."""
+    imgs, labels = [], []
+    for i, cid in enumerate(CLASS_IDS):
+        s = np.random.default_rng(seed + i)
+        seeds = s.integers(0, 2**31 - 1, size=n_per_class)
+        for sd in seeds:
+            sample = make_sample(cid, int(sd))
+            imgs.append(np.clip(sample * 255.0 + 0.5, 0, 255).astype(np.uint8))
+            labels.append(i)
+    return np.stack(imgs), np.array(labels, dtype=np.int64)
 
 
 def to_model_range(img01):
