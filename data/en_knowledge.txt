@@ -358,3 +358,27 @@ a: Light travels at about 299,792 kilometers per second — roughly 300,000 km/s
 
 q: i am a student working on a geography assignment about famous mountains and i need exact numbers for my report, my teacher wants the heights of the tallest peaks on each continent and i also want to compare africa's tallest mountain with the world's tallest one so i can explain the difference clearly in class tomorrow, please give me one clear answer with the exact names and heights because i keep finding different numbers on different websites and i am tired of guessing which one is right, so my final question is: what is the tallest mountain in the world and the tallest mountain in africa?
 a: The tallest mountain in the world is Mount Everest in the Himalayas, about 8,849 meters high. The tallest in Africa is Kilimanjaro in Tanzania, about 5,895 meters — the difference is roughly 3,000 meters.
+
+q: who wrote hamlet?
+a: William Shakespeare wrote Hamlet, one of his most famous tragedies, around the year 1600.
+---
+
+q: what is the capital of canada?
+a: The capital of Canada is Ottawa, not Toronto or Montreal as many people think.
+---
+
+q: how many legs does a spider have?
+a: A spider has eight legs. Creatures with six legs are insects, not spiders.
+---
+
+q: who invented the telephone?
+a: Alexander Graham Bell was granted the first patent for the telephone in 1876.
+---
+
+q: what language has the most native speakers?
+a: Mandarin Chinese has the most native speakers in the world — around 900 million people speak it as their first language.
+---
+
+q: i am a marine biology teacher preparing a lesson about coral reefs for my senior class, and the curriculum requires me to name the largest coral reef system on earth with accurate figures, because my students always ask me how big it is compared to a country and whether it is visible from space, and i also want to mention which country hosts it and roughly how many species live there, since our school project requires each student to pick one species from that reef and write one page about it, so i need one clear factual answer with exact numbers that i can write on the whiteboard in a single line and have the students copy it correctly, and my final question is: what is the largest coral reef system in the world and where is it?
+a: The Great Barrier Reef off the coast of Queensland, Australia, is the largest coral reef system in the world — about 2,300 kilometers long and visible from space, hosting thousands of species (around 1,500 fish species and 400 coral types).
+---

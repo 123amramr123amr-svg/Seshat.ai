@@ -20,7 +20,7 @@ def check(name, ok, detail=""):
 print("1) الأصناف (scenes.py)")
 import numpy as np
 import scenes
-check("١٢ صنف ومعاها أسماء عربي", len(scenes.CLASSES) == 12
+check("١٦ صنف ومعاها أسماء عربي (خ3: +قارب طيور بالونات طريق)", len(scenes.CLASSES) == 16
       and all(isinstance(c, tuple) and c[1] for c in scenes.CLASSES))
 check("CLASS_IDS متطابق مع CLASSES", scenes.CLASS_IDS == tuple(c[0] for c in scenes.CLASSES))
 check("دقة القاعدة 48×48 (جولة خ2)", scenes.BASE == 48)
@@ -34,10 +34,39 @@ check("حاجة غلط → None", scenes.class_from_text("يا نبى سيدي")
 check("نفس البذرة = نفس الصورة بالحرف",
       (scenes.make_sample("sunset", 42) == scenes.make_sample("sunset", 42)).all()
       and not (scenes.make_sample("sunset", 42) == scenes.make_sample("sunset", 43)).all())
+
+print("1خ3) الأصناف الجديدة: قارب، طيور، بالونات، طريق")
+NEW_IDS = ("boat", "birds", "balloons", "road")
+check("الأصناف الجديدة الأربعة في CLASSES وله مولّد",
+      all(c[0] in NEW_IDS for c in scenes.CLASSES[-4:])
+      and all(cid in scenes._GENERATORS for cid in NEW_IDS))
+check("«قارب» → boat و«فلوكة» و«شراع» كمان", scenes.class_from_text("قارب") == "boat"
+      and scenes.class_from_text("فلوكة") == "boat" and scenes.class_from_text("شراع") == "boat")
+check("«طيور» و«عصفور» → birds", scenes.class_from_text("طيور") == "birds"
+      and scenes.class_from_text("عصفور") == "birds")
+check("«بالونات» و«بالون» → balloons", scenes.class_from_text("بالونات") == "balloons"
+      and scenes.class_from_text("بالون") == "balloons")
+check("«طريق» و«طريق سريع» و«شارع» → road", scenes.class_from_text("طريق") == "road"
+      and scenes.class_from_text("طريق سريع") == "road" and scenes.class_from_text("شارع") == "road")
+_ok = True
+for cid in NEW_IDS:
+    a = scenes.make_sample(cid, 11, res=48)
+    b = scenes.make_sample(cid, 11, res=48)
+    if a.shape != (48, 48, 3) or not np.array_equal(a, b) or a.std() < 0.05:
+        _ok = False
+check("عينة جديدة: حتمية + شكل صحيح + مش فارغة", _ok)
+_ok = True
+for res in (24, 96, 128):
+    a = scenes.make_sample("boat", 5, res=res)
+    if a.shape != (res, res, 3) or a.min() < 0 or a.max() > 1:
+        _ok = False
+check("الأصناف الجديدة مستقلة عن الدقة (24/96/128)", _ok)
+imgs16, labels16 = scenes.make_dataset(2, seed=9)
+check("الداتاسيت بتتكلم مع 16 صنف (32 عينة)", imgs16.shape == (32, scenes.BASE, scenes.BASE, 3)
+      and labels16.max() == 15)
 imgs, labels = scenes.make_dataset(3, seed=9)
-check("الداتاسيت (12×3) على دقة القاعدة (48×48×3)",
-      imgs.shape == (36, scenes.BASE, scenes.BASE, 3) and labels.shape == (36,)
-      and imgs.dtype == np.float32 and imgs.min() >= 0 and imgs.max() <= 1)
+check("الداتاسيت (12×3) على دقة القاعدة (48×48×3) — الثوابت القديمة ما اتكسرت",
+      imgs.dtype == np.float32 and imgs.min() >= 0 and imgs.max() <= 1)
 
 print("\n2) كاتب PNG (png.py)")
 import png
@@ -81,6 +110,23 @@ c = torch.tensor([0, 5])
 with torch.no_grad():
     out = net(x, t, c)
 check("مخرج المنبئ بنفس شكل المدخل", out.shape == x.shape)
+
+print("\n3خ3) نمو جدول الأصناف (grow_state) — تكملة تدريب قديم على أصناف جديدة")
+from model import grow_state
+old_state = {"cemb.weight": torch.arange(12 * 8, dtype=torch.float32).reshape(12, 8)}
+grown = grow_state(dict(old_state), 16)
+check("جدول الأصناف 12 → 16 وصل بجد", grown["cemb.weight"].shape == (16, 8))
+check("الصفوف القديمة ما اتحركتش",
+      torch.equal(grown["cemb.weight"][:12], old_state["cemb.weight"]))
+check("الصفوف الجديدة عشوائية ثابتة (نفس البذرة)",
+      torch.equal(grow_state(dict(old_state), 16)["cemb.weight"][12:],
+                  grown["cemb.weight"][12:]))
+check("جدول مكتمل حجمًا بيرجع زي ما هو",
+      grow_state(dict(grown), 16) is not grown
+      and grow_state(dict(grown), 16)["cemb.weight"].shape == (16, 8))
+net16 = KhufuNet()
+net16.load_state_dict(grow_state({k: v for k, v in net.state_dict().items() if True}, 16))
+check("التحميل في شبكة 16 صنف شغال", net16.cemb.weight.shape[0] == 16)
 
 print("\n4) التوليد (generate.py) — نموذج غير متدرب للسرعة، وبعدين المتدرب لو موجود")
 import generate

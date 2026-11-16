@@ -288,9 +288,8 @@ def khufu_gen():
         return jsonify(error="خوفو مش جاهز"), 500
     data = request.get_json(force=True)
     subject = str(data.get("subject", "")).strip()
-    size = int(data.get("size", 128))
-    target_size = data.get("target_size")
-    target_size = int(target_size) if target_size not in (None, "") else 750
+    size = int(data.get("target_size") or data.get("size", 64))   # خ2: المقاس النهائي نفسه (حتى 750 —
+    # المكبّر Lanczos جوا generate.py بيكبّر من قاعدة 48)
     steps = int(data.get("steps", 50))
     seed = data.get("seed")
     seed = int(seed) if seed not in (None, "") else None
@@ -299,20 +298,17 @@ def khufu_gen():
                              + " أو ".join(str(s) for s in khufu_scenes.SIZES)), 400
     if steps not in (20, 50, 100):
         return jsonify(error="الجودة لازم تكون 20 أو 50 أو 100 خطوة"), 400
-    if target_size and target_size not in (32, 64, 96, 128, 256, 512, 750):
-        return jsonify(error="الأبعاد المطلوبة لازم تكون 32 أو 64 أو 96 أو 128 أو 256 أو 512 أو 750"), 400
     cid = subject if subject in khufu_scenes.CLASS_IDS else khufu_scenes.class_from_text(subject)
     if cid is None:
         return jsonify(error="مش عارف أرسم «" + subject + "» — اختار حاجة من القائمة"), 400
     jid = uuid.uuid4().hex[:12]
     with _khufu_lock:
-        _khufu_jobs[jid] = {"status": "running", "cid": cid, "size": size, 
-                           "target_size": target_size, "steps": steps, "seed": seed}
+        _khufu_jobs[jid] = {"status": "running", "cid": cid, "size": size,
+                           "steps": steps, "seed": seed}
 
     def run():
         try:
-            img, _cid = khufu_generate(cid, size=size, steps=steps, seed=seed, 
-                                      target_size=target_size, enhance=True)
+            img, _cid = khufu_generate(cid, size=size, steps=steps, seed=seed)
             path = os.path.join(KHUFU_GEN_DIR, jid + ".png")
             img.save(path)
             with _khufu_lock:

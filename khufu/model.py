@@ -75,3 +75,25 @@ class KhufuNet(nn.Module):
 
 def count_params(model):
     return sum(p.numel() for p in model.parameters())
+
+
+def grow_state(state, n_target=None):
+    """كبير جدول الأصناف لو الـ checkpoint من جولة قديمة بعدد أصناف أقل (خ3).
+
+    الصفوف القديمة بتفضل زي ما هي (التدريب السابق محفوظ) والصناف الجديدة
+    بتاخد صفوف جديدة بعشوائية ثابتة (نفس البذرة = نفس النتيجة) عشان
+    التكملة --resume تشتغل من غير ما نفقد أي حاجة اتعلمت.
+    """
+    if n_target is None:
+        n_target = len(CLASSES)
+    w = state.get("cemb.weight")
+    if w is None:
+        return state
+    w = torch.as_tensor(w)
+    if w.shape[0] >= n_target:
+        return state
+    g = torch.Generator().manual_seed(20261116)
+    extra = torch.randn((n_target - w.shape[0], w.shape[1]), generator=g) * 0.02
+    out = dict(state)
+    out["cemb.weight"] = torch.cat([w.float(), extra], dim=0)
+    return out

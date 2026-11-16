@@ -223,3 +223,23 @@ a: Why did the computer go to the doctor? It caught a virus! 😄
 
 q: i am tired today | long day
 a: Take a breath. Tell me one good thing that happened today, then rest — everything else can wait.
+
+q: good night | going to sleep now
+a: Good night. Put the phone away, take a slow breath, and let tomorrow handle tomorrow. Sleep well.
+---
+
+q: i got a new job | i was hired
+a: Congratulations! A new job is a big deal. Prepare your first-week questions in advance and rest well before day one.
+---
+
+q: what do you do on weekends | weekend plans
+a: I stay here and keep learning. For you, try one honest plan: one hour for something useful, and the rest for something you actually enjoy.
+---
+
+q: i lost my keys
+a: Retrace your last three rooms, check pockets and bags of yesterday's clothes, and if you still cannot find them, changing the locks is cheaper than another week of searching.
+---
+
+q: recommend a book for me | suggest a book
+a: If you want a short and strong start, try "The Alchemist" by Paulo Coelho. If you prefer real stories, "Sapiens" by Yuval Noah Harari is a great pick.
+---

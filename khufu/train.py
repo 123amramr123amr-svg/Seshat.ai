@@ -84,7 +84,7 @@ def write_status(step, loss):
 
 
 def main():
-    from model import KhufuNet, count_params
+    from model import KhufuNet, count_params, grow_state
     import scenes
 
     args = parse_args()
@@ -109,10 +109,16 @@ def main():
     _, saved_ema, prev_step = load_state()
     if args.resume and saved_ema is not None:
         w, _, start = load_state()
-        model.load_state_dict({k: torch.as_tensor(v) for k, v in w.items()})
+        # خ3: لو الأصناف زادت عن آخر تدريب، جدول الأصناف بيتكبر بصفوف جديدة
+        # والأصناف القديمة بتحتفظ بكل اللي اتعلمته
+        model.load_state_dict(
+            grow_state({k: torch.as_tensor(v) for k, v in w.items()},
+                       len(scenes.CLASS_IDS)))
         # خ2: EMA بيكمل من آخر حفظ بدل ما يتصفر — الجولات المتتالية (كل 8 ساعات)
         # مش لازم تعيد تسخينه من أول وجديد كل مرة
-        ema = {k: torch.as_tensor(v).detach().clone().float() for k, v in saved_ema.items()}
+        ema = {k: v.detach().clone().float()
+               for k, v in grow_state({k: torch.as_tensor(v) for k, v in saved_ema.items()},
+                                      len(scenes.CLASS_IDS)).items()}
         print(f"↩️  تكملة من الخطوة {start} (EMA محفوظ)", flush=True)
     else:
         ema = {k: v.detach().clone().float() for k, v in model.state_dict().items()}
