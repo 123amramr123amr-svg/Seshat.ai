@@ -27,7 +27,7 @@ from models import list_models
 # ---------------- خوفو (نموذج الصور) ----------------
 import sys
 import uuid
-KHUFU_DIR = os.path.join(os.path.dirname(__file__), "..", "khufu")
+KHUFU_DIR = os.path.join(os.path.dirname(__file__), "khufu")
 if os.path.exists(KHUFU_DIR):
     sys.path.insert(0, KHUFU_DIR)
     try:
@@ -247,6 +247,18 @@ def chat():
         return jsonify({"response": "حصلت مشكلة جوه السيرفر. جرب تاني بعد شوية.",
                         "thinking": "", "confidence": 0.0, "seconds": 0, "fallback": True,
                         "source": "none", "matched": "", "suggestion": ""}), 500
+    
+    # Optional: Enhance with Nawah (البنية التحتية المتقدمة)
+    if os.environ.get("SESHAT_USE_NAWAH", "0") == "1" and out.get("response"):
+        try:
+            from nawah_integration import get_nawah_brain
+            nawah_brain = get_nawah_brain()
+            enhanced = nawah_brain.enhance_reply(msg, out.get("response", ""), temperature)
+            out["response"] = enhanced["reply"]
+            out["nawah_analysis"] = enhanced["analysis"]
+        except Exception as e:
+            app.logger.warning(f"Nawah enhancement failed: {e}")
+    
     if isinstance(image, dict) and not last_image and out.get("source") == "none" \
             and not out.get("suggestion"):
         out["response"] = vision.help_text(vision.is_arabic(msg))
@@ -264,10 +276,10 @@ def too_large(_):
 def khufu_app():
     if not KHUFU_READY:
         return "خوفو مش جاهز — تأكد إن مجلد khufu موجود", 500
-    khufu_html = os.path.join(KHUFU_DIR, "templates", "index.html")
+    khufu_html = os.path.join(app.static_folder, "khufu", "index.html")
     if not os.path.exists(khufu_html):
         return "ملف واجهة خوفو مش موجود", 404
-    return send_file(khufu_html)
+    return send_file(khufu_html, mimetype="text/html")
 
 
 @app.route("/khufu-generate", methods=["POST"])
@@ -276,7 +288,9 @@ def khufu_gen():
         return jsonify(error="خوفو مش جاهز"), 500
     data = request.get_json(force=True)
     subject = str(data.get("subject", "")).strip()
-    size = int(data.get("size", 64))
+    size = int(data.get("size", 128))
+    target_size = data.get("target_size")
+    target_size = int(target_size) if target_size not in (None, "") else None
     steps = int(data.get("steps", 50))
     seed = data.get("seed")
     seed = int(seed) if seed not in (None, "") else None
@@ -284,16 +298,20 @@ def khufu_gen():
         return jsonify(error="الأبعاد لازم تكون 32 أو 64 أو 96 أو 128"), 400
     if steps not in (20, 50, 100):
         return jsonify(error="الجودة لازم تكون 20 أو 50 أو 100 خطوة"), 400
+    if target_size and target_size not in (32, 64, 96, 128, 256, 512, 750):
+        return jsonify(error="الأبعاد المطلوبة لازم تكون 32 أو 64 أو 96 أو 128 أو 256 أو 512 أو 750"), 400
     cid = subject if subject in khufu_scenes.CLASS_IDS else khufu_scenes.class_from_text(subject)
     if cid is None:
         return jsonify(error="مش عارف أرسم «" + subject + "» — اختار حاجة من القائمة"), 400
     jid = uuid.uuid4().hex[:12]
     with _khufu_lock:
-        _khufu_jobs[jid] = {"status": "running", "cid": cid, "size": size, "steps": steps, "seed": seed}
+        _khufu_jobs[jid] = {"status": "running", "cid": cid, "size": size, 
+                           "target_size": target_size, "steps": steps, "seed": seed}
 
     def run():
         try:
-            img, _cid = khufu_generate(cid, size=size, steps=steps, seed=seed)
+            img, _cid = khufu_generate(cid, size=size, steps=steps, seed=seed, 
+                                      target_size=target_size, enhance=True)
             path = os.path.join(KHUFU_GEN_DIR, jid + ".png")
             img.save(path)
             with _khufu_lock:

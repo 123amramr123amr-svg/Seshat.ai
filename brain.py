@@ -586,6 +586,12 @@ _WIKI_QUERY_DROP = {
     "who", "how", "where", "when", "why", "is", "are", "was", "were",
     "a", "an", "of", "in", "on", "to", "do", "does", "did", "and",
     "or", "for", "with", "about",
+    # جولة 15: أفعال الاستخراج وكلمات المقارنة — كانت بتتلخبط في تقييم
+    # العلاقة (بحث "مين اخترع الراديو" كان بيرفض صفحة الراديو عشان
+    # كلمة "اخترع" مش مكتوبة في أول ٣ سطور منها → score 0.5 < 0.6 → رفض
+    # جاف من غير بحث). الكلمات دي مش كلمات موضوع — الموضوع هو اللي بيتقيّم:
+    "اخترع", "اكتشف", "كام", "عدد", "الفرق", "بين", "معنى", "تعريف",
+    "invented", "discovered", "difference", "between", "meaning", "how many",
 }
 
 
@@ -671,10 +677,13 @@ def _wiki(query):
 
 
 def _ddg(query):
+    # مهلة أقصر من ويكي: لو DDG مش متاح (شبكة/حجب) مياخدش ١٢ ثانية كاملة
+    # وما يعلقش الرد — ويكيبيديا هي المصدر الأساسي للعربي.
+    ddg_timeout = min(8, _NET_TIMEOUT)
     try:
         r = requests.post("https://lite.duckduckgo.com/lite/", data={"q": query},
                           headers={**_UA, "Referer": "https://lite.duckduckgo.com/"},
-                          timeout=_NET_TIMEOUT)
+                          timeout=ddg_timeout)
         links = re.findall(r'<a[^>]+href="([^"]+)"[^>]*>\s*(.*?)\s*</a>', r.text)
         snippets = re.findall(
             r"class=['\"]result-snippet['\"][^>]*>(.*?)</td>", r.text, re.S)

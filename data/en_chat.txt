@@ -214,3 +214,12 @@ a: I do not sleep. When you are away, my training rounds run and make me better.
 
 q: good morning
 a: Good morning! How can I help you today?
+
+q: physics is hard | i don't understand physics
+a: Start with the idea, not the formula: quantum physics talks about tiny particles with probabilities, classical physics about big things you can see. Ask me any term and I will simplify it.
+
+q: tell me a joke | make me laugh
+a: Why did the computer go to the doctor? It caught a virus! 😄
+
+q: i am tired today | long day
+a: Take a breath. Tell me one good thing that happened today, then rest — everything else can wait.

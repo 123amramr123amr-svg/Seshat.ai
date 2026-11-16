@@ -344,9 +344,11 @@ check("صيغة تانية لنفس السؤال مش موضوع تاني",
 r = seshat.reply("كم عدد سكان الصين")
 check("مبيردش برد سؤال شبهه عن حاجة تانية",
       r["fallback"] and r["kind"] == "fact" and r["searchable"] and "مصر" not in r["response"], str(r))
-r = seshat.reply("مين اخترع الراديو")   # سؤال مش موجود في أي ملف معرفة (التليفون اتضاف في جولة 13)
-check("سؤال معلومة مش عنده: بيقول كده عن السؤال نفسه",
-      r["fallback"] and "مين اخترع الراديو" in r["response"], str(r))
+r = seshat.reply("مين اخترع المصعد")   # سؤال مش موجود في أي ملف معرفة (الراديو اتضاف في جولة 15)
+check("سؤال معلومة مش عنده: مبيألفش إجابة شريفة",
+      r["fallback"] and "أوتيس" not in r["response"]
+      and any(w in r["response"] for w in ("مين اخترع المصعد", "مش متأكد", "مش هألف", "تقصد")),
+      str(r))
 
 print("\n9) الرسم والصور (data/drawings.py + vision.py)")
 import base64
@@ -431,6 +433,25 @@ check("رسالة 900+ حرف: عاصمة اليابان", not r["fallback"] and
 r = seshat.reply(LONG + "154 + 382")
 check("رسالة طويلة فيها حساب", not r["fallback"] and "536" in r["response"], r["response"][:50])
 check("السياق في الملف 4096", seshat.config["block_size"] == 4096, str(seshat.config["block_size"]))
+
+print("\n11) إصلاحات بحث ويكي (جولة 15): قايمة استبعاد كلمات الاستفهام")
+import brain as _brain
+check("«مين اخترع الراديو» → البحث بالموضوع بس",
+      _brain._wiki_search_query("مين اخترع الراديو") == "الراديو",
+      _brain._wiki_search_query("مين اخترع الراديو"))
+check("«مين اكتشف بنسلين» → «بنسلين»",
+      _brain._wiki_search_query("مين اكتشف بنسلين") == "بنسلين")
+check("كلمات المقارنة بتتشال من بحث الفرق",
+      "الفرق" not in _brain._wiki_search_query("ايه الفرق بين الفيزياء الكمية والفيزياء النيوتنية")
+      and "الكمية" in _brain._wiki_search_query("ايه الفرق بين الفيزياء الكمية والفيزياء النيوتنية"))
+check("صفحة الراديو بتعدى تقييم العلاقة بعد الإصلاح",
+      _brain._wiki_relevant("مين اخترع الراديو", "الراديو",
+                            "الراديو هو جهاز بيبث الصوت عن طريق موجات كهرومغناطيسية.") >= 0.6)
+check("صفحة ملهاش علاقة لسه بترفض زي الأول",
+      _brain._wiki_relevant("مين اخترع الراديو", "الكونكورد",
+                            "طائرة الكونكورد نفاثة نقل مدني أسرع من الصوت.") < 0.6)
+check("مهلة DDG أقصر من مهلة ويكي (مايعلقش الرد)",
+      min(8, _brain._NET_TIMEOUT) == 8 and _brain._NET_TIMEOUT >= 8)
 
 print("\n" + "—" * 40)
 if FAILURES:
