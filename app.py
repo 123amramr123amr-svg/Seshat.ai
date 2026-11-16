@@ -294,8 +294,9 @@ def khufu_gen():
     steps = int(data.get("steps", 50))
     seed = data.get("seed")
     seed = int(seed) if seed not in (None, "") else None
-    if size not in (32, 64, 96, 128):
-        return jsonify(error="الأبعاد لازم تكون 32 أو 64 أو 96 أو 128"), 400
+    if size not in khufu_scenes.SIZES:          # خوفو بيحدد المقاسات بنفسه (حتى 750 في خ2)
+        return jsonify(error="الأبعاد لازم تكون واحدة من "
+                             + " أو ".join(str(s) for s in khufu_scenes.SIZES)), 400
     if steps not in (20, 50, 100):
         return jsonify(error="الجودة لازم تكون 20 أو 50 أو 100 خطوة"), 400
     if target_size and target_size not in (32, 64, 96, 128, 256, 512, 750):
