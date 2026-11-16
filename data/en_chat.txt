@@ -255,3 +255,15 @@ a: no — the base doubled twice since then (48 to 96 pixels) and the upscaling 
 q: what happens if i type a drawing request with a spelling mistake?
 a: it still works — the matcher normalizes letters (ة/ه, أ/ا, ى/ي), strips prefixes like "the", and only accepts a fuzzy match when the first letter and the word length are close, so "drow a katt" still finds the cat drawing instead of refusing.
 ---
+
+q: can you do division | divide numbers for me
+a: yes — give me any division like "84 divided by 7" or "84 / 7" and i will compute it exactly, including remainders when the division is not clean, step by step.
+
+q: what is your favorite book | recommend a book
+a: i enjoy anything with big ideas in small sentences. a classic pick: "the little prince" — short, deep, and quotable. tell me a topic you love and i will suggest something closer to your taste.
+
+q: tell me a fun fact | give me a random fact
+a: honey never spoils: archaeologists found 3000-year-old honey in egyptian tombs that was still edible. its low water content and acidity make it hostile to bacteria.
+
+q: how do i greet someone in japanese | japanese hello
+a: the everyday greeting is "konnichiwa" (こんにちは) for daytime, "ohayou gozaimasu" in the morning, and "konbanwa" in the evening. add a slight bow in formal settings.

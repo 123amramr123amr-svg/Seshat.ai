@@ -399,3 +399,24 @@ a: because the base was only 48x48 pixels and it was stretched 15 times to reach
 q: describe in detail what changed in your latest image and drawing training round, why it was needed, and what the measurable results were, including how unknown requests are handled now and how the resolution and sharpening work together, because i want the full technical picture in one answer.
 a: the round fixed two real complaints: refusals like "i don't know how to draw that, pick from my list" and blurry 48x48-based images stretched to 750. now a pixel drawing request never returns empty: unknown words go through exact match, longest-synonym match, first-letter-preserving fuzzy match, then semantic buckets (animals to cat, birds for flying things, computers to city, spaceships to rocket, lakes to sea), and the final fallback is the simplest shape — with an honest note saying it is the closest match. khufu's base moved to 96x96 (4x the pixels), the dataset is stored as uint8 to fit memory, training resumed from the old weights, and the lanczos upscaler to 750x750 now applies a light unsharp mask (amount 0.35) only when enlarging, never when shrinking — all tests passed after training.
 ---
+
+q: what is the largest planet in our solar system?
+a: jupiter is the largest planet in the solar system — its mass is about 318 times earth's, and more than 1300 earths could fit inside it by volume. it is a gas giant made mostly of hydrogen and helium, and its great red spot is a storm larger than earth that has raged for centuries.
+
+q: how far is the moon from earth?
+a: the moon orbits earth at an average distance of about 384,400 kilometers. because the orbit is slightly elliptical, the distance varies between roughly 356,500 km at perigee and 406,700 km at apogee. light takes about 1.3 seconds to travel that gap.
+
+q: explain in detail how the internet delivers a web page from typing a url to seeing it on screen, step by step.
+a: typing a url triggers a chain: first the browser resolves the domain through dns — from the resolver cache down to the authoritative server — and gets an ip address. second it opens a tcp connection and negotiates tls encryption so the traffic is unreadable in transit. third it sends an http request; the server, often behind load balancers and caches, answers with a status code and html. fourth the browser parses the html into a dom tree, discovers css, javascript and image urls, and fetches them, often reusing one connection. fifth css becomes style rules, javascript runs, and the page is painted in stages so you see content fast. along the way packets hop through routers and undersea cables guided by routing protocols, and cdn edge servers near you serve the static assets. caching at every layer — browser, dns, cdn, database — is the reason the whole trip usually takes tens to hundreds of milliseconds.
+---
+q: what is the boiling point of water?
+a: water boils at 100 degrees celsius (212 fahrenheit) at standard atmospheric pressure of one atmosphere at sea level. at higher altitude the pressure drops and so does the boiling point — on top of mount everest water boils at about 70 degrees celsius, which is why cooking there takes much longer.
+
+q: who wrote romeo and juliet and when?
+a: romeo and juliet was written by william shakespeare, the english playwright, in the early period of his career — first published around 1597. it is one of the most performed plays in the world and tells of two young lovers in verona whose feuding families, the montagues and capulets, doom their romance.
+
+q: what is the speed of light exactly?
+a: the speed of light in vacuum is exactly 299,792,458 meters per second — about 300,000 km per second or 1.08 billion km per hour. the number is exact because the meter itself is defined from it. light from the sun takes about 8 minutes and 20 seconds to reach earth.
+
+q: what causes the seasons on earth?
+a: seasons come from the tilt of earth's rotation axis — about 23.5 degrees — relative to its orbit around the sun, not from the distance to the sun. when the north pole tilts toward the sun the northern hemisphere gets longer days and more direct sunlight (summer) while the south gets winter, and half an orbit later it reverses.
