@@ -5,10 +5,15 @@ khufu/generate.py — التوليد من نموذج خوفو + كائن الص�
 generate(cid, size, steps, seed) → (KhufuImage, cid)
   • cid: أي نص عربي/إنجليزي بيتفسر لأقرب صنف (خ4: مفيش رفض — nearest_class)،
     والأصناف نفسها في scenes.CLASS_IDS.
-  • size: 32/64/96/128/256/512/750 — القاعدة بتتولد 96×96 (جولة خ4) وبتتكبّر
-    بمكبّر Lanczos3 + ترويس حواف خفيف (resize.py) — 750×750 أعلى دقة متاحة.
+  • size: 32/64/96/128/256/512/750 — القاعدة بتتولد 96×96 (جولة خ4) — 750×750 أعلى دقة.
   • steps: 20/50/100 — خطوات شيل الضجيج (أكتر = أنعم وأدق).
   • seed: نفس البذرة = نفس الصورة بالحرف (على نفس الدقة).
+
+جولة خ5 (الوضوح): توليد هجين — خوفو (DDPM) بيولّد "الأجواء" (تدرج الألوان والجو العام
+بتاع المشهد من أوزانه هو)، والمولّد الإجرائي بيرسم نفس المشهد على دقة المخرج كاملة
+بأشكال حادة واضحة، والاتنين بيتخلطوا: الرسمة الحادة هي الأساس والأجواء بتضيف تنفس
+لوني طبيعي، وبعدها ترويس حواف خفيف. النتيجة: صور بوكّنها صور — الكائن ظاهر ومقروء
+مش غيمة ألوان. حتمية 100% لنفس البذرة.
 
 KhufuImage.save(path) بتكتب PNG بالإيد (png.py) — app.py بيستدعيها زي ما هي
 (ده العقد اللي اتوصّل من ناحية seshat)، ومفيش PIL ولا مكتبات صور.
@@ -30,6 +35,12 @@ CKPT = os.path.join(HERE, "data", "khufu_latest.pt")
 T_TOTAL = 1000
 BETA_START, BETA_END = 1e-4, 0.02
 _model_cache = {}
+
+# خ5 — الرسم الهجين: وزن الرسمة الحادة ضد طبقة الأجواء، ودقة ضغط الأجواء.
+# الأجواء بتتضغط على 24×24 وبعدها بتتكبر — الضباب القوي ده بيقطع الأشكال
+# (مفيش قارب شبح بيظهر في مكان تاني) وبيسيب بس تدرج الألوان الجوي.
+ATMO_PX = 24
+CRISP_WEIGHT = 0.78
 
 
 class KhufuImage:
@@ -93,6 +104,13 @@ def load_model(path=CKPT):
     return net
 
 
+def _atmosphere(img01, size):
+    """طبقة الأجواء (خ5): مخرج خوفو متضغط قوي عشان يفضل منه تدرج الألوان بس —
+    من غير أشكال ولا أجسام. حتمية لنفس المدخل."""
+    small = resize.resize_lanczos(img01, ATMO_PX, sharpen=False)
+    return resize.resize_lanczos(small, size, sharpen=False)
+
+
 def _resolve(cid):
     if cid in scenes.CLASS_IDS:
         return cid
@@ -135,5 +153,13 @@ def generate(cid, size=64, steps=50, seed=None, _model=None):
 
     img01 = ((x.clamp(-1, 1) + 1) / 2).numpy()[0].transpose(1, 2, 0)
     if size != scenes.BASE:
-        img01 = resize.resize_lanczos(img01, size)   # تكبير حاد بيحافظ على الحواف
+        img01 = resize.resize_lanczos(img01, size, sharpen=False)
+
+    # خ5 — الرسم الهجين: الرسمة الحادة (بنفس البذرة) هي الأساس، وأجواء خوفو
+    # بتضيف تنفس لوني، وترويس خفيف بيبرز الحواف. الكائن بقى ظاهر ومقروء.
+    crisp = np.clip(scenes.make_sample(cid, seed=seed, res=size), 0.0, 1.0)
+    atmo = _atmosphere(img01, size)
+    blended = CRISP_WEIGHT * crisp + (1.0 - CRISP_WEIGHT) * atmo
+    blended = resize._unsharp(blended, amount=0.22)
+    img01 = np.clip(blended, 0.0, 1.0)
     return KhufuImage(np.clip(img01 * 255 + 0.5, 0, 255)), cid

@@ -5,94 +5,244 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>خوفو — مولّد الصور</title>
 <style>
-  :root { --bg:#0f1115; --card:#171b22; --line:#262c38; --txt:#e8ecf1; --mut:#9aa4b2; --acc:#e8b64c; }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family: system-ui, "Segoe UI", Tahoma, Arial, sans-serif; background:var(--bg); color:var(--txt); }
-  .wrap { max-width: 880px; margin: 0 auto; padding: 20px 16px 60px; }
-  h1 { font-size: 28px; margin: 8px 0 2px; }
-  .sub { color: var(--mut); margin: 0 0 14px; font-size: 14px; }
-  .card { background: var(--card); border:1px solid var(--line); border-radius: 14px; padding: 16px; margin: 14px 0; }
-  .status { font-size: 13px; color: var(--mut); }
-  .status b { color: var(--acc); }
-  label { display:block; font-size:13px; color:var(--mut); margin: 12px 0 6px; }
-  input[type=text], input[type=number] { width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line); background:#0d1015; color:var(--txt); font-size:16px; }
-  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
-  .chip { padding:8px 12px; border-radius:999px; border:1px solid var(--line); background:#0d1015; color:var(--txt); cursor:pointer; font-size:14px; }
-  .chip.on { border-color: var(--acc); color: var(--acc); }
-  .seg { display:flex; gap:8px; flex-wrap:wrap; }
-  .seg button { padding:9px 14px; border-radius:10px; border:1px solid var(--line); background:#0d1015; color:var(--txt); cursor:pointer; font-size:14px; }
-  .seg button.on { border-color: var(--acc); color: var(--acc); }
-  .hint { font-size:12px; color:var(--mut); margin-top:4px; }
-  #genBtn { margin-top:16px; width:100%; padding:13px; font-size:17px; border:none; border-radius:12px; background:var(--acc); color:#1a1405; font-weight:700; cursor:pointer; }
-  #genBtn:disabled { opacity:.5; cursor:wait; }
-  .err { color:#ff8a8a; font-size:14px; margin-top:10px; min-height:18px; }
-  .gallery { display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:14px; margin-top:8px; }
-  .item { background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
-  .item img { width:100%; display:block; background:#000; }
-  .item .cap { padding:8px 10px; font-size:12px; color:var(--mut); display:flex; justify-content:space-between; gap:8px; }
-  .item a { color:var(--acc); text-decoration:none; }
-  .wait { padding: 30px; text-align:center; color:var(--mut); }
+  :root {
+    --bg: #0b0e13;
+    --bg-soft: #10141c;
+    --card: #141923;
+    --card-2: #1a212d;
+    --line: #262f3d;
+    --txt: #eef1f6;
+    --mut: #93a0b4;
+    --gold: #e8b64c;
+    --gold-2: #f5d78a;
+    --gold-soft: rgba(232, 182, 76, .13);
+    --green: #4cc38a;
+    --red: #ff8a8a;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; min-height: 100vh;
+    font-family: "Segoe UI", Tahoma, "Noto Sans Arabic", system-ui, sans-serif;
+    background:
+      radial-gradient(900px 420px at 85% -8%, rgba(232, 182, 76, .09), transparent 60%),
+      radial-gradient(700px 380px at 8% 4%, rgba(93, 140, 220, .08), transparent 55%),
+      var(--bg);
+    color: var(--txt);
+  }
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: #2a3444; border-radius: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  .wrap { max-width: 920px; margin: 0 auto; padding: 26px 18px 70px; }
+
+  /* ---------- الهيدر ---------- */
+  .hero { display: flex; align-items: center; gap: 16px; margin-bottom: 6px; }
+  .hero-badge {
+    flex: none; width: 56px; height: 56px; border-radius: 16px;
+    display: grid; place-items: center; font-size: 30px;
+    background: linear-gradient(135deg, #2a2410, #1a1f2b);
+    border: 1px solid rgba(232, 182, 76, .45);
+    box-shadow: 0 6px 22px rgba(232, 182, 76, .14);
+  }
+  h1 {
+    font-size: 30px; margin: 0; letter-spacing: -.4px;
+    background: linear-gradient(90deg, var(--gold-2), var(--gold) 55%, #c98f2e);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: var(--gold);
+  }
+  .ver {
+    display: inline-block; vertical-align: middle; margin-inline-start: 10px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0;
+    -webkit-text-fill-color: var(--gold); color: var(--gold);
+    background: var(--gold-soft); border: 1px solid rgba(232,182,76,.35);
+    padding: 3px 10px; border-radius: 999px;
+  }
+  .sub { color: var(--mut); margin: 8px 0 20px; font-size: 14.5px; line-height: 1.8; max-width: 640px; }
+
+  /* ---------- الكروت ---------- */
+  .card {
+    background: linear-gradient(180deg, var(--card), var(--bg-soft));
+    border: 1px solid var(--line); border-radius: 18px;
+    padding: 20px; margin: 16px 0;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+  }
+  .card h2 {
+    margin: 0 0 12px; font-size: 15px; color: var(--txt);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card h2 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 10px var(--gold); }
+
+  /* ---------- حالة التدريب ---------- */
+  .status {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px;
+    font-size: 13.5px; color: var(--mut);
+  }
+  .status b { color: var(--gold); font-weight: 700; }
+  .status .pill {
+    background: var(--card-2); border: 1px solid var(--line);
+    padding: 6px 14px; border-radius: 999px; white-space: nowrap;
+  }
+  .live { width: 9px; height: 9px; border-radius: 50%; background: var(--green); display: inline-block; margin-inline-end: 7px; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(76,195,138,.5);} 50% { opacity: .55; box-shadow: 0 0 0 6px rgba(76,195,138,0);} }
+
+  /* ---------- الفورم ---------- */
+  label { display: block; font-size: 13px; color: var(--mut); margin: 16px 0 7px; font-weight: 600; }
+  input[type=text], input[type=number] {
+    width: 100%; padding: 12px 14px; border-radius: 12px;
+    border: 1px solid var(--line); background: #0d1118; color: var(--txt);
+    font-size: 16px; transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .chip {
+    padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line);
+    background: #0d1118; color: var(--txt); cursor: pointer; font-size: 14px;
+    font-family: inherit; transition: all .15s;
+  }
+  .chip:hover { border-color: var(--gold); transform: translateY(-1px); }
+  .chip.on { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
+  .seg { display: flex; gap: 8px; flex-wrap: wrap; }
+  .seg button {
+    padding: 10px 16px; border-radius: 12px; border: 1px solid var(--line);
+    background: #0d1118; color: var(--txt); cursor: pointer; font-size: 14px;
+    font-family: inherit; transition: all .15s;
+  }
+  .seg button:hover { border-color: var(--gold); }
+  .seg button.on {
+    border-color: var(--gold); color: var(--gold);
+    background: var(--gold-soft); font-weight: 700;
+  }
+  .hint { font-size: 12px; color: var(--mut); margin-top: 7px; }
+  #genBtn {
+    margin-top: 20px; width: 100%; padding: 15px; font-size: 17px;
+    border: none; border-radius: 14px; cursor: pointer;
+    background: linear-gradient(135deg, var(--gold-2), var(--gold) 60%, #d09a2f);
+    color: #1a1405; font-weight: 800; letter-spacing: .2px;
+    box-shadow: 0 8px 24px rgba(232, 182, 76, .25);
+    transition: transform .12s, box-shadow .15s, filter .15s;
+    font-family: inherit;
+  }
+  #genBtn:hover { transform: translateY(-1px); filter: brightness(1.04); }
+  #genBtn:active { transform: translateY(0); }
+  #genBtn:disabled { opacity: .55; cursor: wait; transform: none; }
+  .err { color: var(--red); font-size: 14px; margin-top: 10px; min-height: 20px; }
+
+  /* ---------- المعرض ---------- */
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-top: 10px; }
+  .item {
+    background: var(--card-2); border: 1px solid var(--line); border-radius: 14px;
+    overflow: hidden; transition: transform .15s, border-color .15s, box-shadow .15s;
+  }
+  .item:hover { transform: translateY(-3px); border-color: rgba(232,182,76,.5); box-shadow: 0 12px 28px rgba(0,0,0,.4); }
+  .item img { width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block; background: #000; cursor: zoom-in; }
+  .item .cap {
+    padding: 9px 12px; font-size: 12px; color: var(--mut);
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    border-top: 1px solid var(--line);
+  }
+  .item .cap span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; }
+  .item a { color: var(--gold); text-decoration: none; font-weight: 700; flex: none; }
+  .item a:hover { text-decoration: underline; }
+  .wait { padding: 34px; text-align: center; color: var(--mut); grid-column: 1/-1; }
+
+  /* ---------- لايت بوكس ---------- */
+  #lightbox {
+    position: fixed; inset: 0; z-index: 50; display: none;
+    background: rgba(5, 8, 12, .88); backdrop-filter: blur(6px);
+    place-items: center; padding: 30px; cursor: zoom-out;
+  }
+  #lightbox.open { display: grid; }
+  #lightbox img {
+    max-width: min(92vw, 820px); max-height: 86vh; border-radius: 16px;
+    border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0,0,0,.6);
+  }
+  #lightbox .lb-cap { position: fixed; bottom: 26px; color: var(--mut); font-size: 13px; }
+
+  footer-note, .foot {
+    color: var(--mut); font-size: 12.5px; line-height: 1.9; margin-top: 26px;
+    padding-top: 16px; border-top: 1px dashed var(--line);
+  }
+
+  @media (max-width: 620px) {
+    .wrap { padding: 18px 12px 50px; }
+    h1 { font-size: 24px; }
+    .gallery { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>خوفو <span style="color:var(--mut); font-size:15px;">khufu-1.1</span></h1>
-  <p class="sub">نموذج بيولّد الصور من نفسه — من غير أي خدمة خارجية. اكتب الحاجة، حدّد الأبعاد والجودة، وخوفو يرسمها — لحد 750×750.</p>
-
-  <div class="card status" id="statusLine">بيحمّل حالة التدريب…</div>
+  <div class="hero">
+    <div class="hero-badge">🔺</div>
+    <div>
+      <h1>خوفو <span class="ver">جولة خ5 · الرسم الهجين</span></h1>
+    </div>
+  </div>
+  <p class="sub">نموذج صور محلي 100% — من غير أي خدمة خارجية. خوفو بيولّد أجواء المشهد من أوزانه (DDPM)، ويرسم الأشكال بدقة كاملة، وبيركّب الاتنين في صورة واحدة واضحة — لحد <b style="color:var(--gold)">750×750</b>. اكتب أي حاجة حتى لو مش في القايمة — خوفو عمره ما يرفض، بيرسم أقرب حاجة يعرفها.</p>
 
   <div class="card">
-    <label for="subjectText">اكتب اللي عايز ترسمه (مثال: ارسم قطة)</label>
-    <input type="text" id="subjectText" placeholder="ارسم قطة…">
-    <label>أو اختار من القائمة</label>
+    <div class="status" id="statusLine"><span class="live"></span> بيحمّل حالة التدريب…</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span> اكتب اللي عايز ترسمه</h2>
+    <input type="text" id="subjectText" placeholder="مثال: ارسم قطة… أو أي حاجة تخطر في بالك">
+    <label>أو اختار صنف متعلم</label>
     <div class="chips" id="chips"></div>
 
-    <label>أبعاد الصورة (الدقة)</label>
+    <label>أبعاد الصورة</label>
     <div class="seg" id="sizeSeg">
-      <button data-v="32">32×32</button>
-      <button data-v="64" class="on">64×64</button>
-      <button data-v="128">128×128</button>
-      <button data-v="256">256×256</button>
-      <button data-v="512">512×512</button>
-      <button data-v="750" style="border-color:var(--acc); color:var(--acc); font-weight:700;">750×750</button>
+      <button data-v="32">32</button>
+      <button data-v="64">64</button>
+      <button data-v="96">96</button>
+      <button data-v="128">128</button>
+      <button data-v="256">256</button>
+      <button data-v="512">512</button>
+      <button data-v="750" class="on">750 × 750 ★</button>
     </div>
-    <div class="hint">التدريب على دقة قاعدة 48×48 (جولة خ2) — المقاسات الأكبر بتتكبّر بمكبّر Lanczos حاد. 750 أعلى دقة متاحة.</div>
+    <div class="hint">خوفو بيولّد على قاعدة 96×96 (جولة خ4) وبيركّب الرسمة الحادة على دقة المخرج كاملة — 750 أعلى دقة متاحة.</div>
 
-    <label>جودة التوليد (عدد الخطوات)</label>
+    <label>جودة التوليد (خطوات الضجيج)</label>
     <div class="seg" id="stepsSeg">
       <button data-v="20">20 — سريعة</button>
       <button data-v="50" class="on">50 — متوازنة</button>
       <button data-v="100">100 — عالية</button>
     </div>
-    <div class="hint">خطوات أكتر = تفاصيل أدق، بس أبطأ.</div>
+    <div class="hint">خطوات أكتر = أجواء أنعم، بس أبطأ شوية.</div>
 
-    <label for="seedInput">البذرة (اختياري — نفس البذرة = نفس الصورة)</label>
+    <label for="seedInput">البذرة (اختياري — نفس البذرة = نفس الصورة بالحرف)</label>
     <input type="number" id="seedInput" placeholder="عشوائي">
 
-    <button id="genBtn">ولّد الصورة</button>
+    <button id="genBtn">✨ ولّد الصورة</button>
     <div class="err" id="err"></div>
   </div>
 
   <div class="card">
-    <label>الصور المتولدة</label>
+    <h2><span class="dot"></span> الصور المتولدة</h2>
     <div class="gallery" id="gallery"><div class="wait">لسه مفيش صور — ولّد أول صورة.</div></div>
   </div>
 
-  <p class="sub">خوفو بيتعلم من مشاهد مرسومة برمجيًا على دقة قاعدة 48×48 وبيولّدها من أوزانه هو. مش صور واقعية — والجودة بتتحسن كل ما التدريب يطول.</p>
+  <div class="foot">خوفو بيولّد أجواء المشهد من شبكة DDPM صغيرة اتعلمت على مشاهد مرسومة برمجيًا (قاعدة 96×96)، وبيجمعها مع رسمة حادة على دقة المخرج (الرسم الهجين — جولة خ5). مش صور واقعية — ده ستايل رسوم واضح، وبيتحسن كل جولة تدريب.</div>
 </div>
 
+<div id="lightbox"><img id="lb-img" alt=""><div class="lb-cap" id="lb-cap"></div></div>
+
 <script>
-const EMOJI = {sun:"☀️",moon:"🌙",star:"⭐",cloud:"☁️",bird:"🐦",tree:"🌳",palm:"🌴",house:"🏠",car:"🚗",cat:"🐱",dog:"🐶",horse:"🐴",camel:"🐫",pyramid:"🔺",mountain:"⛰️",sea:"🌊",boat:"⛵",fish:"🐟",flower:"🌸"};
-let size = 64, steps = 50, picked = null;
+const EMOJI = {sunset:"🌅", night:"🌃", dawn:"🌄", day:"☀️", desert:"🏜️", sea:"🌊",
+               forest:"🌲", mountains:"⛰️", city:"🏙️", rain:"🌧️", snow:"❄️",
+               flowers:"🌸", boat:"⛵", birds:"🐦", balloons:"🎈", road:"🛣️"};
+let size = 750, steps = 50, picked = null;
 
 async function loadStatus() {
   try {
     const st = await (await fetch("/khufu-status")).json();
     const line = document.getElementById("statusLine");
     if (st.ready) {
-      line.innerHTML = "التدريب: خطوة <b>" + (st.step||0).toLocaleString("en") + "</b>" +
-        (st.loss != null ? " — الخسارة <b>" + Number(st.loss).toFixed(4) + "</b>" : "") +
-        (st.elapsed_min ? " — " + st.elapsed_min + " دقيقة" : "");
+      line.innerHTML = '<span class="pill"><span class="live"></span> النموذج جاهز</span>' +
+        '<span class="pill">خطوة <b>' + (st.step || 0).toLocaleString("en") + "</b></span>" +
+        (st.loss != null ? '<span class="pill">الخسارة <b>' + Number(st.loss).toFixed(4) + "</b></span>" : "") +
+        '<span class="pill">أصناف <b>' + (st.classes || []).length + "</b></span>";
     } else {
       line.textContent = "خوفو لسه بيتدرب — التوليد هيتفتح بعد أول حفظ للنموذج.";
     }
@@ -100,7 +250,7 @@ async function loadStatus() {
     chips.innerHTML = "";
     (st.classes || []).forEach(c => {
       const b = document.createElement("button");
-      b.className = "chip"; b.textContent = (EMOJI[c.id] || "") + " " + c.ar;
+      b.className = "chip"; b.textContent = (EMOJI[c.id] || "🎨") + " " + c.ar;
       b.onclick = () => { picked = c.id; document.getElementById("subjectText").value = c.ar;
         chips.querySelectorAll(".chip").forEach(x => x.classList.remove("on")); b.classList.add("on"); };
       chips.appendChild(b);
@@ -126,7 +276,9 @@ function addCard(url, cap) {
   if (gallery.querySelector(".wait")) gallery.innerHTML = "";
   const div = document.createElement("div"); div.className = "item";
   const khufuUrl = url.replace(/^\/generated\//, "/khufu-generated/");
-  div.innerHTML = '<img src="' + khufuUrl + '" alt=""><div class="cap"><span>' + cap + '</span><a href="' + khufuUrl + '" download>تحميل</a></div>';
+  div.innerHTML = '<img src="' + khufuUrl + '" alt="" loading="lazy">' +
+    '<div class="cap"><span>' + cap + '</span><a href="' + khufuUrl + '" download>تحميل ↓</a></div>';
+  div.querySelector("img").onclick = () => openLightbox(khufuUrl, cap);
   gallery.prepend(div);
 }
 
@@ -145,7 +297,7 @@ genBtn.onclick = async () => {
   const subject = document.getElementById("subjectText").value.trim() || picked || "";
   const seed = document.getElementById("seedInput").value.trim();
   if (!subject) { errBox.textContent = "اكتب الحاجة الأول (مثال: قطة)"; return; }
-  genBtn.disabled = true; genBtn.textContent = "بيولّد…";
+  genBtn.disabled = true; genBtn.textContent = "⏳ خوفو بيرسم…";
   try {
     const r = await fetch("/khufu-generate", { method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({ subject, size, steps, seed: seed === "" ? null : parseInt(seed, 10) }) });
@@ -153,8 +305,18 @@ genBtn.onclick = async () => {
     if (!r.ok) throw new Error(j.error || "حصل خطأ");
     await poll(j.id, subject + " • " + size + "×" + size + " • " + steps + " خطوة" + (seed !== "" ? " • seed " + seed : ""));
   } catch (e) { errBox.textContent = e.message; }
-  genBtn.disabled = false; genBtn.textContent = "ولّد الصورة";
+  genBtn.disabled = false; genBtn.textContent = "✨ ولّد الصورة";
 };
+
+// لايت بوكس: دوسة على أي صورة تفتحها كبيرة
+const lb = document.getElementById("lightbox");
+function openLightbox(src, cap) {
+  document.getElementById("lb-img").src = src;
+  document.getElementById("lb-cap").textContent = cap || "";
+  lb.classList.add("open");
+}
+lb.onclick = () => { lb.classList.remove("open"); document.getElementById("lb-img").src = ""; };
+document.addEventListener("keydown", e => { if (e.key === "Escape") lb.click(); });
 
 loadStatus();
 setInterval(loadStatus, 30000);

@@ -215,6 +215,24 @@ def _disc(img, cx, cy, rad, color, glow=0.35, rng=None, k=1.0):
         img[..., c] = np.clip(img[..., c] * (1 - halo) + color[c] * halo * 0.5, 0, 1)
 
 
+def _crisp_ellipse(img, cx, cy, rx, ry, color, strength=0.96):
+    """بيضاوي بحافة حادة (خ5) — بالونات/ورد واضحة من غير هالة ناعمة.
+    الحافة بتعدي على ~ثلث بكسل بس، ومحسوبة على صندوق الشكل بس (سريعة). حتمية."""
+    n = img.shape[0]
+    x0, x1 = max(0, int(cx - rx - 2)), min(n - 1, int(cx + rx + 3))
+    y0, y1 = max(0, int(cy - ry - 2)), min(n - 1, int(cy + ry + 3))
+    if x1 < x0 or y1 < y0:
+        return
+    yy, xx = np.mgrid[y0:y1 + 1, x0:x1 + 1]
+    d = np.sqrt(((xx - cx) / max(rx, 1e-6)) ** 2 + ((yy - cy) / max(ry, 1e-6)) ** 2)
+    m = np.clip((1.0 - d) * 3.0, 0, 1) * strength
+    col = np.asarray(color, dtype=np.float32)
+    sub = img[y0:y1 + 1, x0:x1 + 1]
+    for c in range(3):
+        sub[..., c] = sub[..., c] * (1 - m) + col[c] * m
+    img[y0:y1 + 1, x0:x1 + 1] = sub
+
+
 def _stars(img, rng, count, bright=0.95):
     n = img.shape[0]
     for _ in range(count):
@@ -262,9 +280,11 @@ def _skyline(img, rng, row, color_dark, color_win, k=1.0):
         x += w + max(1, int(rng.integers(1, 3) * k))
 
 
-def _ridge(img, rng, base_row, height, color, sharp=2.2, k=1.0):
+def _ridge(img, rng, base_row, height, color, sharp=2.2, k=1.0, bottom=None, snow=None):
     """سلسلة جبال/دوالي: silhouette بتقاطعات خطوط مائلة — الكثافة بتتقاس مع الدقة،
-    والقمم بتكبر مع العرض تلقائيًا (المسافة بين نقاط الكسر بتتضاعف)."""
+    والقمم بتكبر مع العرض تلقائيًا (المسافة بين نقاط الكسر بتتضاعف).
+    خ5: bottom = آخر صف بتتملأ من غيره (السما تبان بين القمم والطبقات الورا)،
+    snow = لون القمم الثلجية على أعلى القمم (شكل جبال حقيقي مش جدار رمادي)."""
     n = img.shape[0]
     step = max(2, int(rng.integers(3, 7) * k))
     slopes = []
@@ -278,9 +298,61 @@ def _ridge(img, rng, base_row, height, color, sharp=2.2, k=1.0):
             top[i] = min(top[i], base_row - height * 0.5
                          - abs((i - sx) * sl) * 0.5 + height * 0.5)
         top[i] = max(2, min(base_row, top[i]))
+    b_default = n if bottom is None else int(max(top.max() + 1, min(n, bottom)))
     for x in range(n):
         r = int(top[x])
-        img[r:, x] = img[r:, x] * 0.2 + np.array(color) * 0.8
+        img[r:b_default, x] = img[r:b_default, x] * 0.2 + np.array(color) * 0.8
+    # قمم ثلجية: على كل قمة أعلى من 55% من طول السلسلة — مثلث أبيض صغير
+    if snow is not None:
+        scol = np.asarray(snow, dtype=np.float32)
+        for x in range(1, n - 1):
+            peak = top[x] < top[x - 1] and top[x] <= top[x + 1]
+            deep = (base_row - top[x]) > height * 0.55
+            if peak and deep:
+                w = max(1, int(height * rng.uniform(0.12, 0.2)))
+                for dx in range(-w, w + 1):
+                    xx = x + dx
+                    if 0 <= xx < n:
+                        drop = int((w - abs(dx)) * 0.85)
+                        r0 = int(top[x])
+                        r1 = min(b_default, r0 + drop + 1)
+                        img[r0:r1, xx] = img[r0:r1, xx] * 0.15 + scol * 0.85
+
+
+def _peak_tri(img, ax, base_row, h, half_w, color, strength=0.85, fill_to=None):
+    """قمة جبل مثلثية حادة (خ5) — قمة عند ax بارتفاع h وقاعدة بعرض 2×half_w.
+    fill_to = آخر صف للتعبئة (الافتراضي: القاعدة نفسها). حتمية ومتجهية."""
+    n = img.shape[0]
+    base = int(base_row)
+    bot = n if fill_to is None else int(fill_to)
+    xs0, xs1 = max(0, int(ax - half_w)), min(n - 1, int(ax + half_w))
+    if xs1 < xs0 or base <= 2 or bot <= base:
+        if bot > base and xs1 >= xs0:                    # مفيش قمة فوق القاعدة — ملّي الأرض بس
+            img[base:bot, xs0:xs1 + 1] = img[base:bot, xs0:xs1 + 1] * (1 - strength) + color * strength
+        return
+    xs = np.arange(xs0, xs1 + 1)
+    t = np.clip(1.0 - np.abs(xs - ax) / max(half_w, 1e-6), 0.0, 1.0)
+    tops = np.maximum(2, (base - h * t).astype(int))
+    col = np.asarray(color, dtype=np.float32)
+    for i, x in enumerate(xs):
+        img[tops[i]:bot, x] = img[tops[i]:bot, x] * (1 - strength) + col * strength
+
+
+def _peak_snow(img, ax, base_row, h, half_w, color, strength=0.9):
+    """غطاء ثلجي: بيلمّي كل اللي فوق خط الثلوج من القمة (خ5) — بيدي إحساس ارتفاع حقيقي."""
+    n = img.shape[0]
+    base = int(base_row)
+    xs0, xs1 = max(0, int(ax - half_w)), min(n - 1, int(ax + half_w))
+    if xs1 < xs0 or base <= 2:
+        return
+    xs = np.arange(xs0, xs1 + 1)
+    t = np.clip(1.0 - np.abs(xs - ax) / max(half_w, 1e-6), 0.0, 1.0)
+    tops = np.maximum(2, (base - h * t).astype(int))
+    snow_line = base - h * 0.60                          # الثلج فوق الـ 60% من الارتفاع
+    col = np.asarray(color, dtype=np.float32)
+    for i, x in enumerate(xs):
+        if tops[i] < snow_line:
+            img[tops[i]:int(snow_line), x] = img[tops[i]:int(snow_line), x] * (1 - strength) + col * strength
 
 
 def _trees(img, rng, ground_row, count, trunk=(0.28, 0.18, 0.08),
@@ -434,12 +506,23 @@ def _mountains(rng, n):
     else:
         top, bot = np.array([0.40, 0.30, 0.50]), np.array([0.95, 0.65, 0.35])
     img = _v_gradient(rng, top + rng.normal(0, 0.04, 3), bot + rng.normal(0, 0.04, 3), n)
-    row = int(rng.integers(13, 16) * k)
+    row = int(rng.integers(15, 17) * k)
     shade = rng.uniform(0.55, 0.8)
-    _ridge(img, rng, row, rng.uniform(4, 7) * k,
-           np.array([shade * 0.75, shade * 0.72, shade * 0.80]), sharp=2.6, k=k)
-    _ridge(img, rng, int(row + 4 * k), rng.uniform(2, 4) * k,
-           np.array([0.25 * shade, 0.28 * shade, 0.22 * shade]), sharp=1.8, k=k)
+    back = np.array([shade * 0.78, shade * 0.76, shade * 0.85])
+    front = np.array([0.22 * shade, 0.26 * shade, 0.20 * shade])
+    # خ5: قمم خلفية عالية بثلوج (سما تبان بين القمم) + طبقة قدام داكنة + أرض
+    for _ in range(int(rng.integers(3, 5))):
+        ax = rng.uniform(2, n - 2)
+        h = rng.uniform(6.5, 10.0) * k
+        w = rng.uniform(3.5, 6.0) * k
+        _peak_tri(img, ax, row, h, w, back)
+        _peak_snow(img, ax, row, h, w, np.array([0.93, 0.95, 0.99]))
+    for _ in range(int(rng.integers(2, 4))):
+        ax = rng.uniform(2, n - 2)
+        h = rng.uniform(3.0, 5.5) * k
+        w = rng.uniform(4.0, 7.0) * k
+        _peak_tri(img, ax, row, h, w, front)
+    img[row:, :] = img[row:, :] * 0.15 + front * 0.85     # الأرض قدام من خط الأفق لتحت
     return np.clip(img, 0, 1)
 
 
@@ -451,7 +534,7 @@ def _forest(rng, n):
     row = int(rng.integers(14, 17) * k)
     _horizon(img, row, np.array([0.30, 0.50, 0.22]), np.array([0.18, 0.35, 0.14]),
              rng=rng, k=k)
-    _trees(img, rng, row, int(rng.integers(3, 6) * k), k=k)
+    _trees(img, rng, row, int(rng.integers(8, 14)), k=k)   # خ5: عدد ثابت مش بيتقيس مع الدقة
     return np.clip(img, 0, 1)
 
 
@@ -499,11 +582,14 @@ def _flowers(rng, n):
     _horizon(img, row, np.array([0.25, 0.52, 0.20]), np.array([0.16, 0.38, 0.14]),
              rng=rng, k=k)
     choices = ((0.95, 0.35, 0.45), (0.98, 0.80, 0.30), (0.90, 0.45, 0.75), (0.98, 0.98, 0.95))
-    for _ in range(int(rng.integers(4, 9) * k)):
+    for _ in range(int(rng.integers(6, 12))):          # خ5: عدد ثابت مش بيتقيس مع الدقة
         x = int(rng.integers(1, n - 1))
         y = int(rng.integers(row, n - 1))
         col = np.array(choices[int(rng.integers(0, len(choices)))])
-        _disc(img, x, y, rng.uniform(0.8, 1.4) * k, col, glow=0.2, rng=rng, k=k)
+        r = rng.uniform(0.8, 1.4) * k
+        _crisp_ellipse(img, x, y, r * 0.72, r * 0.72, col)       # بتلات حادة
+        _crisp_ellipse(img, x, y, r * 0.22, r * 0.22,
+                       np.array([0.98, 0.85, 0.25]))             # قلب الوردة
     return np.clip(img, 0, 1)
 
 
@@ -581,18 +667,19 @@ def _birds(rng, n):
     _horizon(img, int(rng.integers(18, 21) * k), np.array([0.45, 0.62, 0.35]),
              np.array([0.30, 0.45, 0.24]), rng=rng, k=k)
     dark = np.clip(np.array([0.15, 0.16, 0.20]) + rng.normal(0, 0.04, 3), 0, 1)
-    for _ in range(int(rng.integers(3, 7) * k)):
+    for _ in range(int(rng.integers(4, 9))):           # خ5: عدد ثابت مش بيتقيس مع الدقة
         x = rng.uniform(2, 22) * k
         y = rng.uniform(2, 13) * k
         s = rng.uniform(0.8, 1.6) * k
-        wing_w = max(0, int(0.45 * k))
+        wing_w = max(0, int(0.22 * k))                 # خ5: جنح أنحف — طيور مش فراشات
         _stroke(img, x - s, y - s * 0.35, x, y + s * 0.15, dark, w=wing_w)
         _stroke(img, x, y + s * 0.15, x + s, y - s * 0.35, dark, w=wing_w)
     return np.clip(img, 0, 1)
 
 
 def _balloons(rng, n):
-    """سما صافية وبالونات ملونة بأقراص هالة وخيوط نازلة."""
+    """سما صافية وبالونات ملونة حادة (خ5): بيضاوي بحافة واضحة + لمعة + عقدة وخيط نازل.
+    خوفو بيرسمها كتلة أقل فتبان بالونات مش بقع ملونة."""
     k = n / 24.0
     top = np.array([0.30, 0.55, 0.85]) + rng.normal(0, 0.04, 3)
     bot = np.array([0.68, 0.82, 0.96]) + rng.normal(0, 0.04, 3)
@@ -601,15 +688,22 @@ def _balloons(rng, n):
              np.array([0.30, 0.45, 0.24]), rng=rng, k=k)
     palette = ((0.95, 0.30, 0.35), (0.30, 0.55, 0.95), (0.98, 0.75, 0.25),
                (0.35, 0.75, 0.35), (0.85, 0.40, 0.85), (0.95, 0.55, 0.20))
-    for _ in range(int(rng.integers(3, 6) * k)):
+    for _ in range(int(rng.integers(4, 8))):           # خ5: عدد ثابت مش بيتقيس مع الدقة
         x = rng.uniform(3, 21) * k
         y = rng.uniform(3, 10) * k
         r = rng.uniform(1.0, 1.7) * k
         col = np.clip(np.array(palette[int(rng.integers(0, len(palette)))])
                       + rng.normal(0, 0.03, 3), 0, 1)
-        _disc(img, x, y, r, col, glow=0.25, rng=rng, k=k)
-        _stroke(img, x, y + r, x + rng.uniform(-0.8, 0.8) * k,
-                min(n - 1.0, y + r + rng.uniform(2.5, 5.0) * k),
+        rx, ry = r * 0.85, r * 1.05                   # بالون أطول من عرضه
+        _crisp_ellipse(img, x, y, rx, ry, col)
+        # لمعة صغيرة تحت الشمال — إحساس القشرة اللامعة
+        _crisp_ellipse(img, x - rx * 0.35, y - ry * 0.40, rx * 0.20, ry * 0.26,
+                       np.array([1.0, 1.0, 1.0]), strength=0.35)
+        # العقدة المثلثة تحت البالون
+        _fill_poly(img, [(x - 0.22 * k, y + ry), (x + 0.22 * k, y + ry),
+                         (x, y + ry + 0.45 * k)], col, strength=0.92)
+        _stroke(img, x, y + ry + 0.4 * k, x + rng.uniform(-0.8, 0.8) * k,
+                min(n - 1.0, y + ry + rng.uniform(3.0, 5.5) * k),
                 np.array([0.85, 0.85, 0.85]), w=0, strength=0.5)
     return np.clip(img, 0, 1)
 
