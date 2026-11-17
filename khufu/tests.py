@@ -20,7 +20,7 @@ def check(name, ok, detail=""):
 print("1) الأصناف (scenes.py)")
 import numpy as np
 import scenes
-check("١٦ صنف ومعاها أسماء عربي (خ3: +قارب طيور بالونات طريق)", len(scenes.CLASSES) == 16
+check("١٩ صنف ومعاها أسماء عربي (خ3: +4 صنف، خ7: +شاطئ سمكة طيارة ورق)", len(scenes.CLASSES) == 19
       and all(isinstance(c, tuple) and c[1] for c in scenes.CLASSES))
 check("CLASS_IDS متطابق مع CLASSES", scenes.CLASS_IDS == tuple(c[0] for c in scenes.CLASSES))
 check("دقة القاعدة 96×96 (جولة خ4 — كانت 48)", scenes.BASE == 96)
@@ -45,8 +45,8 @@ check("نفس البذرة = نفس الصورة بالحرف",
 
 print("1خ3) الأصناف الجديدة: قارب، طيور، بالونات، طريق")
 NEW_IDS = ("boat", "birds", "balloons", "road")
-check("الأصناف الجديدة الأربعة في CLASSES وله مولّد",
-      all(c[0] in NEW_IDS for c in scenes.CLASSES[-4:])
+check("أصناف خ3 الأربعة في CLASSES (المواقع 13-16) وله مولّد",
+      all(c[0] in NEW_IDS for c in scenes.CLASSES[12:16])
       and all(cid in scenes._GENERATORS for cid in NEW_IDS))
 check("«قارب» → boat و«فلوكة» و«شراع» كمان", scenes.class_from_text("قارب") == "boat"
       and scenes.class_from_text("فلوكة") == "boat" and scenes.class_from_text("شراع") == "boat")
@@ -70,15 +70,46 @@ for res in (24, 96, 128):
         _ok = False
 check("الأصناف الجديدة مستقلة عن الدقة (24/96/128)", _ok)
 imgs16, labels16 = scenes.make_dataset(2, seed=9)
-check("الداتاسيت بتتكلم مع 16 صنف (32 عينة)", imgs16.shape == (32, scenes.BASE, scenes.BASE, 3)
-      and labels16.max() == 15)
+check("الداتاسيت بتتكلم مع 19 صنف (38 عينة، آخر لبل 18)", imgs16.shape == (38, scenes.BASE, scenes.BASE, 3)
+      and labels16.max() == 18)
 imgs, labels = scenes.make_dataset(3, seed=9)
 check("الداتاسيت (12×3) على دقة القاعدة (96×96×3) — الثوابت القديمة ما اتكسرت",
       imgs.dtype == np.float32 and imgs.min() >= 0 and imgs.max() <= 1)
 imgs_u8, labels_u8 = scenes.make_dataset_u8(2, seed=9)
 check("خ4: الداتاسيت uint8 للتدريب على 96 (توفير رام)", imgs_u8.dtype == np.uint8
-      and imgs_u8.shape == (32, 96, 96, 3)
+      and imgs_u8.shape == (38, 96, 96, 3)
       and abs(float(imgs_u8[0].mean()) / 255.0 - float(imgs[0].mean())) < 0.02)
+
+print("1خ7) بيئة شاطئ + عنصرين سمكة وطيارة ورق")
+NEW7 = ("beach", "fish", "kite")
+check("الأصناف الجديدة التلاتة في CLASSES (آخر 3) وله مولّد",
+      tuple(c[0] for c in scenes.CLASSES[-3:]) == NEW7
+      and all(cid in scenes._GENERATORS for cid in NEW7))
+check("«شاطئ» و«الشاطئ» → beach (اتنقلوا من sea في خ7)",
+      scenes.class_from_text("شاطئ") == "beach" and scenes.class_from_text("الشاطئ") == "beach"
+      and scenes.class_from_text("ساحل") == "beach")
+check("«البحر» لسه sea و«محيط» كمان (regression)",
+      scenes.class_from_text("البحر") == "sea" and scenes.class_from_text("محيط") == "sea")
+check("«سمكة» و«سمك» و«حوت» و«دلفين» → fish",
+      scenes.class_from_text("سمكة") == "fish" and scenes.class_from_text("سمك") == "fish"
+      and scenes.class_from_text("حوت") == "fish" and scenes.class_from_text("دلفين") == "fish")
+check("«طيارة ورق» و«طيارة» و«kite» → kite",
+      scenes.class_from_text("طيارة ورق") == "kite" and scenes.class_from_text("طيارة") == "kite"
+      and scenes.class_from_text("kite") == "kite")
+_ok = True
+for cid in NEW7:
+    a = scenes.make_sample(cid, 11, res=48)
+    b = scenes.make_sample(cid, 11, res=48)
+    if a.shape != (48, 48, 3) or not np.array_equal(a, b) or a.std() < 0.05:
+        _ok = False
+check("عينة خ7: حتمية + شكل صحيح + مش فارغة", _ok)
+_ok = True
+for cid in NEW7:
+    for res in (24, 96, 128):
+        a = scenes.make_sample(cid, 5, res=res)
+        if a.shape != (res, res, 3) or a.min() < 0 or a.max() > 1:
+            _ok = False
+check("أصناف خ7 مستقلة عن الدقة (24/96/128)", _ok)
 
 print("\n2) كاتب PNG (png.py)")
 import png
@@ -146,8 +177,9 @@ check("جدول مكتمل حجمًا بيرجع زي ما هو",
       grow_state(dict(grown), 16) is not grown
       and grow_state(dict(grown), 16)["cemb.weight"].shape == (16, 8))
 net16 = KhufuNet()
-net16.load_state_dict(grow_state({k: v for k, v in net.state_dict().items() if True}, 16))
-check("التحميل في شبكة 16 صنف شغال", net16.cemb.weight.shape[0] == 16)
+net16.load_state_dict(grow_state({k: v for k, v in net.state_dict().items() if True},
+                                 len(scenes.CLASS_IDS)))
+check("التحميل في شبكة 19 صنف شغال (خ7: 12→16→19)", net16.cemb.weight.shape[0] == 19)
 
 print("\n4) التوليد (generate.py) — نموذج غير متدرب للسرعة، وبعدين المتدرب لو موجود")
 import generate
@@ -248,6 +280,48 @@ check("** خ6: تركيبة مركبة على 750×750 **",
       and float(img750c.arr.astype(float).std()) > 10.0)
 img_reg, got_reg = generate.generate("غروب", size=32, steps=20, seed=7, _model=net)
 check("الصنف الواحد ماشي زي ما هو بعد خ6 (regression)", got_reg == "sunset")
+
+print("4خ7) عناصر خ7 في التركيبات: سمكة وطيارة ورق وبيئة شاطئ")
+s7a = scenes.parse_composite("سمكة في البحر")
+check("«سمكة في البحر» → بحر + سمكة واحدة (مفرد)",
+      s7a and s7a["bg"] == "sea" and s7a["objects"] == [("fish", 1)])
+s7b = scenes.parse_composite("اسماك في البحر")
+check("جمع السمك («اسماك»/«سمكات») بيسيب العدد للرسّام (None)",
+      s7b and s7b["objects"] == [("fish", None)]
+      and (scenes.parse_composite("سمكات في البحر") or {})["objects"] == [("fish", None)])
+s7c = scenes.parse_composite("3 اسماك في البحر")
+check("عدّاد بالأرقام «3 اسماك» → سمكة ×3", s7c and s7c["objects"] == [("fish", 3)])
+s7d = scenes.parse_composite("طيارة ورق فوق الشاطئ")
+check("«طيارة ورق فوق الشاطئ» → شاطئ + طيارة ورق (تركيبة جديدة كاملة)",
+      s7d and s7d["bg"] == "beach" and s7d["objects"] == [("kite", 1)]
+      and scenes.is_composite(s7d))
+s7e = scenes.parse_composite("طيارات ورق فوق المدينة بالليل")
+check("جمع الطيارات («طيارات ورق») → العدد للرسّام + مدينة بالليل",
+      s7e and s7e["bg"] == "city" and s7e["mood"] == "night"
+      and s7e["objects"] == [("kite", None)])
+s7f = scenes.parse_composite("سمكة في البحر وقت الغروب")
+check("تركيبة خ7 بجو: «سمكة في البحر وقت الغروب»",
+      s7f and s7f["bg"] == "sea" and s7f["mood"] == "sunset" and s7f["objects"] == [("fish", 1)])
+ca = scenes.make_composite(s7d, seed=7, res=96)
+cb = scenes.make_composite(s7d, seed=7, res=96)
+cc = scenes.make_composite(s7d, seed=8, res=96)
+check("حتمية تركيبة خ7: نفس البذرة = نفس المصفوفة", np.array_equal(ca, cb))
+check("بذرة مختلفة = صورة مختلفة", not np.array_equal(ca, cc))
+check("تركيبة الشاطئ ليها تنوع ألوان حقيقي (std > 0.06)",
+      float(ca.std()) > 0.06, float(ca.std()))
+img7, tag7 = generate.generate("طيارة ورق فوق الشاطئ", size=96, steps=20, seed=3, _model=net)
+check("generate بيرسم تركيبة خ7 (96×96) والوصف فيه شاطئ وطيارة",
+      img7.arr.shape == (96, 96, 3) and "beach" in tag7 and "kite" in tag7)
+img750d, _ = generate.generate_composite("3 اسماك في البحر وقت الغروب",
+                                         size=750, steps=20, seed=3, _spec=s7c)
+check("** خ7: تركيبة أسماك على 750×750 **",
+      img750d.arr.shape == (750, 750, 3)
+      and float(img750d.arr.astype(float).std()) > 10.0)
+img_beach, got_beach = generate.generate("شاطئ", size=64, steps=20, seed=7, _model=net)
+check("الصنف الواحد «شاطئ» ماشي في مسار الصنف العادي", got_beach == "beach"
+      and img_beach.arr.shape == (64, 64, 3))
+img_reg2, got_reg2 = generate.generate("البحر", size=32, steps=20, seed=7, _model=net)
+check("regression: «البحر» لسه بيرسم sea بعد نقل شاطئ", got_reg2 == "sea")
 
 print("\n5) عقد الواجهة (app.py من seshat بيتصل بينا كده)")
 check("CLASSES فيها (id, عربي) للـ /khufu-status",

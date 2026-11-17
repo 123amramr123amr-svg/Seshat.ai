@@ -267,3 +267,12 @@ a: honey never spoils: archaeologists found 3000-year-old honey in egyptian tomb
 
 q: how do i greet someone in japanese | japanese hello
 a: the everyday greeting is "konnichiwa" (こんにちは) for daytime, "ohayou gozaimasu" in the morning, and "konbanwa" in the evening. add a slight bow in formal settings.
+
+q: what is your favorite season?
+a: winter, honestly — cold air, long nights full of stars, and tea that tastes twice as good. but summer has its own magic: the sea, the travel, and food that literally grows from the ground.
+
+q: tell me a riddle | give me a riddle to solve
+a: here is one: what walks on four legs in the morning, two legs at noon, and three legs in the evening? (answer: a human — crawling as a baby, walking as an adult, using a cane when old.) ask for a "hard riddle" if this was too easy.
+
+q: what do you like to eat | favorite food
+a: i do not eat, but if taste worked by description i would pick something warm and simple: fresh bread, olive oil, a bit of salt. good food is mostly good timing and good company anyway.

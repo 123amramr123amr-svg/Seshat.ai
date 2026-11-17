@@ -42,6 +42,9 @@ CLASSES = [
     ("birds", "طيور"),
     ("balloons", "بالونات"),
     ("road", "طريق"),
+    ("beach", "شاطئ"),
+    ("fish", "سمكة"),
+    ("kite", "طيارة ورق"),
 ]
 CLASS_IDS = tuple(c[0] for c in CLASSES)
 
@@ -51,7 +54,7 @@ _SYNONYMS = {
     "sunset": ("غروب", "الغروب", "غروب الشمس", "غروب شمس", "المغيب", "sunset", "dusk"),
     "night": ("ليل", "الليل", "بنجوم", "نجوم", "قمر", "سما بالليل", "night", "stars", "moon"),
     "dawn": ("فجر", "الفجر", "سحر", "السحر", "بكور", "dawn", "sunrise", "twilight"),
-    "sea": ("بحر", "البحر", "محط", "مية", "مياه", "شاطئ", "الشاطئ", "ساحل", "sea", "ocean", "beach"),
+    "sea": ("بحر", "البحر", "محط", "مية", "مياه", "محيط", "المحيط", "sea", "ocean"),
     "desert": ("صحرا", "الصحرا", "صحراء", "رمال", "الرمال", "desert", "dunes", "sand"),
     "mountains": ("جبال", "جبل", "الجبل", "سلسلة جبال", "قمم", "mountains", "mountain", "hills"),
     "forest": ("غابة", "الغابة", "غابا", "أشجار", "اشجار", "شجر", "forest", "trees", "jungle"),
@@ -63,6 +66,10 @@ _SYNONYMS = {
     "birds": ("طيور", "الطيور", "طير", "طائر", "عصافير", "عصفور", "birds", "bird"),
     "balloons": ("بالونات", "بالون", "بالونة", "البالونات", "balloon", "balloons"),
     "road": ("طريق", "الطريق", "شارع", "الشارع", "طريق سريع", "اسفلت", "إسفلت", "road", "highway", "street"),
+    # جولة خ7 — بيئة شاطئ + عنصرين سمكة وطيارة ورق
+    "beach": ("شاطئ", "الشاطئ", "ساحل", "الساحل", "رمل", "الرمل", "رمل بحر", "beach", "shore", "coast"),
+    "fish": ("سمكة", "السمكة", "سمكه", "السمكه", "سمك", "السمك", "سمكات", "السمكات", "أسماك", "اسماك", "الأسماك", "الاسماك", "حوت", "الحوت", "دلفين", "fish", "whale", "dolphin"),
+    "kite": ("طيارة ورق", "طياره ورق", "ورق طيارة", "ورق طياره", "طيارات ورق", "طيارة", "طياره", "kite"),
 }
 
 _CLASS_BY_ID = dict(CLASSES)
@@ -115,6 +122,9 @@ _BUCKETS = (
     ("boat", ("شراعي", "يخت", "نجاة", "yacht", "sail")),
     ("balloons", ("طيران", "سفر", "flight", "fly", "travel")),
     ("mountains", ("وادي", "هضبة", "صخور", "valley", "rock", "cliff")),
+    ("fish", ("قرش", "سردين", "تونة", "سلطعون", "اختوبوس", "اكتوبوس", "shark", "octopus", "crab", "sardine", "tuna")),
+    ("kite", ("ورق في السما", "ورقيه", "kite flying")),
+    ("beach", ("بحر رمل", "شط", "sand beach")),
 )
 
 
@@ -573,6 +583,152 @@ def _snow(rng, n):
     return np.clip(img, 0, 1)
 
 
+# ============================================================
+# جولة خ7 — بيئة شاطئ + عنصرين سمكة وطيارة ورق
+# نفس القاعدة: إحداثيات نسبية في فضاء 24 × k وبذور حتمية
+# ============================================================
+def _beach(rng, n):
+    """شاطئ: سما صافية + شمس + شريط بحر في الثلث العلوي + خط موج أبيض + رمل دافي بحبيبات."""
+    k = n / 24.0
+    sky_top = np.array([0.40, 0.64, 0.90]) + rng.normal(0, 0.04, 3)
+    sky_bot = np.array([0.76, 0.87, 0.95]) + rng.normal(0, 0.03, 3)
+    img = _v_gradient(rng, np.clip(sky_top, 0, 1), np.clip(sky_bot, 0, 1), n)
+    _disc(img, rng.uniform(4, 20) * k, rng.uniform(1.5, 4.5) * k,
+          rng.uniform(1.2, 1.8) * k, np.array([1.0, 0.96, 0.80]), glow=0.4, rng=rng, k=k)
+    sea_row = int(rng.integers(8, 11) * k)
+    shore_row = int(rng.integers(13, 16) * k)
+    water_top = np.array([0.16, 0.45, 0.66]) + rng.normal(0, 0.03, 3)
+    water_bot = np.array([0.10, 0.36, 0.55]) + rng.normal(0, 0.03, 3)
+    # شريط المية بين صفين — تدرج رأسي بسيط
+    for y in range(max(0, sea_row), min(n, shore_row)):
+        t = (y - sea_row) / max(1, shore_row - sea_row)
+        img[y, :] = np.clip(water_top * (1 - t) + water_bot * t, 0, 1)
+    # موجات خفيفة في المية
+    for _ in range(int(rng.integers(2, 5) * k)):
+        y = int(rng.integers(max(1, sea_row + 1), max(2, shore_row - 1)))
+        x = int(rng.integers(int(1 * k), max(2, n - int(5 * k))))
+        w = max(1, int(rng.integers(2, 5) * k))
+        img[y, x:x + w] = img[y, x:x + w] * 0.6 + 0.4
+    # خط الموج الأبيض عند التقاء المية بالرمل + رمال مبتلة أدكن تحته
+    foam = np.array([0.96, 0.97, 0.98])
+    if 0 <= shore_row < n:
+        img[shore_row, :] = img[shore_row, :] * 0.25 + foam * 0.75
+    if 0 <= shore_row + 1 < n:
+        img[shore_row + 1, :] = img[shore_row + 1, :] * 0.55 + np.array([0.72, 0.62, 0.48]) * 0.45
+    # الرمل من خط الموج لتحت — تدرج دافي + حبيبات
+    sand_top = np.array([0.93, 0.82, 0.60]) + rng.normal(0, 0.03, 3)
+    sand_bot = np.array([0.80, 0.66, 0.44]) + rng.normal(0, 0.03, 3)
+    for y in range(max(0, shore_row), n):
+        t = (y - shore_row) / max(1, n - shore_row)
+        img[y, :] = np.clip(sand_top * (1 - t) + sand_bot * t, 0, 1)
+    for _ in range(int(rng.integers(8, 16) * k)):
+        x = int(rng.integers(0, n))
+        y = int(rng.integers(max(0, shore_row + 2), n))
+        d = max(1, int(0.35 * k))
+        img[y:y + d, x:x + d] = img[y:y + d, x:x + d] * 0.82 + 0.05
+    return np.clip(img, 0, 1)
+
+
+def _fish(rng, n):
+    """سمكة بتقفز فوق المية: بحر + جسم بيضاوي حاد + ذيل مثلث + عين + زعنفة + رذاذ."""
+    k = n / 24.0
+    sky_kind = int(rng.integers(0, 3))
+    palettes = {
+        0: (np.array([0.35, 0.58, 0.88]), np.array([0.70, 0.82, 0.95])),
+        1: (np.array([0.55, 0.35, 0.45]), np.array([0.95, 0.60, 0.30])),
+        2: (np.array([0.06, 0.09, 0.20]), np.array([0.14, 0.18, 0.32])),
+    }
+    top, bot = palettes[sky_kind]
+    img = _v_gradient(rng, np.clip(top + rng.normal(0, 0.03, 3), 0, 1),
+                      np.clip(bot + rng.normal(0, 0.03, 3), 0, 1), n)
+    row = int(rng.integers(12, 14) * k)
+    water = np.array([0.10, 0.35, 0.55]) + rng.normal(0, 0.04, 3)
+    water2 = np.array([0.06, 0.25, 0.42]) + rng.normal(0, 0.03, 3)
+    _horizon(img, row, np.clip(water, 0, 1), np.clip(water2, 0, 1), wobble=0.6, rng=rng, k=k)
+    fx = rng.uniform(7, 17) * k
+    fy = rng.uniform(row + 1.5, min(n - 4.0, row + 5.0))
+    _paint_one_fish(img, rng, n, fx, fy)
+    # رذاذ تحت السمكة + موجات
+    ref_y = int(fy + 2.6 * k)   # جسم السمكة اكتر حاجة بتطول 2.6 في فضاء 24
+    if 0 <= ref_y < n:
+        x0 = max(0, int(fx - 2.0 * k))
+        x1 = min(n, int(fx + 2.0 * k))
+        img[ref_y, x0:x1] = img[ref_y, x0:x1] * 0.7 + 0.3
+    for _ in range(int(rng.integers(2, 5) * k)):
+        y = int(rng.integers(row + int(1.5 * k), n - 1))
+        x = int(rng.integers(int(1 * k), max(2, n - int(5 * k))))
+        w = max(1, int(rng.integers(2, 5) * k))
+        img[y, x:x + w] = img[y, x:x + w] * 0.65 + 0.35
+    return np.clip(img, 0, 1)
+
+
+def _paint_one_fish(img, rng, n, fx, fy):
+    """رسمة سمكة واحدة حادة: جسم + ذيل + عين + زعنفة ظهرية — حتمية لنفس البذرة."""
+    k = n / 24.0
+    L = rng.uniform(1.6, 2.6) * k
+    H = L * rng.uniform(0.40, 0.55)
+    if rng.random() < 0.5:
+        body = np.clip(np.array([0.95, 0.55, 0.15]) + rng.normal(0, 0.06, 3), 0, 1)
+    else:
+        body = np.clip(np.array([0.55, 0.75, 0.92]) + rng.normal(0, 0.05, 3), 0, 1)
+    dirn = 1.0 if rng.random() < 0.5 else -1.0
+    _crisp_ellipse(img, fx, fy, L, H, body)
+    _fill_poly(img, [(fx - dirn * L * 0.85, fy),
+                     (fx - dirn * L * 1.5, fy - H * 0.95),
+                     (fx - dirn * L * 1.5, fy + H * 0.95)], body, strength=0.9)
+    _crisp_ellipse(img, fx + dirn * L * 0.5, fy - H * 0.28,
+                   max(0.4, 0.16 * k), max(0.4, 0.16 * k),
+                   np.array([0.05, 0.05, 0.08]), strength=0.95)
+    _fill_poly(img, [(fx - L * 0.2, fy - H * 0.9),
+                     (fx + L * 0.05, fy - H - 0.55 * k),
+                     (fx + L * 0.55, fy - H * 0.85)],
+               np.clip(body * 0.82, 0, 1), strength=0.85)
+
+
+def _kite(rng, n):
+    """طيارة ورق في سما صافية: معين + عوارض متصالبة + ذيل بفيونكات + خيط نازل."""
+    k = n / 24.0
+    top = np.array([0.40, 0.62, 0.90]) + rng.normal(0, 0.04, 3)
+    bot = np.array([0.78, 0.88, 0.96]) + rng.normal(0, 0.03, 3)
+    img = _v_gradient(rng, np.clip(top, 0, 1), np.clip(bot, 0, 1), n)
+    for _ in range(int(rng.integers(1, 3))):
+        x = rng.uniform(5, 19) * k
+        y = rng.uniform(4, 10) * k
+        _paint_one_kite(img, rng, n, x, y)
+    return np.clip(img, 0, 1)
+
+
+def _paint_one_kite(img, rng, n, x, y):
+    """طيارة ورق واحدة حادة: معين + عوارض + ذيل بفيونكات + خيط لتحت."""
+    k = n / 24.0
+    palette = ((0.92, 0.28, 0.32), (0.25, 0.55, 0.92), (0.98, 0.72, 0.22),
+               (0.35, 0.72, 0.38), (0.80, 0.40, 0.85))
+    col = np.clip(np.array(palette[int(rng.integers(0, len(palette)))])
+                  + rng.normal(0, 0.04, 3), 0, 1)
+    s = rng.uniform(1.3, 2.0) * k
+    _fill_poly(img, [(x, y - s), (x + s * 0.72, y), (x, y + s * 1.15), (x - s * 0.72, y)],
+               col, strength=0.92)
+    stick = np.array([0.30, 0.22, 0.14])
+    _stroke(img, x, y - s, x, y + s * 1.15, stick, w=max(0, int(0.22 * k)), strength=0.9)
+    _stroke(img, x - s * 0.72, y, x + s * 0.72, y, stick, w=max(0, int(0.22 * k)), strength=0.9)
+    # ذيل بفيونكات صغيرة
+    tx, ty = x, y + s * 1.15
+    for _ in range(int(rng.integers(3, 5))):
+        nx = tx + rng.uniform(-0.7, 0.7) * k
+        ny = ty + rng.uniform(0.8, 1.2) * k
+        _stroke(img, tx, ty, nx, ny, np.array([0.85, 0.85, 0.85]),
+                w=max(0, int(0.1 * k)), strength=0.6)
+        bw = max(0.5, 0.28 * k)
+        _fill_poly(img, [(nx, ny - bw), (nx + bw * 0.8, ny),
+                         (nx, ny + bw), (nx - bw * 0.8, ny)],
+                   np.clip(col * 0.9, 0, 1), strength=0.85)
+        tx, ty = nx, ny
+    # خيط من الطيارة لتحت الصورة
+    _stroke(img, x, y - s, x + rng.uniform(-2.0, 2.0) * k,
+            min(n - 1.0, y + rng.uniform(6.0, 10.0) * k),
+            np.array([0.88, 0.88, 0.88]), w=max(0, int(0.08 * k)), strength=0.5)
+
+
 def _flowers(rng, n):
     k = n / 24.0
     sky_top = np.array([0.50, 0.68, 0.88]) + rng.normal(0, 0.05, 3)
@@ -753,6 +909,7 @@ _GENERATORS = {
     "sea": _sea, "desert": _desert, "mountains": _mountains, "forest": _forest,
     "city": _city, "rain": _rain, "snow": _snow, "flowers": _flowers,
     "boat": _boat, "birds": _birds, "balloons": _balloons, "road": _road,
+    "beach": _beach, "fish": _fish, "kite": _kite,
 }
 
 
@@ -762,9 +919,9 @@ _GENERATORS = {
 # كل حاجة إجرائية وحتمية: نفس البذرة = نفس الصورة بالحرف.
 # ============================================================
 _MOOD_IDS = ("day", "sunset", "night", "dawn", "rain", "snow")   # جو بيتلط على أي خلفية
-_OBJ_IDS = ("boat", "birds", "balloons")                         # عناصر بتترسم فوق الخلفية
+_OBJ_IDS = ("boat", "birds", "balloons", "fish", "kite")          # عناصر بتترسم فوق الخلفية
 _BG_IDS = ("sea", "desert", "mountains", "forest", "city", "road",
-           "flowers")                                            # بيئات = خلفية كاملة
+           "flowers", "beach")                                   # بيئات = خلفية كاملة (خ7: +شاطئ)
 
 _AR_NUM = {"واحد": 1, "اثنين": 2, "اتنين": 2, "ثلاث": 3, "تلاته": 3, "تلاتة": 3,
            "اربع": 4, "اربعه": 4, "خمس": 5, "خمسه": 5, "ست": 6, "سته": 6,
@@ -772,7 +929,9 @@ _AR_NUM = {"واحد": 1, "اثنين": 2, "اتنين": 2, "ثلاث": 3, "تل
 
 # كلمات الجمع — من غير رقم صريح بتسيب العدد للرسّام (سرب طيور/بالونات/قوارب)
 _PLURAL_WORDS = {"قوارب", "طيور", "الطيور", "عصافير", "birds",
-                 "بالونات", "البالونات", "balloons"}
+                 "بالونات", "البالونات", "balloons",
+                 "اسماك", "الاسماك", "سمكات", "السمكات", "fish school",   # خ7: جمع السمك
+                 "طيارات ورق", "طيارات ورق"}                        # خ7: جمع الطيارات
 
 
 def _find_words(t):
@@ -889,6 +1048,10 @@ def make_composite(spec, seed, res=None):
             img = _paint_birds(img, rng, n, count)
         elif cid == "balloons":
             img = _paint_balloons(img, rng, n, count)
+        elif cid == "fish":
+            img = _paint_fish(img, rng, n, count, water_bg=(bg == "sea"))
+        elif cid == "kite":
+            img = _paint_kite(img, rng, n, count)
     return np.clip(img, 0, 1)
 
 
@@ -1002,6 +1165,41 @@ def _paint_balloons(img, rng, n, count=None):
         _stroke(img, x, y + ry + 0.4 * k, x + rng.uniform(-0.8, 0.8) * k,
                 min(n - 1.0, y + ry + rng.uniform(3.0, 5.5) * k),
                 np.array([0.85, 0.85, 0.85]), w=0, strength=0.5)
+    return img
+
+
+def _paint_fish(img, rng, n, count=1, water_bg=True):
+    """سمكة/أسماك فوق أي خلفية (خ7): على البحر بتعوم جوا المية، وغير كده بيتحط
+    حواليها بركة مية صغيرة عشان تفضل مقروءة. جمع من غير رقم → مجموعة سمك."""
+    k = n / 24.0
+    if not count:
+        count = int(rng.integers(2, 5))
+    for _ in range(int(count)):
+        fx = rng.uniform(5, 19) * k
+        fy = rng.uniform(12, 19) * k
+        if not water_bg:
+            pw = rng.uniform(4.5, 6.5) * k
+            _crisp_ellipse(img, fx, fy + 1.6 * k, pw, 1.0 * k,
+                           np.array([0.10, 0.35, 0.55]), strength=0.55)
+        _paint_one_fish(img, rng, n, fx, fy)
+        ref_y = int(fy + 2.4 * k)
+        if 0 <= ref_y < n:
+            x0 = max(0, int(fx - 2.0 * k))
+            x1 = min(n, int(fx + 2.0 * k))
+            img[ref_y, x0:x1] = img[ref_y, x0:x1] * 0.7 + 0.3
+    return img
+
+
+def _paint_kite(img, rng, n, count=None):
+    """طيارة ورق/طيارات ورق فوق منطقة السما — أي خلفية (خ7).
+    جمع من غير رقم → 1-2 طيارة، والمفرد واحد."""
+    k = n / 24.0
+    if not count:
+        count = int(rng.integers(1, 3))
+    for _ in range(int(count)):
+        x = rng.uniform(4, 20) * k
+        y = rng.uniform(3, 9) * k
+        _paint_one_kite(img, rng, n, x, y)
     return img
 
 

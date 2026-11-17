@@ -420,3 +420,21 @@ a: the speed of light in vacuum is exactly 299,792,458 meters per second — abo
 
 q: what causes the seasons on earth?
 a: seasons come from the tilt of earth's rotation axis — about 23.5 degrees — relative to its orbit around the sun, not from the distance to the sun. when the north pole tilts toward the sun the northern hemisphere gets longer days and more direct sunlight (summer) while the south gets winter, and half an orbit later it reverses.
+
+q: why do stars twinkle at night?
+a: stars twinkle because their light travels through layers of moving air before reaching your eye. each layer bends the light slightly and the bending keeps shifting, so the star's apparent position and brightness flicker. planets are close enough to appear as tiny discs instead of points, so their light averages out — that is how you can tell a planet from a star.
+
+q: why do we yawn?
+a: the leading theory says yawning cools the brain. when you are tired or bored your brain warms slightly, and a deep inhale with a wide jaw stretches the skull and pushes blood flow through, carrying heat away. yawning is also contagious: seeing one triggers mirror neurons and about half of people yawn back within minutes.
+
+q: what is a black hole?
+a: a black hole is a region where gravity is so strong that nothing can escape — not even light. it forms when a massive star collapses under its own weight at the end of its life. the boundary of no return is called the event horizon; anything crossing it is lost from our view forever. scientists photograph them indirectly by the glowing gas swirling around.
+
+q: how do fish breathe underwater?
+a: fish do not breathe water the way we breathe air — they extract the oxygen dissolved in it. water enters the mouth, flows over the gills, and oxygen passes into the blood through thin gill filaments while carbon dioxide exits. the system is so efficient that fish extract up to 80 percent of the dissolved oxygen, compared with about 25 percent for human lungs.
+
+q: why do we sneeze?
+a: a sneeze is a defensive reflex. when something irritates the lining of the nose — dust, pollen, a virus — a nerve signal reaches the brain and triggers a powerful burst of air that can exceed 150 km/h to eject the irritant. that is why covering with your elbow, not your hand, matters: droplets carry infection far.
+
+q: explain in detail how a refrigerator keeps food cold, step by step.
+a: a refrigerator moves heat instead of creating cold. first a refrigerant fluid circulates in sealed pipes; inside the fridge cabinet it absorbs heat from the food and air and evaporates at low pressure, which pulls temperature down. second the compressor squeezes that gas, raising its pressure and temperature well above room level. third the hot compressed gas flows through coils on the back or bottom, where the kitchen air cools it and the fluid condenses back to liquid while dumping the absorbed heat outside. fourth an expansion valve drops the pressure again, the fluid becomes cold, and the cycle repeats continuously. a thermostat switches the compressor on only when the interior drifts above the set point, and insulation keeps outside heat from leaking in — that is why an unopened fridge holds its temperature for hours during a power cut.
