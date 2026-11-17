@@ -183,7 +183,12 @@ def main():
             write_status(step, hloss)
 
     if run_n:
-        last_reported = {"train": run_loss / run_n}
+        # خ8: لو الجولة اقطعت قبل حد تقييم، آخر خسارة اختبار معروفة ما تتغطيش
+        # بـ null — الجولة القادمة بتقرأ الحالة فلازم القيمة الصالحة تفضل موجودة.
+        if last_reported:
+            last_reported["train"] = run_loss / run_n
+        else:
+            last_reported = {"train": run_loss / run_n}
     save_state(CKPT, model, ema, step, args)
     write_status(step, (last_reported or {}).get("holdout"))
     print(f"--- انتهى التدريب عند خطوة {step} | آخر خسارة: {last_reported} ---", flush=True)

@@ -20,7 +20,7 @@ def check(name, ok, detail=""):
 print("1) الأصناف (scenes.py)")
 import numpy as np
 import scenes
-check("١٩ صنف ومعاها أسماء عربي (خ3: +4 صنف، خ7: +شاطئ سمكة طيارة ورق)", len(scenes.CLASSES) == 19
+check("٢٠ صنف ومعاها أسماء عربي (خ3: +4، خ7: +3، خ8: +قوس قزح)", len(scenes.CLASSES) == 20
       and all(isinstance(c, tuple) and c[1] for c in scenes.CLASSES))
 check("CLASS_IDS متطابق مع CLASSES", scenes.CLASS_IDS == tuple(c[0] for c in scenes.CLASSES))
 check("دقة القاعدة 96×96 (جولة خ4 — كانت 48)", scenes.BASE == 96)
@@ -70,20 +70,20 @@ for res in (24, 96, 128):
         _ok = False
 check("الأصناف الجديدة مستقلة عن الدقة (24/96/128)", _ok)
 imgs16, labels16 = scenes.make_dataset(2, seed=9)
-check("الداتاسيت بتتكلم مع 19 صنف (38 عينة، آخر لبل 18)", imgs16.shape == (38, scenes.BASE, scenes.BASE, 3)
-      and labels16.max() == 18)
+check("الداتاسيت بتتكلم مع 20 صنف (40 عينة، آخر لبل 19)", imgs16.shape == (40, scenes.BASE, scenes.BASE, 3)
+      and labels16.max() == 19)
 imgs, labels = scenes.make_dataset(3, seed=9)
 check("الداتاسيت (12×3) على دقة القاعدة (96×96×3) — الثوابت القديمة ما اتكسرت",
       imgs.dtype == np.float32 and imgs.min() >= 0 and imgs.max() <= 1)
 imgs_u8, labels_u8 = scenes.make_dataset_u8(2, seed=9)
 check("خ4: الداتاسيت uint8 للتدريب على 96 (توفير رام)", imgs_u8.dtype == np.uint8
-      and imgs_u8.shape == (38, 96, 96, 3)
+      and imgs_u8.shape == (40, 96, 96, 3)
       and abs(float(imgs_u8[0].mean()) / 255.0 - float(imgs[0].mean())) < 0.02)
 
 print("1خ7) بيئة شاطئ + عنصرين سمكة وطيارة ورق")
 NEW7 = ("beach", "fish", "kite")
-check("الأصناف الجديدة التلاتة في CLASSES (آخر 3) وله مولّد",
-      tuple(c[0] for c in scenes.CLASSES[-3:]) == NEW7
+check("الأصناف الجديدة التلاتة في CLASSES (قبل قوس قزح الأخير) وله مولّد",
+      tuple(c[0] for c in scenes.CLASSES[-4:-1]) == NEW7
       and all(cid in scenes._GENERATORS for cid in NEW7))
 check("«شاطئ» و«الشاطئ» → beach (اتنقلوا من sea في خ7)",
       scenes.class_from_text("شاطئ") == "beach" and scenes.class_from_text("الشاطئ") == "beach"
@@ -179,7 +179,7 @@ check("جدول مكتمل حجمًا بيرجع زي ما هو",
 net16 = KhufuNet()
 net16.load_state_dict(grow_state({k: v for k, v in net.state_dict().items() if True},
                                  len(scenes.CLASS_IDS)))
-check("التحميل في شبكة 19 صنف شغال (خ7: 12→16→19)", net16.cemb.weight.shape[0] == 19)
+check("التحميل في شبكة 20 صنف شغال (خ8: 12→16→20)", net16.cemb.weight.shape[0] == 20)
 
 print("\n4) التوليد (generate.py) — نموذج غير متدرب للسرعة، وبعدين المتدرب لو موجود")
 import generate
@@ -322,6 +322,57 @@ check("الصنف الواحد «شاطئ» ماشي في مسار الصنف ا
       and img_beach.arr.shape == (64, 64, 3))
 img_reg2, got_reg2 = generate.generate("البحر", size=32, steps=20, seed=7, _model=net)
 check("regression: «البحر» لسه بيرسم sea بعد نقل شاطئ", got_reg2 == "sea")
+
+print("1خ8) قوس قزح: صنف جديد + جو بيتلط على أي مشهد")
+NEW8 = "rainbow"
+check("قوس قزح في CLASSES (آخر صنف) وله مولّد",
+      scenes.CLASSES[-1][0] == NEW8 and NEW8 in scenes._GENERATORS)
+check("«قوس قزح» و«رينبو» و«سبع الوان» → rainbow",
+      scenes.class_from_text("قوس قزح") == "rainbow"
+      and scenes.class_from_text("رينبو") == "rainbow"
+      and scenes.class_from_text("سبع الوان") == "rainbow"
+      and scenes.class_from_text("rainbow") == "rainbow")
+a8 = scenes.make_sample("rainbow", 11, res=48)
+b8 = scenes.make_sample("rainbow", 11, res=48)
+check("عينة قوس قزح: حتمية + شكل صحيح + ملونة فعلاً",
+      a8.shape == (48, 48, 3) and np.array_equal(a8, b8) and a8.std() > 0.05
+      and float(np.abs(a8[..., 0] - a8[..., 2]).mean()) > 0.02)
+_ok = True
+for res in (24, 96, 128):
+    a = scenes.make_sample("rainbow", 5, res=res)
+    if a.shape != (res, res, 3) or a.min() < 0 or a.max() > 1:
+        _ok = False
+check("قوس قزح مستقل عن الدقة (24/96/128)", _ok)
+s8 = scenes.parse_composite("قوس قزح فوق البحر")
+check("«قوس قزح فوق البحر» → بحر + جو قوس قزح (تركيبة كاملة)",
+      s8 and s8["bg"] == "sea" and s8["mood"] == "rainbow" and scenes.is_composite(s8))
+s8b = scenes.parse_composite("طيور فوق الجبال مع قوس قزح")
+check("«طيور فوق الجبال مع قوس قزح» → جبال + قوس قزح + طيور",
+      s8b and s8b["bg"] == "mountains" and s8b["mood"] == "rainbow"
+      and s8b["objects"] == [("birds", None)])
+rb_sea = scenes.make_composite({"bg": "sea", "mood": "rainbow", "objects": []}, seed=11)
+rb_plain = scenes.make_composite({"bg": "sea", "mood": None, "objects": []}, seed=11)
+check("جو قوس قزح بيغيّر المشهد فعلاً (فرق متوسط > 0.02)",
+      float(np.abs(rb_sea - rb_plain).mean()) > 0.02)
+print("\n4خ8) طبقة الطاقة في الخلط الهجين (generate._vivid)")
+_v = generate._vivid(np.clip(scenes.make_sample("rainbow", 7), 0, 1))
+check("طبقة الطاقة: حتمية + في المدى + بتفعل الفعلاً",
+      np.array_equal(_v, generate._vivid(np.clip(scenes.make_sample("rainbow", 7), 0, 1)))
+      and _v.min() >= 0 and _v.max() <= 1
+      and float(np.abs(_v - scenes.make_sample("rainbow", 7)).mean()) > 0.01)
+_spread_before = float(np.abs(scenes.make_sample("rainbow", 7)[..., 0]
+                              - scenes.make_sample("rainbow", 7)[..., 2]).mean())
+_spread_after = float(np.abs(_v[..., 0] - _v[..., 2]).mean())
+check("طبقة الطاقة بتزود تشبع الألوان (فرق قنوات أعلى)",
+      _spread_after >= _spread_before, (_spread_before, _spread_after))
+check("الخلط الهجين خ8: وزن الرسمة الحادة 0.82 (أوضح)", generate.CRISP_WEIGHT == 0.82)
+img8, tag8 = generate.generate("قوس قزح فوق البحر", size=96, steps=20, seed=3, _model=net)
+check("generate بيرسم تركيبة قوس قزح (96×96)",
+      img8.arr.shape == (96, 96, 3) and "sea" in tag8 and "rainbow" in tag8
+      and float(img8.arr.astype(float).std()) > 15.0)
+img_r8, got_r8 = generate.generate("قوس قزح", size=64, steps=20, seed=7, _model=net)
+check("الصنف الواحد «قوس قزح» ماشي في المسار العادي", got_r8 == "rainbow"
+      and img_r8.arr.shape == (64, 64, 3))
 
 print("\n5) عقد الواجهة (app.py من seshat بيتصل بينا كده)")
 check("CLASSES فيها (id, عربي) للـ /khufu-status",

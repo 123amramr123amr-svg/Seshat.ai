@@ -45,6 +45,7 @@ CLASSES = [
     ("beach", "شاطئ"),
     ("fish", "سمكة"),
     ("kite", "طيارة ورق"),
+    ("rainbow", "قوس قزح"),
 ]
 CLASS_IDS = tuple(c[0] for c in CLASSES)
 
@@ -70,6 +71,9 @@ _SYNONYMS = {
     "beach": ("شاطئ", "الشاطئ", "ساحل", "الساحل", "رمل", "الرمل", "رمل بحر", "beach", "shore", "coast"),
     "fish": ("سمكة", "السمكة", "سمكه", "السمكه", "سمك", "السمك", "سمكات", "السمكات", "أسماك", "اسماك", "الأسماك", "الاسماك", "حوت", "الحوت", "دلفين", "fish", "whale", "dolphin"),
     "kite": ("طيارة ورق", "طياره ورق", "ورق طيارة", "ورق طياره", "طيارات ورق", "طيارة", "طياره", "kite"),
+    # جولة خ8 — قوس قزح: صنف كامل + جو بيتلط على أي خلفية
+    "rainbow": ("قوس قزح", "القوس", "رينبو", "سبع الوان", "الوان السما",
+                "rainbow", "arc"),
 }
 
 _CLASS_BY_ID = dict(CLASSES)
@@ -104,14 +108,17 @@ def class_name(cid):
 _BUCKETS = (
     ("birds", ("قرد", "نمر", "أسد", "اسد", "فار", "أرنب", "ارنب", "حصان", "فيل",
      "جمل", "بقرة", "بقره", "فراشه", "فراشة", "بطة", "بط", "ديناصور", "تمساح",
-     "duck", "monkey", "lion", "elephant", "camel", "horse", "rabbit", "butterfly",
-     "animal", "حيوان", "dinosaur", "crocodile")),
-    ("sea", ("نهر", "بحيره", "موج", "غرق", "شلال", "river", "lake", "wave", "water", "waterfall")),
+     "حمامه", "عقم", "duck", "monkey", "lion", "elephant", "camel", "horse", "rabbit",
+     "butterfly", "animal", "حيوان", "dinosaur", "crocodile", "pigeon", "sparrow")),
+    ("sea", ("نهر", "بحيره", "موج", "غرق", "شلال", "نيل", "نهر النيل", "river", "lake", "wave",
+     "water", "waterfall")),
     ("city", ("عماره", "بيت", "منزل", "قلعه", "برج", "قرية", "حاسوب", "كمبيوتر",
-     "تليفون", "موبايل", "روبوت", "house", "tower", "castle", "village", "town",
+     "تليفون", "موبايل", "روبوت", "فندق", "مدرسه", "مستشفي", "مسجد",
+     "house", "tower", "castle", "village", "town",
      "computer", "phone", "laptop", "robot", "wifi")),
-    ("forest", ("غاب", "نخل", "زرع", "حقل", "عشب", "field", "grass", "nature", "طبيعه")),
-    ("night", ("سما", "سماء", "مجره", "كواكب", "تنين", "وحش", "شبح", "خيال",
+    ("forest", ("غاب", "نخل", "زرع", "حقل", "عشب", "بستان", "مزرعه", "field", "grass",
+     "nature", "طبيعه")),
+    ("night", ("سما", "سماء", "مجره", "كواكب", "تنين", "وحش", "شبح", "خيال", "فضاء", "كوكب",
      "sky", "galaxy", "planet", "space", "dragon", "monster", "ghost", "fantasy")),
     ("rain", ("سحاب", "غيم", "رعد", "برق", "طوفان", "cloud", "thunder", "storm")),
     ("snow", ("برد", "صقيع", "جليد", "تلج", "cold", "ice", "frost")),
@@ -122,9 +129,16 @@ _BUCKETS = (
     ("boat", ("شراعي", "يخت", "نجاة", "yacht", "sail")),
     ("balloons", ("طيران", "سفر", "flight", "fly", "travel")),
     ("mountains", ("وادي", "هضبة", "صخور", "valley", "rock", "cliff")),
-    ("fish", ("قرش", "سردين", "تونة", "سلطعون", "اختوبوس", "اكتوبوس", "shark", "octopus", "crab", "sardine", "tuna")),
+    ("fish", ("قرش", "سردين", "تونة", "سلطعون", "سلطعونه", "ضفدع", "اختوبوس", "اكتوبوس",
+     "shark", "octopus", "crab", "sardine", "tuna", "frog")),
     ("kite", ("ورق في السما", "ورقيه", "kite flying")),
-    ("beach", ("بحر رمل", "شط", "sand beach")),
+    ("beach", ("بحر رمل", "شط", "شواطئ", "رصيف", "sand beach")),
+    ("desert", ("واحه", "خيمه", "كثبان", "oasis", "tent")),
+    ("mountains", ("تلال", "بركان", "volcano")),
+    ("flowers", ("توليب", "ياسمين", "نرجس", "tulip", "jasmine")),
+    ("road", ("نفق", "كوبري", "tunnel")),
+    ("dawn", ("شروق", "شروق الشمس")),
+    ("rainbow", ("الوان", "ملون", "الطيف", "colorful", "spectrum")),
 )
 
 
@@ -904,12 +918,60 @@ def _road(rng, n):
     return np.clip(img, 0, 1)
 
 
+_RAINBOW_COLORS = (
+    (0.92, 0.22, 0.20),   # أحمر
+    (0.97, 0.55, 0.18),   # برتقالي
+    (0.98, 0.85, 0.25),   # أصفر
+    (0.32, 0.75, 0.34),   # أخضر
+    (0.26, 0.52, 0.92),   # أزرق
+    (0.36, 0.32, 0.72),   # نيلي
+    (0.62, 0.38, 0.82),   # بنفسجي
+)
+
+
+def _paint_rainbow(img, rng, n, strength=0.8):
+    """قوس قزح من 7 ألوان (خ8): حلقات متحدة المركز فوق نقطة تحت الأفق، بحواف أنعم
+    من الأشكال الحادة عشان يبان جو طبيعي مش ملصق. بيرجع الصورة بعد الرسم."""
+    k = n / 24.0
+    cx = rng.uniform(9.5, 14.5) * k
+    cy = rng.uniform(17.5, 19.8) * k                 # المركز تحت الأفق — القوس بيفوقه
+    r_out = rng.uniform(8.2, 10.5) * k
+    band = 0.62 * k
+    yy, xx = np.mgrid[0:n, 0:n]
+    d = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
+    above = (yy <= cy + band).astype(np.float64)      # نص علوي بس — مفيش قوس مقلوب تحت الأرض
+    for i, col in enumerate(_RAINBOW_COLORS):
+        r_i = r_out - i * band
+        wm = np.clip((band * 0.55 - np.abs(d - r_i)) / (band * 0.22), 0.0, 1.0) * above * strength
+        img += wm[..., None] * (np.array(col)[None, None, :] - img)
+    return img
+
+
+def _rainbow(rng, n):
+    """قوس قزح كامل (خ8): سما نهارية، شمس، مرج أخضر، القوس بالألوان السبعة، وسحاب بيضاء."""
+    k = n / 24.0
+    top = np.array([0.35, 0.58, 0.88]) + rng.normal(0, 0.04, 3)
+    bot = np.array([0.72, 0.84, 0.95]) + rng.normal(0, 0.04, 3)
+    img = _v_gradient(rng, np.clip(top, 0, 1), np.clip(bot, 0, 1), n)
+    _horizon(img, int(rng.integers(18, 20) * k), np.array([0.48, 0.64, 0.38]),
+             np.array([0.32, 0.48, 0.26]), rng=rng, k=k)
+    _disc(img, rng.uniform(2.5, 5.5) * k, rng.uniform(3.0, 6.0) * k,
+          rng.uniform(1.0, 1.4) * k, np.array([1.0, 0.96, 0.75]), glow=0.30, rng=rng, k=k)
+    _paint_rainbow(img, rng, n, strength=0.88)
+    for _ in range(int(rng.integers(2, 4))):          # سحاب صغيرة عند رجل القوس
+        x = rng.uniform(2, 22) * k
+        y = rng.uniform(3, 9) * k
+        _crisp_ellipse(img, x, y, rng.uniform(1.8, 2.8) * k, rng.uniform(0.55, 0.85) * k,
+                       np.array([0.97, 0.97, 0.98]), strength=0.55)
+    return np.clip(img, 0, 1)
+
+
 _GENERATORS = {
     "day": _day, "sunset": _sunset, "night": _night, "dawn": _dawn,
     "sea": _sea, "desert": _desert, "mountains": _mountains, "forest": _forest,
     "city": _city, "rain": _rain, "snow": _snow, "flowers": _flowers,
     "boat": _boat, "birds": _birds, "balloons": _balloons, "road": _road,
-    "beach": _beach, "fish": _fish, "kite": _kite,
+    "beach": _beach, "fish": _fish, "kite": _kite, "rainbow": _rainbow,
 }
 
 
@@ -918,7 +980,7 @@ _GENERATORS = {
 # «قارب في البحر وقت الغروب» → خلفية بحر + تلطيخ غروب + قارب حاد فوق المية.
 # كل حاجة إجرائية وحتمية: نفس البذرة = نفس الصورة بالحرف.
 # ============================================================
-_MOOD_IDS = ("day", "sunset", "night", "dawn", "rain", "snow")   # جو بيتلط على أي خلفية
+_MOOD_IDS = ("day", "sunset", "night", "dawn", "rain", "snow", "rainbow")   # جو بيتلط على أي خلفية (خ8: +قوس قزح)
 _OBJ_IDS = ("boat", "birds", "balloons", "fish", "kite")          # عناصر بتترسم فوق الخلفية
 _BG_IDS = ("sea", "desert", "mountains", "forest", "city", "road",
            "flowers", "beach")                                   # بيئات = خلفية كاملة (خ7: +شاطئ)
@@ -1079,6 +1141,9 @@ def _apply_mood(img, mood, rng, k, bg=None):
     elif mood == "rain":
         img = img * 0.72 + np.array([0.10, 0.11, 0.13])
         _rain_lines(img, rng, int(rng.integers(10, 20) * k), k=k)
+    elif mood == "rainbow":                            # خ8: قوس قزح فوق أي مشهد
+        img = img * 1.03 + 0.01
+        _paint_rainbow(img, rng, n, strength=0.58)
     elif mood == "snow":
         img = img * 0.85 + np.array([0.12, 0.13, 0.16])
         _snow_dots(img, rng, int(rng.integers(12, 24) * k), k=k)

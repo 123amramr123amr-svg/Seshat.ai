@@ -151,6 +151,13 @@ check("حساب بالكلمات: 15 على 3", try_math("15 على 3") == "15 �
 check("حساب بالكلمات: 8 زائد 2", try_math("8 زائد 2") == "8 + 2 = 10")
 check("حساب بالكلمات: 10 ناقص 4", try_math("10 ناقص 4") == "10 - 4 = 6")
 check("حساب بالكلمات: 9 مضروب في 7", try_math("9 مضروب في 7") == "9 × 7 = 63")
+# خ8: مسائل متسلسلة بأولوية عمليات
+check("خ8 متسلسلة: 2 زائد 3 زائد 10", try_math("2 زائد 3 زائد 10") == "2 + 3 + 10 = 15")
+check("خ8 متسلسلة: 5 ناقص 2 مضروب في 4", try_math("5 ناقص 2 مضروب في 4") == "5 - 2 * 4 = -3")
+check("خ8 متسلسلة: 10 على 2 على 5", try_math("10 على 2 على 5") == "10 / 2 / 5 = 1")
+check("خ8 متسلسلة: احسب 4 زائد 6 على 2", try_math("احسب 4 زائد 6 على 2") == "4 + 6 / 2 = 7")
+check("خ8 متسلسلة بالرموز: 5 + 3 * 2", try_math("5 + 3 * 2") == "5 + 3 * 2 = 11")
+check("خ8 حماية: جملة طويلة فيها «في» ما تتحسبش", try_math("الموضوع في التفاصيل دي كبير في 5 مواضع") is None)
 check("حساب بالكلمات: 100 تقسيم على 4", try_math("100 تقسيم على 4") == "100 ÷ 4 = 25")
 check("حساب بالكلمات: كم 12 في 12", try_math("كم 12 في 12") == "12 × 12 = 144")
 check("جملة عادية فيها «في» ما تتحسبش: في 2024 حصلت حاجة في 3 شهور",
@@ -204,68 +211,50 @@ r = b.reply("انت اهبل")
 check("المخ: الشتم بياخد رد مؤدب", r["source"] == "politeness" and "يسامحك" in r["response"])
 r = b.reply("7 × 8")
 check("المخ: الحساب مضمون", r["source"] == "math" and r["response"] == "7 × 8 = 56")
-# --- الصور الواقعية (imagegen.py) بخدمة وهمية: مفيش نت في الاختبارات ---
-from imagegen import ImageMaker, image_kind, add_style
+r = b.reply("2 زائد 3 زائد 10")
+check("المخ: الحساب المتسلسل مضمون (خ8)", r["source"] == "math" and r["response"] == "2 + 3 + 10 = 15", r["response"])
+
+# --- الهوية الموحدة (خ8): «انت مين» بيرجع تعريف النموذج الموحد ---
+from seshat_unified import SeshatOne as _SeshatOneTest
+one = _SeshatOneTest(_DummyEngine())
+one.learned = LearnedMemory(os.path.join(tmp_dir, "learned3.json"))
+one.cfg.api_key = ""
+one.cfg.search_enabled = False
+r = one.reply("انت مين")
+check("خ8 الهوية: «انت مين» = seshat 1.0 من النموذج الموحد",
+      r["source"] == "identity" and "seshat 1.0" in r["response"] and "خوفو" in r["response"], r["response"])
+r = one.reply("who are you?")
+check("خ8 الهوية: إنجليزي", r["source"] == "identity" and "seshat 1.0" in r["response"], r["response"])
+r = one.reply("مين اخترع الراديو")
+check("خ8 الهوية: مش هيدخ سؤال معلومات في الهوية", r["source"] != "identity", r["source"])
+# --- الصور من خوفو المحلي (imagegen.py بعد خ8: التوحيد — مفيش أي خدمة خارجية) ---
+from imagegen import ImageMaker, image_kind, add_style, __file__ as imagegen_source_path
 JPEG = b"\xff\xd8\xff\xe0" + b"0" * 64
-calls, clock = [], [1000.0]
-
-
-def fake_get(url, headers=None, timeout=60):
-    calls.append((url, headers or {}))
-    if "mymemory" in url:
-        return 200, {}, '{"responseData": {"translatedText": "A singing monkey"}}'.encode()
-    if "text.pollinations" in url:
-        if "Requested%20change" in url and "REWRITE" in url:
-            return 200, {}, b'"A singing monkey wearing a hat"'
-        return 500, {}, b""
-    if "REFUSE" in url:
-        return 403, {}, b"{}"
-    if "LIMIT" in url and not any("LIMIT" in u for u, _ in calls[:-1]):
-        return 402, {"Retry-After": "8"}, b'{"error": "FREE_LIMIT"}'
-    if "CARD" in url:
-        return 200, {}, b"<html>Free limit reached</html>"
-    return 200, {}, JPEG
-
-
-def fake_sleep(sec):
-    clock[0] += sec
-
-
-b.images = ImageMaker(store_dir=os.path.join(tmp_dir, "generated"), http_get=fake_get,
-                      sleep=fake_sleep, clock=lambda: clock[0])
+b.images = ImageMaker(store_dir=os.path.join(tmp_dir, "generated"), size=96, steps=20)
 r = b.reply("ارسم قرد بيغني")
-check("المخ: «ارسم» بيرجع صورة من عنوان السيرفر نفسه، والرد مفيهوش اسم خدمة",
-      r["source"] == "image" and r["image"] == "generated/%s.jpg" % r["image_id"]
+check("المخ: «ارسم» بيرجع صورة من عنوان السيرفر نفسه (خوفو المحلي)، والرد مفيهوش اسم خدمة",
+      r["source"] == "image" and r["image"] == "generated/%s.png" % r["image_id"]
       and "قرد بيغني" in r["response"] and "pollinations" not in str(r).lower(), str(r))
-check("المخ: الرد بيرجع قبل ما الصورة تتولد (مفيش طلب للخدمة لسه)", calls == [])
 first = r["image_id"]
 path, err = b.images.ensure(first)
 meta = b.images.meta(first)
-check("الصورة اتولدت واتخزنت", err is None and open(path, "rb").read() == JPEG
-      and meta["state"] == "ready", str(err))
-check("الوصف العربي اتترجم إنجليزي قبل ما يتبعت، واتطلبت صورة واقعية",
-      meta["prompt_en"] == "A singing monkey, realistic photo, sharp focus, detailed"
-      and "A%20singing%20monkey" in calls[-1][0] and "seed=%d" % meta["seed"] in calls[-1][0],
-      str(meta))
-n = len(calls)
+check("الصورة اتولدت محليًا من خوفو واتخزنت PNG سليمة",
+      err is None and open(path, "rb").read()[:8] == b"\x89PNG\r\n\x1a\n"
+      and meta["state"] == "ready" and meta["engine"] == "khufu", str(err))
+check("خوفو فهم الوصف العربي ورسم صنف/تركيبة حقيقية", bool(meta.get("resolved")), str(meta))
+check("مفيش أي خدمة صور خارجية في كود المولّد (pollinations اتشال خالص)",
+      "pollinations" not in open(imagegen_source_path, encoding="utf-8").read().lower())
+mt = os.path.getmtime(path)
 b.images.ensure(first)
-check("الصورة الجاهزة مبتتولدش تاني", len(calls) == n)
+check("الصورة الجاهزة مبتتولدش تاني", os.path.getmtime(path) == mt)
 r = b.reply("خليه لابس قبعة", last_image=first)
 edited = b.images.meta(r["image_id"])
 check("تعديل بالوصف: صورة جديدة بنفس البذرة والوصف القديم + التعديل",
       r["source"] == "image" and edited["seed"] == meta["seed"] and edited["parent"] == first
       and edited["prompt"] == "قرد بيغني، خليه لابس قبعة" and "مش تعديل" in r["response"], str(r))
-before = clock[0]
-b.images.ensure(r["image_id"])
-check("من غير مفتاح: بيستنى 45 ثانية بين الصورتين بدل ما الخدمة ترفض", clock[0] - before >= 45)
-check("تعديل من غير نموذج نصوص: الوصف كله بيتترجم مع بعض",
-      b.images.meta(r["image_id"])["rewritten"] is False
-      and "mymemory" in calls[-2][0], str(calls[-2:]))
-r2 = b.reply("حط له قبعة REWRITE", last_image=first)
-b.images.ensure(r2["image_id"])
-check("تعديل بنموذج نصوص: وصف إنجليزي جديد بعد التعديل",
-      b.images.meta(r2["image_id"])["prompt_en"].startswith("A singing monkey wearing a hat")
-      and b.images.meta(r2["image_id"])["rewritten"] is True, str(b.images.meta(r2["image_id"])))
+path, err = b.images.ensure(r["image_id"])
+check("التعديل اترسم محليًا من خوفو كمان", err is None
+      and b.images.meta(r["image_id"])["state"] == "ready", str(err))
 r = b.reply("صورة تانية", last_image=first)
 again = b.images.meta(r["image_id"])
 check("صورة تانية: نفس الوصف وبذرة جديدة", again["prompt"] == "قرد بيغني"
@@ -274,27 +263,11 @@ check("من غير صورة سابقة «خليه لابس قبعة» مش طل�
       b.reply("خليه لابس قبعة")["source"] != "image")
 check("id غلط أو مسار ملفات: مرفوض", b.images.meta("../../etc/passwd") is None
       and b.images.meta("zz") is None and b.images.ensure("0" * 16)[0] is None)
-limit = b.images.new("LIMIT cat")
-path, err = b.images.ensure(limit)
-check("الحد المجاني (402): بيستنى ويجرب تاني وينجح", path is not None, str(err))
-card = b.images.new("CARD cat")
-path, err = b.images.ensure(card)
-check("رد مش صورة (كارت الحد المجاني): مبيتعرضش وبيقول جرب تاني",
-      path is None and "Try again" in err and b.images.meta(card)["state"] == "pending", str(err))
-refused = b.images.new("REFUSE cat")
-path, err = b.images.ensure(refused)
-check("وصف مرفوض: رسالة واضحة", path is None and "refused" in err
-      and b.images.meta(refused)["state"] == "failed", str(err))
 check("نوع الملف من أول بايتات", image_kind(JPEG) == "jpeg" and image_kind(b"<html>") is None
       and image_kind(b"\x89PNG\r\n\x1a\n....") == "png")
-check("الأسلوب: الوصف اللي فيه أسلوب بيفضل زي ما هو",
-      add_style("a cat, cartoon style") == "a cat, cartoon style")
-keyed = ImageMaker(store_dir=os.path.join(tmp_dir, "generated2"), key="sk_test", http_get=fake_get,
-                   sleep=fake_sleep, clock=lambda: clock[0])
-keyed.ensure(keyed.new("a red car"))
-check("بمفتاح: المفتاح في الهيدر مش في العنوان",
-      calls[-1][1].get("Authorization") == "Bearer sk_test" and "sk_test" not in calls[-1][0]
-      and calls[-1][0].startswith("https://gen.pollinations.ai/image/"), str(calls[-1]))
+check("الأسلوب: add_style بيضبط الوصف من غير ما يغيّره",
+      add_style("a cat, cartoon style") == "a cat, cartoon style"
+      and add_style("  سمكة   ملونة  ") == "سمكة ملونة")
 r = b.reply("ارسم بالمربعات قرد بيغني")
 check("«ارسم بالمربعات»: رسم seshat نفسه مش صورة من المولّد",
       r["source"] == "draw" and not r["image"], str(r))
@@ -303,6 +276,16 @@ r = b.reply("ارسم قرد بيغني")
 check("المولّد مقفول (SESHAT_EXTERNAL_IMAGES=0): مفيش صورة خارجية",
       r["source"] == "draw" and not r["image"], str(r))
 b.cfg.external_images = True
+# --- النموذج الموحّد seshat 1.0 (خ8): سي شات + خوفو في مدخل واحد ---
+from seshat_unified import SeshatOne, MODEL_NAME
+one = SeshatOne(None)
+check("النموذج الموحّد: الاسم والهوية", one.model_name == "seshat 1.0"
+      and MODEL_NAME == "seshat 1.0" and "محلي" in one.identify()["external_services"])
+check("النموذج الموحّد: الحالة بتوضح فهم نصي + صور محلية من خوفو",
+      one.status()["unified"] is True and "خوفو" in one.status()["image_engine"])
+check("النموذج الموحّد: نفس عقد المخ شغال (أدب + حساب)",
+      one.reply("انت اهبل")["source"] == "politeness"
+      and one.reply("3 + 4")["response"] == "3 + 4 = 7")
 r = b.reply("علمني: س: ايه هواية عمرو ج: البرمجة")
 check("المخ: التعلم اليدوي", r["source"] == "learn")
 r = b.reply("ايه هواية عمرو")

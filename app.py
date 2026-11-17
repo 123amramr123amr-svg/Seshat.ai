@@ -21,7 +21,8 @@ from flask import Flask, jsonify, render_template, request, send_file
 
 import vision
 from engine import Seshat, drawings, _trim_memory
-from brain import Brain
+from brain import Brain  # noqa: F401 — لسه متصدّر للتوافق؛ السيرفر بيشغل SeshatOne
+from seshat_unified import SeshatOne
 from models import list_models
 
 # ---------------- خوفو (نموذج الصور) ----------------
@@ -98,11 +99,12 @@ print("⏳ جاري تحميل النموذج...")
 seshat = Seshat()
 print(f"✅ اتحمل النموذج — {seshat.num_params():,} معامل | المحرك: {seshat.engine_name}")
 
-print("⏳ تجهيز المخ (البحث + التعلم الذاتي + الصور + الأدب)...")
-brain = Brain(seshat)
+print("⏳ تجهيز النموذج الموحّد seshat 1.0 (سي شات + خوفو في واحد)...")
+brain = SeshatOne(seshat)
 st = brain.status()
-print(f"✅ المخ جاهز — بحث النت: {'شغال' if st['search'] else 'واقف'} | "
+print(f"✅ seshat 1.0 جاهز — بحث النت: {'شغال' if st['search'] else 'واقف'} | "
       f"مخ خارجي: {st['api_model'] if st['api'] else 'مش مفعل'} | "
+      f"الصور: {st['image_engine']} | "
       f"اتعلم {st['learned']} حاجة قبل كده")
 
 
@@ -118,13 +120,13 @@ def generated_image(name):
     وبعد كده بتتبعت من الملف المتخزن. لو فشلت → JSON فيه رسالة للمستخدم.
     الطلبات بتتسجل من /chat بس، فالعنوان ده ميقدرش يولّد حاجة من عنده.
     """
-    image_id = name[:-4] if name.endswith(".jpg") else ""
+    image_id = name[:-4] if name.endswith((".jpg", ".png")) else ""
     if brain.images.meta(image_id) is None:
         return jsonify({"error": "الصورة دي مش موجودة."}), 404
     path, error = brain.images.ensure(image_id)
     if path is None:
         return jsonify({"error": error}), 503
-    kind = (brain.images.meta(image_id) or {}).get("kind", "jpeg")
+    kind = (brain.images.meta(image_id) or {}).get("kind", "png")
     response = send_file(path, mimetype="image/" + kind, max_age=3600)
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response

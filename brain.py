@@ -13,7 +13,7 @@ seshat.chet — المخ الجديد (brain.py)
      على طول. وكمان يقدر تعلمه بيدويًا بصيغتين:
          علمني: س: اللعبة المفضلة لعمرو ج: الشطرنج
          علمني: ايه اللعبة المفضلة لعمرو؟ الشطرنج   (صيغة مرنة: سؤال؟ جواب)
-  4. الصور — "ارسم قطة بتبص للقمر" → صورة واقعية من مولّد صور خارجي (imagegen.py)، وتعديلها
+  4. الصور — "ارسم قطة بتبص للقمر" → صورة من **خوفو** (مولّد الصور المحلي imagegen.py)، وتعديلها
      بالوصف. "ارسم بالمربعات …" → النموذج المحلي بيرسم بنفسه (engine.draw).
   5. مخ خارجي اختياري — لو ضفت مفتاح API متوافق مع OpenAI (زرار الإعدادات
      ⚙ في الواجهة أو متغيرات البيئة)، الردود بتشتغل بشبكة عصبية ضخمة بترد
@@ -65,11 +65,10 @@ class BrainConfig:
         self.api_base = os.environ.get("SESHAT_API_BASE", "https://api.openai.com/v1")
         self.api_model = os.environ.get("SESHAT_API_MODEL", "gpt-4o-mini")
         self.search_enabled = os.environ.get("SESHAT_SEARCH", "1") != "0"
-        # الصور الواقعية بتيجي من مولّد صور خارجي (شوف imagegen.py). SESHAT_EXTERNAL_IMAGES=0
-        # بيقفله، وساعتها "ارسم" بيرجع لرسم seshat بالمربعات بس.
+        # الصور بتتولد محليًا 100% من خوفو (شوف imagegen.py) — جولة خ8: التوحيد.
+        # مفيش خدمة خارجية ولا مفاتيح خالص. SESHAT_EXTERNAL_IMAGES=0 بس بيحوّل
+        # "ارسم" لرسم seshat بالمربعات بدل صور خوفو.
         self.external_images = os.environ.get("SESHAT_EXTERNAL_IMAGES", "1") != "0"
-        # مفتاح مجاني من خدمة الصور: بيشيل اللوجو وحد الـ 45 ثانية (اختياري)
-        self.image_key = os.environ.get("SESHAT_IMAGE_KEY", "").strip()
         self.reload()
 
     def reload(self):
@@ -232,6 +231,17 @@ APOLOGY_EN = [
 
 _APOLOGY_RE = re.compile(
     r"^(اسف|آسف|اسفين|معلش|معليش|مش\s*قصدي|سامحني|sorry|my\s*bad)\b", re.I)
+
+# خ8: أسئلة الهوية — بترد من تعريف النموذج الموحد نفسه (IDENTITY_AR/EN)
+# مش من الكوربس، فالهوية بتتحدث مع أي جولة دمج من غير إعادة تدريب.
+_IDENTITY_Q = re.compile(
+    r"(?<![\u0600-\u06FF])(مين|من)\s*(انت|انتي|حضرتك)"
+    r"|(?<![\u0600-\u06FF])(انت|انتي|حضرتك)\s*(مين|ايه|إيه)"
+    r"|مين\s*(عملك|مطورك|مصنعك|صانعك)|مطورك\s*مين|مين\s*طورك"
+    r"|عرفني\s*بنفسك|عرف\s*نفسك|عرّفني\s*بنفسك|تعرف\s*على\s*نفسك"
+    r"|اسمك\s*(ايه|إيه)|ما\s*اسمك|انت\s*مين\s*ب?ال?ظبط|انت\s*ب?ال?ظبط\s*مين"
+    r"|who\s*are\s*you|what\s*are\s*you|what'?s\s*your\s*name|your\s*name"
+    r"|who\s*(made|built|created|developed)\s*you|introduce\s*yourself", re.I)
 
 
 def _is_arabic_text(text):
@@ -451,6 +461,87 @@ def _math_word_sym(sym):
     return " ".join(sym.split())
 
 
+# ------------------------------------------------------------------
+# خ8: مسائل متسلسلة بالكلمات («2 زائد 3 زائد 10» / «5 ناقص 2 مضروب في 4»)
+# بتحول كلمات العمليات لرموز، وتتأكد إن اللي فاضل أرقام وعمليات بس
+# (عشان «في» العادي في الجمل ما تتحسبش)، وبعدين تقيّم بأولوية عمليات
+# حقيقية (ضرب/قسمة قبل جمع/طرح) — من غير eval خالص.
+# ------------------------------------------------------------------
+def _ar_word_re(word):
+    """كلمة عملية عربي بكلمة كاملة بس (فيها ما تتعدلش جوه)."""
+    return re.compile(r"(?<![\u0600-\u06FF])" + re.escape(word) + r"(?![\u0600-\u06FF])")
+
+
+_WORD_OPS_ORDERED = [        # الأطول الأول عشان «مضروب في» ما تتبوظش بـ«في»
+    ("مضروب في", "*", None), ("تقسيم على", "/", None), ("مقسوم على", "/", None),
+    ("زائد", "+", None), ("ناقص", "-", None), ("ضرب", "*", None),
+    ("على", "/", None), ("في", "*", None),
+]
+for _i, (_w, _s, _r) in enumerate(_WORD_OPS_ORDERED):
+    _WORD_OPS_ORDERED[_i] = (_w, _s, _ar_word_re(_w))
+_X_RE = re.compile(r"(?<![A-Za-z])x(?![A-Za-z])", re.I)          # 2 x 3 (حرف x لوحده)
+_MATH_STRIP_FILLER = re.compile(r"^(احسبلي|احسب|calc|calculate)\s+", re.I)
+_MATH_CHAIN_OK = re.compile(r"^[\d\s+\-*/.]+$")
+
+
+def _word_expr(message):
+    """مسألة متسلسلة بالكلمات → تعبير رمزي نقي («2 + 3 + 10»)، أو None."""
+    if len(message.split()) > 12:
+        return None
+    t = _MATH_STRIP_FILLER.sub("", message.strip())
+    for w, sym, rx in _WORD_OPS_ORDERED:
+        t = rx.sub(" %s " % sym, t)
+    t = _X_RE.sub(" * ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    if not t or not _MATH_CHAIN_OK.search(t):
+        return None
+    return t
+
+
+def _eval_math_chain(expr):
+    """تقييم تعبير رمزي بأولوية عمليات — بيرجع نص الناتج أو None."""
+    toks = re.findall(r"\d+(?:\.\d+)?|[+\-*/]", expr)
+    merged = []                                            # دمج الناقص الأحادي
+    for t in toks:
+        if t == "-" and (not merged or merged[-1] in "+-*/"):
+            merged.append("u-")
+        else:
+            merged.append(t)
+    nums, ops = [], []
+    sign = 1.0
+    for t in merged:
+        if t == "u-":
+            sign = -sign
+            continue
+        if t in "+-*/":
+            if not nums:
+                return None
+            ops.append(t)
+        else:
+            nums.append(sign * float(t))
+            sign = 1.0
+    if len(nums) < 2 or len(ops) != len(nums) - 1:
+        return None
+    # أولوية الضرب والقسمة الأول
+    vals, ops2 = [nums[0]], []
+    for o, v in zip(ops, nums[1:]):
+        if o == "*":
+            vals[-1] *= v
+        elif o == "/":
+            if v == 0:
+                return None
+            vals[-1] /= v
+        else:
+            ops2.append(o)
+            vals.append(v)
+    r = vals[0]
+    for o, v in zip(ops2, vals[1:]):
+        r = r + v if o == "+" else r - v
+    if abs(r - round(r)) < 1e-9:
+        return str(int(round(r)))
+    return ("%.6f" % r).rstrip("0").rstrip(".")
+
+
 def try_math(message):
     m = _MATH_ONE.search(message)
     if m:
@@ -458,13 +549,13 @@ def try_math(message):
     elif len(message.split()) <= 6:
         mw = _MATH_WORDS.search(message)
         if not mw:
-            return None
+            return _try_chain_math(message)
         sym = _MATH_WORD_SYM.get(_math_word_sym(mw.group(2)))
         if not sym:
-            return None
+            return _try_chain_math(message)
         a, b = mw.group(1), mw.group(3)
     else:
-        return None
+        return _try_chain_math(message)
     a = a.replace(",", ".")
     b = b.replace(",", ".")
     try:
@@ -487,6 +578,17 @@ def try_math(message):
     else:
         out = ("%.6f" % r).rstrip("0").rstrip(".")
     return "%s %s %s = %s" % (a, sym, b, out)
+
+
+def _try_chain_math(message):
+    """خ8: المسائل المتسلسلة («2 زائد 3 زائد 10») — بعد ما الطرق القديمة ما لقوش."""
+    expr = _word_expr(message)
+    if not expr:
+        return None
+    r = _eval_math_chain(expr)
+    if r is None:
+        return None
+    return "%s = %s" % (expr, r)
 
 
 # ============================================================
@@ -820,22 +922,26 @@ def llm_vision(message, image_url, cfg):
 # ============================================================
 class Brain:
 
+    # خ8: هوية النموذج — الافتراضي نص سي شات القديم، وSeshatOne بيديله
+    # تعريف seshat 1.0 الموحد، فسؤال «انت مين» بيرجع هوية النموذج الموحد دايمًا.
+    IDENTITY_AR = ("أنا seshat — نموذج ذكاء اصطناعي مصري طوّره عمرو أحمد من الصفر، "
+                   "بتكلم عربي وإنجليزي وبحسب وبكتب أكواد وبرسم.")
+    IDENTITY_EN = ("I am seshat — an Egyptian AI model built from scratch by Amr Ahmed. "
+                   "I chat in Arabic and English, do math, write code, and draw.")
+
     def __init__(self, engine=None):
         self.engine = engine            # ممكن يكون None في وضع المحلي الخالص
         self.cfg = BrainConfig()
         self.learned = LearnedMemory()
         from imagegen import ImageMaker
-        self.images = ImageMaker(key=self.cfg.image_key, llm=self._llm_translate)
-
-    def _llm_translate(self, ask):
-        """ترجمة وصف الصورة بالمخ الخارجي لو متربط (غير كده imagegen بيستخدم طرق تانية)"""
-        return llm_answer(ask, self.cfg) if self.cfg.api_key else None
+        self.images = ImageMaker()
 
     def status(self):
         return {"search": self.cfg.search_enabled, "api": bool(self.cfg.api_key),
                 "api_model": self.cfg.api_model if self.cfg.api_key else "",
                 "learned": len(self.learned.items),
-                "politeness": True, "images": True}
+                "politeness": True, "images": True,
+                "images_engine": "خوفو (محلي)"}
 
     def _out(self, response, source, source_label="", thinking="",
              confidence=1.0, fallback=False, matched="", suggestion="",
@@ -884,9 +990,15 @@ class Brain:
         if math:
             return self._out(math, "math", "حساب", thinking="حسبتها بنفسي بدقة")
 
+        # 3.5) سؤال الهوية — من تعريف النموذج الموحد نفسه مش من الكوربس
+        if _IDENTITY_Q.search(msg) and len(msg) <= 60:
+            return self._out(self.IDENTITY_AR if _is_arabic_text(msg) else self.IDENTITY_EN,
+                             "identity", "هوية",
+                             thinking="سؤال عن هويتي — بجاوب من تعريفي الموحد")
+
         # 4) الصور.
-        #    • "ارسم / اعمل صورة …" → صورة واقعية من مولّد الصور (imagegen.py). الرد بيرجع
-        #      فورًا والصورة بتتولد لما المتصفح يطلبها من /generated/<id>.jpg.
+        #    • "ارسم / اعمل صورة …" → خوفو بيفهم الوصف العربي/الإنجليزي ويرسم على 750×750.
+        #      الرد بيرجع فورًا والصورة بتتولد لما المتصفح يطلبها من /generated/<id>.png.
         #    • "ارسم بالمربعات …" أو المولّد مقفول → رسم seshat نفسه (النموذج المحلي).
         #    • فيه صورة اتولدت قبل كده (last_image) والكلام تعديل عليها ("خليها بالليل") أو
         #      "صورة تانية" → صورة جديدة مبنية على وصف القديمة.
@@ -908,7 +1020,7 @@ class Brain:
             return self._out(("بجهزلك صورة «%s»." if arabic else "Making an image of “%s”.")
                              % draw["prompt"], "image", "صور",
                              thinking=("طلب صورة: " if arabic else "image request: ") + draw["prompt"],
-                             image="generated/%s.jpg" % image_id, image_id=image_id, confidence=0.9)
+                             image="generated/%s.png" % image_id, image_id=image_id, confidence=0.9)
         if last and self.cfg.external_images:
             change = parse_image_edit(msg)
             if change and change[0] == "again":
@@ -917,7 +1029,7 @@ class Brain:
                                  % last["prompt"], "image", "صور",
                                  thinking="صورة تانية لنفس الوصف" if arabic
                                  else "another image for the same description",
-                                 image="generated/%s.jpg" % image_id, image_id=image_id,
+                                 image="generated/%s.png" % image_id, image_id=image_id,
                                  confidence=0.9)
             if change:
                 image_id = self.images.new("", parent=last["id"], edit=change[1])
@@ -928,7 +1040,7 @@ class Brain:
                 return self._out(text % self.images.meta(image_id)["prompt"], "image", "صور",
                                  thinking=("تعديل بالوصف على آخر صورة: " if arabic
                                            else "edit by description on the last image: ") + change[1],
-                                 image="generated/%s.jpg" % image_id, image_id=image_id,
+                                 image="generated/%s.png" % image_id, image_id=image_id,
                                  confidence=0.8)
 
         # 5) تعليم يدوي: علمني: س: … ج: …

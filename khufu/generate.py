@@ -39,8 +39,12 @@ _model_cache = {}
 # خ5 — الرسم الهجين: وزن الرسمة الحادة ضد طبقة الأجواء، ودقة ضغط الأجواء.
 # الأجواء بتتضغط على 24×24 وبعدها بتتكبر — الضباب القوي ده بيقطع الأشكال
 # (مفيش قارب شبح بيظهر في مكان تاني) وبيسيب بس تدرج الألوان الجوي.
+# خ8 (الوضوح والطاقة): وزن الرسمة الحادة اترفع 0.78 → 0.82 عشان الشكل يبان أدق،
+# والترويس اتزاد، وفوقهم طبقة طاقة (_vivid): تشبع أعلى + تباين ناعم.
 ATMO_PX = 24
-CRISP_WEIGHT = 0.78
+CRISP_WEIGHT = 0.82
+VIVID_SAT = 1.20        # مضاعف التشبع اللوني — ألوان بطاقة أعلى
+VIVID_CURVE = 0.28      # وزن منحنى التباين الناعم (smoothstep)
 
 
 class KhufuImage:
@@ -149,13 +153,25 @@ def _ddpm_sample(cid, size, steps, seed, _model=None):
     return img01
 
 
+def _vivid(img01):
+    """خ8 — طبقة الطاقة: تشبع لوني أعلى (الألوان تبقى أصفى) + منحنى تباين ناعم
+    (smoothstep) بيقوي الفرق بين الظل والنور من غير ما يقطع التفاصيل. حتمي 100%."""
+    lum = (img01 * np.array([0.299, 0.587, 0.114], dtype=np.float32)).sum(axis=2, keepdims=True)
+    sat = lum + (img01 - lum) * VIVID_SAT
+    x = np.clip(sat, 0.0, 1.0)
+    curve = x * x * (3.0 - 2.0 * x)                       # S-curve مونوتوني ناعم
+    out = x * (1.0 - VIVID_CURVE) + curve * VIVID_CURVE
+    return np.clip(out, 0.0, 1.0)
+
+
 def _blend_hybrid(crisp, img01, size):
-    """خ5/خ6 — خلط الرسمة الحادة بأجواء خوفو: 78% رسمة حادة + 22% جو متضغوط
-    + ترويس خفيف. نفس المعادلة للمسارين (صنف واحد وتركيبة مركبة)."""
+    """خ5/خ6/خ8 — خلط الرسمة الحادة بأجواء خوفو: 82% رسمة حادة + 18% جو متضغوط
+    + ترويس أقوى + طبقة طاقة (تشبع وتباين). نفس المعادلة للمسارين (صنف واحد
+    وتركيبة مركبة)."""
     atmo = _atmosphere(img01, size)
     blended = CRISP_WEIGHT * crisp + (1.0 - CRISP_WEIGHT) * atmo
-    blended = resize._unsharp(blended, amount=0.22)
-    return np.clip(blended, 0.0, 1.0)
+    blended = resize._unsharp(blended, amount=0.30)
+    return _vivid(np.clip(blended, 0.0, 1.0))
 
 
 def generate(cid, size=64, steps=50, seed=None, _model=None):
