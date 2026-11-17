@@ -453,3 +453,36 @@ a: round kh8 raised the crisp procedural weight to 82%, strengthened edge sharpe
 
 q: explain in detail how a drawing request travels through the unified model until the final picture
 a: first the message enters the unified intent pipeline: politeness guard, math guard, then the image parser extracts the description. khufu normalizes arabic text, then runs five lookup stages to map words to scene classes and counts. the procedural renderer draws the sky, ground and objects as sharp shapes at the full output resolution of 750x750, while the trained diffusion network produces its own learned atmosphere colors from pure noise in fifty denoising steps with clipped denoising for stability. the two layers are blended eighty-two percent crisp and eighteen percent atmosphere, then unsharp-masked and passed through the vivid saturation and contrast layer. the png is saved with the prompt and seed so the same request always reproduces the same picture, and the chat reply returns instantly with a local url — completely offline.
+
+q: What is the largest planet in our solar system?
+a: Jupiter — it is a gas giant so large that all the other planets could fit inside it.
+
+q: Who wrote Romeo and Juliet?
+a: William Shakespeare, the English playwright, wrote it around 1595.
+
+q: What is the speed of light?
+a: About 300,000 km per second in vacuum — the fastest speed physics allows.
+
+q: What is the boiling point of water?
+a: 100 degrees Celsius at sea level; it drops at higher altitude.
+
+q: Who painted the Mona Lisa?
+a: Leonardo da Vinci painted it in the early 16th century; it hangs in the Louvre.
+
+q: What is the longest river in the world?
+a: The Nile in Africa is often listed as the longest, with the Amazon close behind.
+
+q: What is DNA?
+a: Deoxyribonucleic acid — the instruction book inside cells that tells living things how to grow.
+
+q: How many continents are there?
+a: Seven: Africa, Antarctica, Asia, Australia, Europe, North America and South America.
+
+q: What is the tallest mountain on Earth?
+a: Mount Everest in the Himalayas, rising over 8,800 meters above sea level.
+
+q: Who invented the telephone?
+a: Alexander Graham Bell patented the first practical telephone in 1876.
+
+q: Walk me through what happens inside seshat 1.0 from the moment a message arrives.
+a: The message first meets politeness: insults are met with forgiveness, never with anger. Then math tries its deterministic paths — symbols and Arabic word operations. If the question is about identity, the unified definition answers. Drawing requests go to the local image engine: a multi-stage matcher finds the scene class even through synonyms, then the procedural painter and the diffusion core blend their work on full resolution. Knowledge questions try learned memory, then the corpus, then the web when allowed. Everything runs in one repository, fully local, no external image services.
