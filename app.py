@@ -298,8 +298,10 @@ def khufu_gen():
                              + " أو ".join(str(s) for s in khufu_scenes.SIZES)), 400
     if steps not in (20, 50, 100):
         return jsonify(error="الجودة لازم تكون 20 أو 50 أو 100 خطوة"), 400
-    # خ4: مفيش رفض تاني — أي نص بيتفسر لأقرب صنف (nearest_class)
-    cid = subject if subject in khufu_scenes.CLASS_IDS else khufu_scenes.nearest_class(subject)
+    # خ6: النص الخام بيمر لخوفو زي ما هو — generate جوه خوفو بيحل بنفسه:
+    # صنف واحد → مسار الصنف العادي، ووصف حر فيه أكتر من عنصر → تركيبة مركبة.
+    # (خوفو عمره ما بيرفض — أقرب صنف دايمًا موجود جوّاه).
+    cid = str(subject).strip()
     jid = uuid.uuid4().hex[:12]
     with _khufu_lock:
         _khufu_jobs[jid] = {"status": "running", "cid": cid, "size": size,

@@ -756,6 +756,255 @@ _GENERATORS = {
 }
 
 
+# ============================================================
+# جولة خ6 — تركيبات مركبة بوصف حر: بيئة + جو + عناصر
+# «قارب في البحر وقت الغروب» → خلفية بحر + تلطيخ غروب + قارب حاد فوق المية.
+# كل حاجة إجرائية وحتمية: نفس البذرة = نفس الصورة بالحرف.
+# ============================================================
+_MOOD_IDS = ("day", "sunset", "night", "dawn", "rain", "snow")   # جو بيتلط على أي خلفية
+_OBJ_IDS = ("boat", "birds", "balloons")                         # عناصر بتترسم فوق الخلفية
+_BG_IDS = ("sea", "desert", "mountains", "forest", "city", "road",
+           "flowers")                                            # بيئات = خلفية كاملة
+
+_AR_NUM = {"واحد": 1, "اثنين": 2, "اتنين": 2, "ثلاث": 3, "تلاته": 3, "تلاتة": 3,
+           "اربع": 4, "اربعه": 4, "خمس": 5, "خمسه": 5, "ست": 6, "سته": 6,
+           "سبع": 7, "سبعه": 7, "تمنيه": 8, "تسع": 9}
+
+# كلمات الجمع — من غير رقم صريح بتسيب العدد للرسّام (سرب طيور/بالونات/قوارب)
+_PLURAL_WORDS = {"قوارب", "طيور", "الطيور", "عصافير", "birds",
+                 "بالونات", "البالونات", "balloons"}
+
+
+def _find_words(t):
+    """كل كلمة معروفة في النص بترتيب ظهورها — أطول تطابق الأول وعلامات متداخلة ممنوعة
+    («بالونات» ما تتحسبش تاني «بالون»). المرادفات نفسها بتتطبّع عشان «المدينة» تلاقي
+    «المدينه» في النص المتطبع."""
+    flat = [(w, cid) for cid, ws in _SYNONYMS.items() for w in ws]
+    flat = [( _norm_ar(w), cid) for w, cid in flat]
+    flat.sort(key=lambda x: -len(x[0]))
+    used = [False] * len(t)
+    found = []
+    for w, cid in flat:
+        if len(w) < 2:
+            continue
+        start = 0
+        while True:
+            i = t.find(w, start)
+            if i < 0:
+                break
+            end = i + len(w)
+            if not any(used[i:end]):
+                for j in range(i, end):
+                    used[j] = True
+                found.append((cid, w, i))
+            start = end
+    found.sort(key=lambda x: x[2])
+    return found
+
+
+def _count_before(t, pos):
+    """عدّاد صريح قبل كلمة العنصر: رقم (3/٣) أو كلمة عربي («تلاتة طيور») — سقف 6.
+    بيرجع None لو مفيش عدّاد صريح (ساعتها الجمع/المفرد بيتقرر من الكلمة نفسها)."""
+    before = t[max(0, pos - 7):pos]
+    digits = "".join(ch if ch.isdigit() else " " for ch in before).split()
+    if digits:
+        try:
+            return max(1, min(6, int(digits[-1])))
+        except ValueError:
+            pass
+    for aw, v in _AR_NUM.items():
+        if aw in before:
+            return max(1, min(6, v))
+    return None
+
+
+def parse_composite(text):
+    """نص حر → مواصفة تركيبة:
+      {"bg": بيئة، "mood": جو أو None، "objects": [(صنف، عدد أو None)، …]}
+    العدد: رقم صريح أو كلمة عدد بيغلب، ولو مفيش — الكلمة الجمع (طيور/بالونات/قوارب)
+    بتسيب العدد للرسّام (سرب افتراضي)، والمفرد بيرسم واحد. بترجع None لو مفيش
+    أي كلمة معروفة. كلمة واحدة بس مش تركيبة — بتترجع للمسار العادي (خ4: أقرب صنف)."""
+    t = _norm_ar((text or "").strip().lower())
+    if not t:
+        return None
+    found = _find_words(t)
+    if not found:
+        return None
+    bg, mood, objects, seen = None, None, [], set()
+    for cid, w, pos in found:
+        if cid in seen:
+            continue
+        seen.add(cid)
+        if cid in _BG_IDS and bg is None:
+            bg = cid
+        elif cid in _MOOD_IDS and mood is None:
+            mood = cid
+        elif cid in _OBJ_IDS:
+            explicit = _count_before(t, pos)
+            if explicit is not None:
+                count = explicit
+            elif _norm_ar(w) in _PLURAL_WORDS:
+                count = None                   # جمع من غير رقم → الرسّام يقرر
+            else:
+                count = 1                      # مفرد → واحد
+            objects.append((cid, count))
+    if bg is None and mood is None and not objects:
+        return None
+    return {"bg": bg, "mood": mood, "objects": objects}
+
+
+def is_composite(spec):
+    """هل المواصفة تركيبة فعلية (مش مجرد صنف واحد)؟
+    بيئة + عناصر، أو جو مع أي حاجة تانية، أو بيئة وجو مع بعض، أو عنصرين فما فوق."""
+    if not spec:
+        return False
+    bg, mood, objs = spec.get("bg"), spec.get("mood"), spec.get("objects") or []
+    if bg and objs:
+        return True
+    if (bg and mood) or (mood and objs):
+        return True
+    if not bg and not mood and len(objs) >= 2:
+        return True
+    return False
+
+
+def make_composite(spec, seed, res=None):
+    """رسمة تركيبة مركبة على أي دقة — حتمية لنفس البذرة.
+    ترتيب الرسم ثابت: خلفية البيئة → تلطيخ الجو → العناصر بالترتيب اللي اتقالوا."""
+    n = int(res or BASE)
+    k = n / 24.0
+    rng = np.random.default_rng(int(seed))
+    bg, mood = spec.get("bg"), spec.get("mood")
+    if bg is None and mood is not None:
+        bg, mood = mood, None              # جو لوحده من غير بيئة = مشهد كامل بنفسه
+    if bg is None:
+        bg = "day"
+    img = _GENERATORS[bg](rng, n)
+    if mood is not None:
+        img = _apply_mood(img, mood, rng, k, bg=bg)
+    for cid, count in spec.get("objects") or []:
+        if cid == "boat":
+            img = _paint_boat(img, rng, n, count, water_bg=(bg == "sea"))
+        elif cid == "birds":
+            img = _paint_birds(img, rng, n, count)
+        elif cid == "balloons":
+            img = _paint_balloons(img, rng, n, count)
+    return np.clip(img, 0, 1)
+
+
+def _apply_mood(img, mood, rng, k, bg=None):
+    """تلطيخ الجو على الخلفية: ليل بتلطيخ ونجوم وقمر، غروب بتدرج دافي، مطر بخطوط…
+    المدينة بتتلطخ أقل في الليل عشان نوافذها المضيوعة ما تختفيش."""
+    n = img.shape[0]
+    if mood == "night":
+        factor = 0.74 if bg == "city" else 0.40
+        img = img * factor + np.array([0.02, 0.03, 0.09])
+        _disc(img, rng.uniform(4, 20) * k, rng.uniform(3, 7) * k,
+              rng.uniform(1.1, 1.6) * k, np.array([0.95, 0.95, 0.85]),
+              glow=0.25, rng=rng, k=k)
+        _stars(img, rng, int(rng.integers(14, 28) * k))
+    elif mood == "sunset":
+        w = np.linspace(0.42, 0.12, n)[:, None, None]        # قوي فوق وخفيف تحت
+        grad = np.tile(np.array([0.90, 0.50, 0.22]), (n, 1, 1))
+        img = img * (1 - w) + grad * w
+    elif mood == "dawn":
+        w = np.linspace(0.36, 0.10, n)[:, None, None]
+        grad = np.tile(np.array([0.92, 0.68, 0.68]), (n, 1, 1))
+        img = img * (1 - w) + grad * w
+    elif mood == "day":
+        img = img * 1.07 + 0.02
+    elif mood == "rain":
+        img = img * 0.72 + np.array([0.10, 0.11, 0.13])
+        _rain_lines(img, rng, int(rng.integers(10, 20) * k), k=k)
+    elif mood == "snow":
+        img = img * 0.85 + np.array([0.12, 0.13, 0.16])
+        _snow_dots(img, rng, int(rng.integers(12, 24) * k), k=k)
+    return img
+
+
+def _paint_boat(img, rng, n, count=1, water_bg=True):
+    """قارب/قوارب فوق أي خلفية: على البحر بيلمس المية مباشرة، وغير كده بيرسم
+    بركة مية صغيرة أول عشان القارب يفضل مقروء حتى فوق الصحرا أو العشب.
+    جمع من غير رقم («قوارب») → 3 قوارب موزعين."""
+    k = n / 24.0
+    if not count:
+        count = 3
+    if count == 1:
+        positions = [(rng.uniform(6, 18) * k, rng.uniform(0.58, 0.74) * n)]
+    else:
+        xs = np.linspace(0.22, 0.80, count)
+        positions = [(x * n + rng.uniform(-1.5, 1.5) * k,
+                      rng.uniform(0.60, 0.72) * n) for x in xs]
+    for bx, wy in positions:
+        if not water_bg:
+            pw = rng.uniform(4.0, 5.5) * k
+            _crisp_ellipse(img, bx, wy + 0.8 * k, pw, 0.9 * k,
+                           np.array([0.10, 0.32, 0.52]), strength=0.55)
+        hull_w = rng.uniform(2.4, 3.2) * k
+        hull_h = rng.uniform(0.6, 1.0) * k
+        sail_h = rng.uniform(2.8, 4.6) * k
+        hull = np.clip(np.array([0.42, 0.24, 0.12]) + rng.normal(0, 0.05, 3), 0, 1)
+        sail = (np.array([0.96, 0.95, 0.90]) if rng.random() < 0.6
+                else np.clip(np.array([0.85, 0.30, 0.25]) + rng.normal(0, 0.04, 3), 0, 1))
+        _fill_poly(img, [(bx - hull_w / 2, wy), (bx + hull_w / 2, wy),
+                         (bx + hull_w * 0.32, wy + hull_h),
+                         (bx - hull_w * 0.32, wy + hull_h)], hull, strength=0.9)
+        mast_x = bx + rng.uniform(-0.4, 0.4) * k
+        _stroke(img, mast_x, wy, mast_x, wy - sail_h, np.array([0.30, 0.20, 0.10]),
+                w=0.5 * k, strength=0.9)
+        side = 1.0 if rng.random() < 0.5 else -1.0
+        _fill_poly(img, [(mast_x, wy - sail_h), (mast_x, wy - 0.5 * k),
+                         (mast_x + side * rng.uniform(1.4, 2.2) * k, wy - 0.7 * k)],
+                   sail, strength=0.92)
+        ref_y = int(wy + hull_h + 0.9 * k)
+        if 0 <= ref_y < n:
+            x0 = max(0, int(bx - hull_w * 0.4))
+            x1 = min(n, int(bx + hull_w * 0.4))
+            img[ref_y, x0:x1] = img[ref_y, x0:x1] * 0.75 + 0.12
+    return img
+
+
+def _paint_birds(img, rng, n, count=None):
+    """طيور V بأجنحة أنحف (نفس إصلاح خ5) فوق منطقة السما — أي خلفية."""
+    k = n / 24.0
+    dark = np.clip(np.array([0.15, 0.16, 0.20]) + rng.normal(0, 0.04, 3), 0, 1)
+    if not count:
+        count = int(rng.integers(4, 9))
+    for _ in range(int(count)):
+        x = rng.uniform(2, 22) * k
+        y = rng.uniform(2, 11) * k
+        s = rng.uniform(0.55, 1.0) * k          # أصغر — طير مش خفاش
+        wing_w = max(0, int(0.12 * k))          # جنح أنحف
+        _stroke(img, x - s, y - s * 0.35, x, y + s * 0.15, dark, w=wing_w)
+        _stroke(img, x, y + s * 0.15, x + s, y - s * 0.35, dark, w=wing_w)
+    return img
+
+
+def _paint_balloons(img, rng, n, count=None):
+    """بالونات ملونة حادة (بيضاوي + لمعة + عقدة + خيط) فوق السما — أي خلفية."""
+    k = n / 24.0
+    palette = ((0.95, 0.30, 0.35), (0.30, 0.55, 0.95), (0.98, 0.75, 0.25),
+               (0.35, 0.75, 0.35), (0.85, 0.40, 0.85), (0.95, 0.55, 0.20))
+    if not count:
+        count = int(rng.integers(4, 8))
+    for _ in range(int(count)):
+        x = rng.uniform(3, 21) * k
+        y = rng.uniform(3, 10) * k
+        r = rng.uniform(1.0, 1.7) * k
+        col = np.clip(np.array(palette[int(rng.integers(0, len(palette)))])
+                      + rng.normal(0, 0.03, 3), 0, 1)
+        rx, ry = r * 0.85, r * 1.05
+        _crisp_ellipse(img, x, y, rx, ry, col)
+        _crisp_ellipse(img, x - rx * 0.35, y - ry * 0.40, rx * 0.20, ry * 0.26,
+                       np.array([1.0, 1.0, 1.0]), strength=0.35)
+        _fill_poly(img, [(x - 0.22 * k, y + ry), (x + 0.22 * k, y + ry),
+                         (x, y + ry + 0.45 * k)], col, strength=0.92)
+        _stroke(img, x, y + ry + 0.4 * k, x + rng.uniform(-0.8, 0.8) * k,
+                min(n - 1.0, y + ry + rng.uniform(3.0, 5.5) * k),
+                np.array([0.85, 0.85, 0.85]), w=0, strength=0.5)
+    return img
+
+
 def make_sample(cid, seed, res=None):
     """عينة واحدة من صنف — نفس البذرة على نفس الدقة = نفس الصورة بالحرف
     (مضمون للاختبارات). res اختيارية لو محتاج ترسم على دقة تانية."""

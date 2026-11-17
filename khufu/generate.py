@@ -118,16 +118,9 @@ def _resolve(cid):
     return scenes.nearest_class(str(cid))
 
 
-def generate(cid, size=64, steps=50, seed=None, _model=None):
-    """العقد اللي app.py بيستدعيه: (KhufuImage, cid)."""
-    cid = _resolve(cid)
-    if int(size) not in scenes.SIZES:
-        raise ValueError("الأبعاد لازم تكون %s" % (scenes.SIZES,))
-    if int(steps) not in scenes.STEPS:
-        raise ValueError("الخطوات لازم تكون %s" % (scenes.STEPS,))
-    size, steps = int(size), int(steps)
-    seed = int(seed) if seed not in (None, "") else secrets.randbelow(2**31)
-
+def _ddpm_sample(cid, size, steps, seed, _model=None):
+    """مسار DDPM الخام (خ6: اتفصل عشان مسار التركيبات يستخدمه هو كمان):
+    بيرجع مصفوفة [0,1] على دقة المخرج — نفس clip denoised وترتيب ts التنازلي."""
     model = _model or load_model()
     alphas, abar = _tables()
     g = torch.Generator().manual_seed(seed)
@@ -150,16 +143,60 @@ def generate(cid, size=64, steps=50, seed=None, _model=None):
                 + (1 - anext).sqrt() * torch.randn(x.shape, generator=g)
         else:
             x = x0                                      # آخر خطوة من غير ضجيج
-
     img01 = ((x.clamp(-1, 1) + 1) / 2).numpy()[0].transpose(1, 2, 0)
     if size != scenes.BASE:
         img01 = resize.resize_lanczos(img01, size, sharpen=False)
+    return img01
 
-    # خ5 — الرسم الهجين: الرسمة الحادة (بنفس البذرة) هي الأساس، وأجواء خوفو
-    # بتضيف تنفس لوني، وترويس خفيف بيبرز الحواف. الكائن بقى ظاهر ومقروء.
-    crisp = np.clip(scenes.make_sample(cid, seed=seed, res=size), 0.0, 1.0)
+
+def _blend_hybrid(crisp, img01, size):
+    """خ5/خ6 — خلط الرسمة الحادة بأجواء خوفو: 78% رسمة حادة + 22% جو متضغوط
+    + ترويس خفيف. نفس المعادلة للمسارين (صنف واحد وتركيبة مركبة)."""
     atmo = _atmosphere(img01, size)
     blended = CRISP_WEIGHT * crisp + (1.0 - CRISP_WEIGHT) * atmo
     blended = resize._unsharp(blended, amount=0.22)
-    img01 = np.clip(blended, 0.0, 1.0)
+    return np.clip(blended, 0.0, 1.0)
+
+
+def generate(cid, size=64, steps=50, seed=None, _model=None):
+    """العقد اللي app.py بيستدعيه: (KhufuImage, cid).
+    خ6: لو النص وصف حر فيه أكتر من عنصر/جو — بيروح لمسار التركيبة المركبة."""
+    if int(size) not in scenes.SIZES:
+        raise ValueError("الأبعاد لازم تكون %s" % (scenes.SIZES,))
+    if int(steps) not in scenes.STEPS:
+        raise ValueError("الخطوات لازم تكون %s" % (scenes.STEPS,))
+    size, steps = int(size), int(steps)
+    seed = int(seed) if seed not in (None, "") else secrets.randbelow(2**31)
+
+    spec = scenes.parse_composite(cid)
+    if spec is not None and scenes.is_composite(spec):
+        return generate_composite(cid, size=size, steps=steps, seed=seed, _spec=spec)
+
+    cid = _resolve(cid)
+    img01 = _ddpm_sample(cid, size, steps, seed, _model=_model)
+    crisp = np.clip(scenes.make_sample(cid, seed=seed, res=size), 0.0, 1.0)
+    img01 = _blend_hybrid(crisp, img01, size)
     return KhufuImage(np.clip(img01 * 255 + 0.5, 0, 255)), cid
+
+
+def generate_composite(text, size=64, steps=50, seed=None, _spec=None):
+    """خ6 — تركيبات مركبة بوصف حر: «قارب في البحر وقت الغروب» →
+    خلفية بحر (إجرائية حادة) + تلطيخ غروب + قارب فوق المية، وأجواء خوفو (DDPM)
+    بتضيف تنفس لوني بنفس خلط خ5. بترجع (KhufuImage, وصف-التركيبة).
+    النصوص اللي مش تركيبة بترجع لمسار الصنف الواحد العادي — مفيش رفض."""
+    spec = _spec if _spec is not None else scenes.parse_composite(text)
+    if spec is None or not scenes.is_composite(spec):
+        return generate(scenes.nearest_class(text), size=size, steps=steps, seed=seed)
+    size, steps = int(size), int(steps)
+    seed = int(seed) if seed not in (None, "") else secrets.randbelow(2**31)
+
+    crisp = np.clip(scenes.make_composite(spec, seed=seed, res=size), 0.0, 1.0)
+    atmo_cid = spec.get("bg") or (spec["objects"][0][0] if spec.get("objects") else "day")
+    if atmo_cid not in scenes.CLASS_IDS:
+        atmo_cid = scenes.nearest_class(str(atmo_cid))
+    img01 = _ddpm_sample(atmo_cid, size, steps, seed)
+    img01 = _blend_hybrid(crisp, img01, size)
+
+    parts = [spec.get("bg"), spec.get("mood")] + [c for c, _ in spec.get("objects") or []]
+    tag = "+".join(str(p) for p in parts if p)
+    return KhufuImage(np.clip(img01 * 255 + 0.5, 0, 255)), tag

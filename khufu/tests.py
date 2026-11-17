@@ -194,6 +194,61 @@ if os.path.exists(trained_path):
 else:
     check("النموذج المتدرب لسه ماتدرنش (تخطي اختبار العينات)", True)
 
+print("\n4خ6) تركيبات مركبة بوصف حر (scenes + generate)")
+s1 = scenes.parse_composite("قارب في البحر وقت الغروب")
+check("«قارب في البحر وقت الغروب» → بحر + غروب + قارب",
+      s1 and s1["bg"] == "sea" and s1["mood"] == "sunset"
+      and ("boat", 1) in s1["objects"] and scenes.is_composite(s1))
+s2 = scenes.parse_composite("طيور فوق الجبال بالليل")
+check("«طيور فوق الجبال بالليل» → جبال + ليل + طيور (جمع → العدد للرسّام)",
+      s2 and s2["bg"] == "mountains" and s2["mood"] == "night"
+      and ("birds", None) in s2["objects"])
+s3 = scenes.parse_composite("تلاتة بالونات على المدينة")
+check("«تلاتة بالونات على المدينة» → مدينة + 3 بالونات (عدّاد بالكلمات)",
+      s3 and s3["bg"] == "city" and ("balloons", 3) in s3["objects"])
+s4 = scenes.parse_composite("3 طيور")
+check("عدّاد بالأرقام «3 طيور» → طيور ×3 (من غير خلفية)",
+      s4 and s4["objects"] == [("birds", 3)])
+s5 = scenes.parse_composite("بالونات فوق مدينة بالليل")
+check("الجمع من غير رقم («بالونات») بيسيب العدد للرسّام (None) — والمفرد واحد",
+      s5 and s5["objects"] == [("balloons", None)]
+      and (scenes.parse_composite("قوارب في البحر") or {})["objects"] == [("boat", None)]
+      and (scenes.parse_composite("قارب في البحر") or {})["objects"] == [("boat", 1)])
+check("كلمة واحدة («قارب») مش تركيبة — بترجع للمسار العادي",
+      scenes.parse_composite("قارب") is not None
+      and not scenes.is_composite(scenes.parse_composite("قارب")))
+check("نص غرب مفيهوش حاجة معروفة → None (والباب لسه مفتوح لأقرب صنف)",
+      scenes.parse_composite("يا نبى سيدي") is None)
+check("«المدينة» بتتطبع صح (ة→ه في المرادفات نفسها)",
+      (scenes.parse_composite("طيور فوق المدينة") or {}).get("bg") == "city"
+      and (scenes.parse_composite("بالونات فوق المدينة بالليل") or {}).get("mood") == "night")
+
+a = scenes.make_composite(s1, seed=5, res=96)
+b = scenes.make_composite(s1, seed=5, res=96)
+c = scenes.make_composite(s1, seed=6, res=96)
+check("حتمية: نفس البذرة = نفس المصفوفة بالحرف", np.array_equal(a, b))
+check("بذرة مختلفة = صورة مختلفة", not np.array_equal(a, c))
+check("التركيبة ليها تنوع ألوان حقيقي (std > 0.06)",
+      float(a.std()) > 0.06, float(a.std()))
+night_i = scenes.make_composite({"bg": "sea", "mood": "night", "objects": []}, seed=11)
+day_i = scenes.make_composite({"bg": "sea", "mood": None, "objects": []}, seed=11)
+check("جو الليل بيغيّر الصورة فعليًا (فرق متوسط > 0.05)",
+      float(np.abs(night_i - day_i).mean()) > 0.05)
+
+img_c, tag_c = generate.generate("قارب في البحر وقت الليل", size=96, steps=20, seed=3, _model=net)
+check("generate بياخد وصف حر ويرسم تركيبة (96×96)",
+      img_c.arr.shape == (96, 96, 3) and "sea" in tag_c and "night" in tag_c)
+check("صورة التركيبة مش ضوضاء (std > 15)",
+      float(img_c.arr.astype(float).std()) > 15.0,
+      float(img_c.arr.astype(float).std()))
+img750c, _ = generate.generate_composite("قوارب في البحر وقت الغروب",
+                                         size=750, steps=20, seed=3, _spec=s1)
+check("** خ6: تركيبة مركبة على 750×750 **",
+      img750c.arr.shape == (750, 750, 3)
+      and float(img750c.arr.astype(float).std()) > 10.0)
+img_reg, got_reg = generate.generate("غروب", size=32, steps=20, seed=7, _model=net)
+check("الصنف الواحد ماشي زي ما هو بعد خ6 (regression)", got_reg == "sunset")
+
 print("\n5) عقد الواجهة (app.py من seshat بيتصل بينا كده)")
 check("CLASSES فيها (id, عربي) للـ /khufu-status",
       all(len(c) == 2 for c in scenes.CLASSES))
