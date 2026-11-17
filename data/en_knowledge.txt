@@ -383,23 +383,6 @@ q: i am a marine biology teacher preparing a lesson about coral reefs for my sen
 a: The Great Barrier Reef off the coast of Queensland, Australia, is the largest coral reef system in the world — about 2,300 kilometers long and visible from space, hosting thousands of species (around 1,500 fish species and 400 coral types).
 ---
 
-q: do you refuse to draw things you have not learned? | what if i ask for an unknown drawing?
-a: never. every drawing request produces an image: if the name is not among the drawings i learned, i draw the closest match i know and say so clearly ("i don't have a drawing named X yet, so this is the closest one") — no refusals, no "pick from a list".
----
-q: what resolution does khufu draw at now? | how sharp are khufu images after the update?
-a: after round kh4 the base is 96x96 pixels (four times the old 48x48), and when the picture is enlarged up to 750x750 it passes through a light unsharp-mask edge filter, so the result comes out crisp instead of mushy.
----
-q: how do you understand a drawing request with unusual words?
-a: in stages: exact match first, then the longest synonym found inside the sentence (so "sunset of the sun" beats "sun"), then a letter-similarity match that must keep the same first letter and a similar length, and finally broad meaning buckets — animals to the cat or birds, computers to the city, spaceships to rockets, lakes to the sea.
----
-q: why were your generated pictures blurry before?
-a: because the base was only 48x48 pixels and it was stretched 15 times to reach 750 — small details vanished. the new 96x96 base plus lanczos resampling with edge sharpening keeps the composition but renders it much cleaner.
----
-
-q: describe in detail what changed in your latest image and drawing training round, why it was needed, and what the measurable results were, including how unknown requests are handled now and how the resolution and sharpening work together, because i want the full technical picture in one answer.
-a: the round fixed two real complaints: refusals like "i don't know how to draw that, pick from my list" and blurry 48x48-based images stretched to 750. now a pixel drawing request never returns empty: unknown words go through exact match, longest-synonym match, first-letter-preserving fuzzy match, then semantic buckets (animals to cat, birds for flying things, computers to city, spaceships to rocket, lakes to sea), and the final fallback is the simplest shape — with an honest note saying it is the closest match. khufu's base moved to 96x96 (4x the pixels), the dataset is stored as uint8 to fit memory, training resumed from the old weights, and the lanczos upscaler to 750x750 now applies a light unsharp mask (amount 0.35) only when enlarging, never when shrinking — all tests passed after training.
----
-
 q: what is the largest planet in our solar system?
 a: jupiter is the largest planet in the solar system — its mass is about 318 times earth's, and more than 1300 earths could fit inside it by volume. it is a gas giant made mostly of hydrogen and helium, and its great red spot is a storm larger than earth that has raged for centuries.
 
@@ -436,23 +419,11 @@ a: fish do not breathe water the way we breathe air — they extract the oxygen 
 q: why do we sneeze?
 a: a sneeze is a defensive reflex. when something irritates the lining of the nose — dust, pollen, a virus — a nerve signal reaches the brain and triggers a powerful burst of air that can exceed 150 km/h to eject the irritant. that is why covering with your elbow, not your hand, matters: droplets carry infection far.
 
-q: explain in detail how a refrigerator keeps food cold, step by step.
-a: a refrigerator moves heat instead of creating cold. first a refrigerant fluid circulates in sealed pipes; inside the fridge cabinet it absorbs heat from the food and air and evaporates at low pressure, which pulls temperature down. second the compressor squeezes that gas, raising its pressure and temperature well above room level. third the hot compressed gas flows through coils on the back or bottom, where the kitchen air cools it and the fluid condenses back to liquid while dumping the absorbed heat outside. fourth an expansion valve drops the pressure again, the fluid becomes cold, and the cycle repeats continuously. a thermostat switches the compressor on only when the interior drifts above the set point, and insulation keeps outside heat from leaking in — that is why an unopened fridge holds its temperature for hours during a power cut.
----
-q: what is seshat 1.0 (the unified model)?
-a: seshat 1.0 merges the text brain (chat, math, learning, search, politeness) with khufu the image generator into one local model with a single reply pipeline. text questions are answered from memory and the trained engine, and any 'draw …' request is parsed and painted by khufu at 750x750. everything runs on the same server with no external services.
-
-q: where do the images come from?
-a: every image is generated locally by khufu — a small DDPM diffusion model plus a procedural hybrid renderer written from scratch in this repository. there is no external image service, no api keys, and no network wait. images are stored as png in data/generated and served from the server's own url.
-
 q: how does the image request get understood?
 a: the description goes through five lookup stages: exact class match, arabic/english synonyms inside the text, closest word, semantic buckets, and a final nearest-class fallback — so khufu never refuses to draw. free-form descriptions become composites: environment + mood lighting + objects with counts from digits, arabic number words, or plurals.
 
 q: why are the images sharper and more colorful now?
 a: round kh8 raised the crisp procedural weight to 82%, strengthened edge sharpening, and added a vivid layer that boosts color saturation by 1.20x and applies a smooth contrast curve. the result reads as a clear subject with brighter colors instead of a color cloud.
-
-q: explain in detail how a drawing request travels through the unified model until the final picture
-a: first the message enters the unified intent pipeline: politeness guard, math guard, then the image parser extracts the description. khufu normalizes arabic text, then runs five lookup stages to map words to scene classes and counts. the procedural renderer draws the sky, ground and objects as sharp shapes at the full output resolution of 750x750, while the trained diffusion network produces its own learned atmosphere colors from pure noise in fifty denoising steps with clipped denoising for stability. the two layers are blended eighty-two percent crisp and eighteen percent atmosphere, then unsharp-masked and passed through the vivid saturation and contrast layer. the png is saved with the prompt and seed so the same request always reproduces the same picture, and the chat reply returns instantly with a local url — completely offline.
 
 q: What is the largest planet in our solar system?
 a: Jupiter — it is a gas giant so large that all the other planets could fit inside it.
@@ -484,5 +455,3 @@ a: Mount Everest in the Himalayas, rising over 8,800 meters above sea level.
 q: Who invented the telephone?
 a: Alexander Graham Bell patented the first practical telephone in 1876.
 
-q: Walk me through what happens inside seshat 1.0 from the moment a message arrives.
-a: The message first meets politeness: insults are met with forgiveness, never with anger. Then math tries its deterministic paths — symbols and Arabic word operations. If the question is about identity, the unified definition answers. Drawing requests go to the local image engine: a multi-stage matcher finds the scene class even through synonyms, then the procedural painter and the diffusion core blend their work on full resolution. Knowledge questions try learned memory, then the corpus, then the web when allowed. Everything runs in one repository, fully local, no external image services.

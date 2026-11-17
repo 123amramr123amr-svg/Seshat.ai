@@ -287,12 +287,6 @@
   .settings-actions button.ghost { background: none; border: 1px solid var(--line); color: var(--muted); font-weight: 400; }
   #settings-status { color: var(--muted); font-size: 12.5px; }
   #settings-status b { color: var(--gold); }
-  .genimg {
-    display: block; width: 100%; max-width: 420px;
-    border-radius: 12px; margin-top: 10px; border: 1px solid var(--line);
-  }
-  .genwait { margin-top: 10px; color: var(--muted); font-size: 13.5px; }
-  .generr { margin: 10px 0 8px; }
 
   @media (max-width: 600px) {
     .tagline, .meta { display: none; }
@@ -339,7 +333,6 @@
   </div>
   <div class="model-tabs">
     <button class="model-tab active" data-model="seshat">seshat</button>
-    <button class="model-tab" data-model="khufu">خوفو</button>
     <button class="model-tab" data-model="nawah">نواة-1</button>
   </div>
   <div class="meta" id="meta"></div>
@@ -411,10 +404,6 @@
   </div>
 </main>
 
-<div id="khufu-section" style="display:none; position:absolute; top:0; left:0; right:0; z-index:100; background:var(--bg);">
-  <iframe id="khufu-frame" title="خوفو — مولّد الصور" style="width:100%; height:100%; border:0; display:block;"></iframe>
-</div>
-
 <div id="nawah-section" style="display:none; position:absolute; top:0; left:0; right:0; z-index:100; background:var(--bg); overflow-y:auto; padding:24px 16px;">
   <div style="max-width:860px; margin:0 auto;">
     <div style="background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:20px; margin-bottom:16px;">
@@ -430,37 +419,13 @@
 </div>
 
 <footer>
-  <div class="attach-bar" id="attachBar">
-    <span id="attachThumb"></span>
-    <div class="attach-info"><b id="attachName"></b><span id="attachNote"></span></div>
-    <button class="attach-x" id="attachX" title="شيل المرفق" aria-label="شيل المرفق">×</button>
-  </div>
-  <div class="quick" id="quick">
-    <button class="chip">ايه ده؟</button>
-    <button class="chip">ابيض واسود</button>
-    <button class="chip">وضحها</button>
-    <button class="chip">غبشها</button>
-    <button class="chip">فتحها</button>
-    <button class="chip">زود التباين</button>
-    <button class="chip">اقلبها</button>
-    <button class="chip">لفها يمين</button>
-    <button class="chip">رسم رصاص</button>
-    <button class="chip">سيبيا</button>
-    <button class="chip">بكسلها</button>
-    <button class="chip">برواز دهبي</button>
-    <button class="chip">رجعها زي ما كانت</button>
-  </div>
   <div class="composer">
-    <button id="attach" title="ابعت صورة أو فيديو" aria-label="ابعت صورة أو فيديو">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M21 16l-5-5-8 9"/></svg>
-    </button>
-    <input type="file" id="file" accept="image/*,video/*" hidden>
     <textarea id="input" rows="1" dir="auto" placeholder="اكتب رسالتك هنا…  /  Type your message…" maxlength="8000"></textarea>
     <button id="send" title="إرسال" aria-label="إرسال">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
     </button>
   </div>
-  <div class="hint">seshat بيرد من ذاكرته، ولو مش عارف بيدور في ويكيبيديا والنت وبيتعلم بنفسه، وبيحسب وبيكتب أكواد وبيرسم، وبيعدّل الصور اللي تبعتهاله من زرار الصورة. عايز تربطه بمخ أقوى؟ دوس ⚙ فوق. تطوير: عمرو أحمد</div>
+  <div class="hint">seshat بيرد من ذاكرته، ولو مش عارف بيدور في ويكيبيديا والنت وبيتعلم بنفسه، وبيحسب وبيكتب أكواد وبيرسم بالمربعات (رسم نصي في الشات نفسه). عايز تربطه بمخ أقوى؟ دوس ⚙ فوق. تطوير: عمرو أحمد</div>
 </footer>
 
 <script>
@@ -568,68 +533,6 @@
     return bubble;
   }
 
-  // صورة متولدة. العنوان اللي بيبدأ بـ generated/ بتاع السيرفر نفسه: الصورة بتتولد لما نطلبها
-  // (ممكن تاخد لحد دقيقة)، ولما تجهز بتبقى هي الصورة الحالية عشان التعديل اللي بعده يتبني عليها.
-  function appendImage(bubble, url, data) {
-    if (url.indexOf("generated/") !== 0) {            // عنوان خارجي: عرض عادي
-      var link = el("a");
-      link.href = url; link.target = "_blank"; link.rel = "noopener";
-      var pic = document.createElement("img");
-      pic.className = "genimg"; pic.alt = "صورة من seshat";
-      pic.onload = toBottom;
-      pic.onerror = function () { link.remove(); };
-      pic.src = url;
-      link.appendChild(pic); bubble.appendChild(link); toBottom();
-      return;
-    }
-    var box = el("div", "genbox");
-    bubble.appendChild(box);
-    var english = !/[\u0600-\u06FF]/.test((data && data.response) || "");
-    function load() {
-      box.textContent = "";
-      var wait = el("div", "genwait", english ? "⏳ Making the image… this can take a minute or two."
-                                              : "⏳ بجهز الصورة… ممكن تاخد دقيقة أو اتنين.");
-      box.appendChild(wait);
-      toBottom();
-      fetch(url).then(function (r) {
-        if (r.ok) return r.blob().then(function (blob) { return { blob: blob }; });
-        return r.json().then(function (j) { return { error: j.error || "" }; },
-                             function () { return { error: "" }; });
-      }, function () { return { error: "" }; }).then(function (got) {
-        box.textContent = "";
-        if (!got.blob) {
-          bubble.classList.add("fallback");
-          box.appendChild(el("div", "generr", got.error ||
-            (english ? "The image did not arrive. Try again." : "الصورة موصلتش. جرب تاني.")));
-          var again = el("button", "chip", english ? "Try again" : "جرب تاني");
-          again.addEventListener("click", function () { bubble.classList.remove("fallback"); load(); });
-          box.appendChild(again);
-          toBottom();
-          return;
-        }
-        var src = URL.createObjectURL(got.blob);
-        var img = document.createElement("img");
-        img.className = "genimg"; img.alt = "صورة من seshat";
-        img.src = src;
-        box.appendChild(img);
-        var a = el("a", "save", english ? "Save image" : "حفظ الصورة");
-        a.href = src; a.download = "seshat-image.jpg";
-        box.appendChild(a);
-        loadImage(src).then(function (loaded) {
-          var ow = loaded.naturalWidth, oh = loaded.naturalHeight;
-          var px = grab(loaded, ow, oh, MAX_SIDE);
-          var preview = px.canvas.toDataURL("image/jpeg", 0.85);
-          var pixels = { w: px.w, h: px.h, data: px.data, ow: ow, oh: oh };
-          attached = { kind: "image", name: english ? "seshat image" : "صورة seshat", ow: ow, oh: oh,
-                       preview: preview, original: pixels, originalPreview: preview,
-                       current: pixels, fresh: false, generated: (data && data.image_id) || "" };
-          showAttachment();
-          toBottom();
-        }, function () {});
-      });
-    }
-    load();
-  }
 
   // بيكتب الرد تدريجي عشان يبان إنه بيتولّد حرف حرف
   function typeOut(bubble, text, done) {
@@ -646,171 +549,18 @@
   }
 
   // ============================================================
-  // المرفقات: صورة أو فيديو
-  // ============================================================
-  var MAX_SIDE = 512;          // بنصغّر الصورة قبل ما تتبعت
-  var FRAME_SIDE = 160;        // حجم لقطة الفيديو
-  var FRAMES = 12;             // عدد اللقطات اللي بناخدها من الفيديو
-  var attachBtn = document.getElementById("attach");
-  var fileInput = document.getElementById("file");
-  var attachBar = document.getElementById("attachBar");
-  var quick = document.getElementById("quick");
-  // المرفق الحالي. للصورة: original (أول نسخة) و current (آخر تعديل) — التعديلات بتتراكم.
-  var attached = null;
 
-  function toBase64(bytes) {
-    var out = "", step = 0x8000;
-    for (var i = 0; i < bytes.length; i += step) {
-      out += String.fromCharCode.apply(null, bytes.subarray(i, i + step));
-    }
-    return btoa(out);
-  }
-
-  // بياخد أي مصدر (صورة / فيديو / canvas) ويرجعه بكسلات RGBA مصغّرة
-  function grab(source, sw, sh, maxSide) {
-    var scale = Math.min(1, maxSide / Math.max(sw, sh));
-    var w = Math.max(1, Math.round(sw * scale)), h = Math.max(1, Math.round(sh * scale));
-    var cv = document.createElement("canvas");
-    cv.width = w; cv.height = h;
-    var g = cv.getContext("2d", { willReadFrequently: true });
-    g.drawImage(source, 0, 0, w, h);
-    return { w: w, h: h, data: toBase64(g.getImageData(0, 0, w, h).data), canvas: cv };
-  }
-
-  function loadImage(url) {
-    return new Promise(function (ok, fail) {
-      var img = new Image();
-      img.onload = function () { ok(img); };
-      img.onerror = function () { fail(new Error("image")); };
-      img.src = url;
-    });
-  }
-
-  function showAttachment() {
-    var thumb = document.getElementById("attachThumb");
-    thumb.textContent = "";
-    if (!attached) {
-      attachBar.classList.remove("on"); quick.classList.remove("on");
-      return;
-    }
-    var note = document.getElementById("attachNote");
-    document.getElementById("attachName").textContent = attached.name;
-    if (attached.kind === "image") {
-      var img = el("img"); img.src = attached.preview; img.alt = "";
-      thumb.appendChild(img);
-      note.textContent = attached.ow + " × " + attached.oh + (attached.generated
-        ? " — اكتب التعديل (خليها بالليل، ضيف قبعة، صورة تانية) أو اختار من تحت"
-        : " — اكتب عايز إيه، أو اختار من تحت");
-      quick.classList.add("on");
-    } else {
-      var v = el("video"); v.src = attached.url; v.muted = true;
-      thumb.appendChild(v);
-      note.textContent = attached.duration.toFixed(1) + " ثانية — " + attached.frames.length + " لقطة — دوس إرسال وأنا أوصفه";
-      quick.classList.remove("on");
-    }
-    attachBar.classList.add("on");
-  }
-
-  function readImage(file) {
-    var url = URL.createObjectURL(file);
-    return loadImage(url).then(function (img) {
-      var ow = img.naturalWidth, oh = img.naturalHeight;
-      var px = grab(img, ow, oh, MAX_SIDE);
-      URL.revokeObjectURL(url);
-      var preview = px.canvas.toDataURL("image/jpeg", 0.85);
-      var pixels = { w: px.w, h: px.h, data: px.data, ow: ow, oh: oh };
-      attached = { kind: "image", name: file.name, ow: ow, oh: oh, preview: preview,
-                   original: pixels, originalPreview: preview, current: pixels, fresh: true };
-    });
-  }
-
-  function readVideo(file) {
-    var url = URL.createObjectURL(file);
-    var v = document.createElement("video");
-    v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url;
-    function wait(name, ms) {
-      return new Promise(function (ok, fail) {
-        var t = setTimeout(function () { fail(new Error(name)); }, ms);
-        v.addEventListener(name, function () { clearTimeout(t); ok(); }, { once: true });
-        v.addEventListener("error", function () { clearTimeout(t); fail(new Error("video")); }, { once: true });
-      });
-    }
-    return wait("loadeddata", 15000).then(function () {
-      var duration = isFinite(v.duration) ? v.duration : 0;
-      var frames = [], i = 0;
-      function next() {
-        if (i >= FRAMES) return null;
-        var at = duration ? duration * (i + 0.5) / FRAMES : 0;
-        i++;
-        var seeked = wait("seeked", 5000);
-        v.currentTime = at;
-        return seeked.then(function () {
-          var px = grab(v, v.videoWidth, v.videoHeight, FRAME_SIDE);
-          frames.push({ w: px.w, h: px.h, data: px.data });
-        }, function () {}).then(function () { return duration ? next() : null; });
-      }
-      return Promise.resolve(next()).then(function () {
-        if (!frames.length) throw new Error("frames");
-        attached = { kind: "video", name: file.name, url: url, duration: duration,
-                     w: v.videoWidth, h: v.videoHeight, frames: frames, fresh: true };
-      });
-    });
-  }
-
-  attachBtn.addEventListener("click", function () { if (!busy) fileInput.click(); });
-  document.getElementById("attachX").addEventListener("click", function () {
-    attached = null; showAttachment();
-  });
-  fileInput.addEventListener("change", function () {
-    var file = fileInput.files && fileInput.files[0];
-    fileInput.value = "";
-    if (!file) return;
-    var isVideo = file.type.indexOf("video/") === 0;
-    var isImage = file.type.indexOf("image/") === 0;
-    if (!isVideo && !isImage) { warn("الملف ده مش صورة ولا فيديو."); return; }
-    if (file.size > 200 * 1024 * 1024) { warn("الملف أكبر من 200 ميجا."); return; }
-    attachBtn.disabled = true;
-    (isVideo ? readVideo(file) : readImage(file)).then(function () {
-      showAttachment(); input.focus();
-    }, function () {
-      warn(isVideo ? "المتصفح معرفش يفتح الفيديو ده. جرب فيديو mp4." : "المتصفح معرفش يفتح الصورة دي.");
-    }).then(function () { attachBtn.disabled = false; });
-  });
-  quick.querySelectorAll(".chip").forEach(function (c) {
-    c.addEventListener("click", function () { send(c.textContent); });
-  });
-
-  function warn(text) {
-    var b = addMessage("bot", text);
-    b.classList.add("fallback");
-  }
 
   function send(text) {
     text = (text || input.value).trim();
-    var fresh = attached && attached.fresh;         // مرفق جديد لسه متبعتش
-    if ((!text && !fresh) || busy) return;
+    if (!text || busy) return;
     busy = true;
     sendBtn.disabled = true;
-    attachBtn.disabled = true;
     input.value = "";
     autosize();
 
     var body = { message: text };
     var userBubble = addMessage("user", text || undefined);
-    if (attached && attached.kind === "image") {
-      body.image = attached.current;
-      if (attached.generated) body.image_id = attached.generated;   // صورة seshat ولّدها
-      if (fresh) {
-        var pic = el("img", "media"); pic.src = attached.preview; pic.alt = attached.name;
-        userBubble.insertBefore(pic, userBubble.firstChild);
-      }
-    } else if (attached && attached.kind === "video" && fresh) {
-      body.video = { duration: attached.duration, w: attached.w, h: attached.h, frames: attached.frames };
-      var vid = el("video", "media"); vid.src = attached.url; vid.controls = true; vid.muted = true;
-      userBubble.insertBefore(vid, userBubble.firstChild);
-    }
-    if (attached) attached.fresh = false;
-    if (attached && attached.kind === "video") { attached = null; showAttachment(); }
 
     var bubble = addMessage("bot");
     var dots = el("span", "typing");
@@ -819,7 +569,7 @@
     toBottom();
 
     var finish = function () {
-      busy = false; sendBtn.disabled = false; attachBtn.disabled = false; input.focus();
+      busy = false; sendBtn.disabled = false; input.focus();
     };
 
     fetch("chat", {
@@ -840,15 +590,6 @@
         }
         typeOut(bubble, data.response, function () {
           if (think) bubble.insertBefore(think, bubble.firstChild);
-          if (data.edited) showEdited(bubble, data);
-          if (data.image) appendImage(bubble, data.image, data);
-          if (data.reset && attached && attached.kind === "image") {
-            attached.current = attached.original;
-            attached.preview = attached.originalPreview;
-            var back = el("img", "media"); back.src = attached.preview; back.alt = "";
-            bubble.appendChild(back);
-            showAttachment();
-          }
           if (data.suggestion) {
             // مش متأكد → زرار بالسؤال اللي يقصده، دوسة واحدة تبعته
             var hint = el("button", "chip suggest", data.suggestion);
@@ -874,23 +615,6 @@
       });
   }
 
-  // الصورة المتعدلة: بنعرضها، وبتبقى هي الصورة الحالية عشان التعديل اللي بعده يتبني عليها
-  function showEdited(bubble, data) {
-    var img = el("img", "media"); img.src = data.edited; img.alt = "";
-    bubble.appendChild(img);
-    var a = el("a", "save", "حفظ الصورة");
-    a.href = data.edited; a.download = "seshat-edit.png";
-    bubble.appendChild(a);
-    if (!attached || attached.kind !== "image") return;
-    var keep = attached;
-    loadImage(data.edited).then(function (loaded) {
-      var px = grab(loaded, loaded.naturalWidth, loaded.naturalHeight, 720);
-      keep.current = { w: px.w, h: px.h, data: px.data, ow: px.w, oh: px.h };
-      keep.preview = data.edited;
-      if (attached === keep) showAttachment();
-      toBottom();
-    }, function () {});
-  }
 
   function autosize() {
     input.style.height = "auto";
@@ -983,11 +707,8 @@
   });
 
   // ---------------- التبديل بين النماذج ----------------
-  // خوفو بيتحمّل في iframe من /khufu-app (المصدر الوحيد لواجهته) — أول مرة تتفتح بس.
   var seshatMain = document.getElementById("scroll");
   var seshatFooter = document.querySelector("footer");
-  var khufuSection = document.getElementById("khufu-section");
-  var khufuFrame = document.getElementById("khufu-frame");
   var nawahSection = document.getElementById("nawah-section");
 
   function runNawahAnalyze() {
@@ -1037,20 +758,10 @@
       if (model === "seshat") {
         seshatMain.style.display = "";
         seshatFooter.style.display = "";
-        khufuSection.style.display = "none";
         if (nawahSection) nawahSection.style.display = "none";
-      } else if (model === "khufu") {
-        seshatMain.style.display = "none";
-        seshatFooter.style.display = "none";
-        if (nawahSection) nawahSection.style.display = "none";
-        khufuSection.style.top = hdr.offsetHeight + "px";
-        khufuSection.style.height = "calc(100vh - " + hdr.offsetHeight + "px)";
-        khufuSection.style.display = "block";
-        if (!khufuFrame.src) khufuFrame.src = "/khufu-app";
       } else if (model === "nawah") {
         seshatMain.style.display = "none";
         seshatFooter.style.display = "none";
-        khufuSection.style.display = "none";
         if (nawahSection) {
           nawahSection.style.top = hdr.offsetHeight + "px";
           nawahSection.style.height = "calc(100vh - " + hdr.offsetHeight + "px)";

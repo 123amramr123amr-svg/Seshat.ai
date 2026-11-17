@@ -932,9 +932,9 @@ def sheet(path, cell=8, per_row=9):
     """بيرسم كل الرسومات في صورة واحدة عشان نراجعها بالعين"""
     import os
     import sys
+    import zlib
+    import struct
     import numpy as np
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-    import vision
     keys = list(OBJECTS)
     n_rows = (len(keys) + per_row - 1) // per_row
     size = N * cell + cell
@@ -946,8 +946,17 @@ def sheet(path, cell=8, per_row=9):
             for x, ch in enumerate(row):
                 rgb = tuple(int(PALETTE[ch][k:k + 2], 16) for k in (1, 3, 5))
                 img[oy + y * cell:oy + (y + 1) * cell, ox + x * cell:ox + (x + 1) * cell, :3] = rgb
+    # خ10: مشفّر PNG محلي (كان في vision.py — اتشال مع نموذج الصور)
+    def _chunk(tag, data):
+        c = tag + data
+        return struct.pack(">I", len(data)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+    h, w = img.shape[0], img.shape[1]
+    raw = b"".join(b"\x00" + img[y].tobytes() for y in range(h))   # فلتر 0 لكل صف
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)            # RGBA 8bit
+    png = (b"\x89PNG\r\n\x1a\n" + _chunk(b"IHDR", ihdr)
+           + _chunk(b"IDAT", zlib.compress(raw, 9)) + _chunk(b"IEND", b""))
     with open(path, "wb") as f:
-        f.write(vision.encode_png(img))
+        f.write(png)
 
 
 if __name__ == "__main__":

@@ -13,8 +13,9 @@ seshat.chet — المخ الجديد (brain.py)
      على طول. وكمان يقدر تعلمه بيدويًا بصيغتين:
          علمني: س: اللعبة المفضلة لعمرو ج: الشطرنج
          علمني: ايه اللعبة المفضلة لعمرو؟ الشطرنج   (صيغة مرنة: سؤال؟ جواب)
-  4. الصور — "ارسم قطة بتبص للقمر" → صورة من **خوفو** (مولّد الصور المحلي imagegen.py)، وتعديلها
-     بالوصف. "ارسم بالمربعات …" → النموذج المحلي بيرسم بنفسه (engine.draw).
+  4. الرسم النصي — "ارسم بالمربعات …" → النموذج المحلي بيرسم بنفسه بحروف ومربعات
+     (engine.draw) — مخرج نصي في الشات نفسه. مفيش توليد صور خالص (نموذج الصور اتشال
+     بطلب المستخدم — أي طلب صورة بيرجع رد مؤدب بيقول إن النموذج نصي).
   5. مخ خارجي اختياري — لو ضفت مفتاح API متوافق مع OpenAI (زرار الإعدادات
      ⚙ في الواجهة أو متغيرات البيئة)، الردود بتشتغل بشبكة عصبية ضخمة بترد
      على أي سؤال في الدنيا — و seshat لسه بيحافظ على هويته (seshat من
@@ -65,10 +66,7 @@ class BrainConfig:
         self.api_base = os.environ.get("SESHAT_API_BASE", "https://api.openai.com/v1")
         self.api_model = os.environ.get("SESHAT_API_MODEL", "gpt-4o-mini")
         self.search_enabled = os.environ.get("SESHAT_SEARCH", "1") != "0"
-        # الصور بتتولد محليًا 100% من خوفو (شوف imagegen.py) — جولة خ8: التوحيد.
-        # مفيش خدمة خارجية ولا مفاتيح خالص. SESHAT_EXTERNAL_IMAGES=0 بس بيحوّل
-        # "ارسم" لرسم seshat بالمربعات بدل صور خوفو.
-        self.external_images = os.environ.get("SESHAT_EXTERNAL_IMAGES", "1") != "0"
+        # مفيش توليد صور خالص — النموذج نصي بس (نموذج الصور اتشال بطلب المستخدم).
         self.reload()
 
     def reload(self):
@@ -708,20 +706,6 @@ def try_draw(message):
     return {"prompt": prompt, "strong": bool(m.group("strong")), "pixels": pixels}
 
 
-def parse_image_edit(message):
-    """
-    كلام عن آخر صورة اتولدت؟ بيرجع ("edit", نص التعديل) أو ("again", "") أو None.
-    """
-    msg = (message or "").strip()
-    if not msg or len(msg) > 300:
-        return None
-    if _AGAIN_RE.match(msg):
-        return "again", ""
-    if _EDIT_DESC_RE.match(msg):
-        return "edit", msg.strip(" .!؟?")
-    return None
-
-
 # ============================================================
 # بحث في الإنترنت — ويكيبيديا أولًا (مصدر موثوق) و DuckDuckGo بعدها
 # ============================================================
@@ -931,61 +915,32 @@ def _other_subject(question, suggestion):
         return False
 
 
-def llm_vision(message, image_url, cfg):
-    """
-    فهم صورة بالمخ الخارجي (لو فيه مفتاح والموديل بيشوف صور، زي gpt-4o-mini).
-    image_url: الصورة data URL. بيرجع النص أو None لو مفيش مفتاح / الموديل مبيشوفش / حصل خطأ.
-    """
-    if not cfg.api_key:
-        return None
-    base = (cfg.api_base or "https://api.openai.com/v1").rstrip("/")
-    ask = message.strip() or "اوصف الصورة دي بالتفصيل: فيها إيه؟"
-    try:
-        r = requests.post(
-            base + "/chat/completions",
-            headers={"Authorization": "Bearer " + cfg.api_key,
-                     "Content-Type": "application/json"},
-            json={"model": cfg.api_model,
-                  "messages": [{"role": "system", "content": _LLM_SYSTEM},
-                               {"role": "user", "content": [
-                                   {"type": "text", "text": ask[:2000]},
-                                   {"type": "image_url", "image_url": {"url": image_url}}]}],
-                  "temperature": 0.4,
-                  "max_tokens": 700},
-            timeout=60)
-        r.raise_for_status()
-        text = r.json()["choices"][0]["message"]["content"].strip()
-        return text or None
-    except Exception:
-        return None
-
-
 # ============================================================
 # المخ الكامل — بيجاوب بالترتيب: أدب → حساب → رسم → تعلم →
 # النموذج المحلي → المخ الخارجي → البحث في النت → كلام صريح
 # ============================================================
 class Brain:
 
-    # خ8: هوية النموذج — الافتراضي نص سي شات القديم، وSeshatOne بيديله
-    # تعريف seshat 1.0 الموحد، فسؤال «انت مين» بيرجع هوية النموذج الموحد دايمًا.
-    IDENTITY_AR = ("أنا seshat — نموذج ذكاء اصطناعي مصري طوّره عمرو أحمد من الصفر، "
-                   "بتكلم عربي وإنجليزي وبحسب وبكتب أكواد وبرسم.")
-    IDENTITY_EN = ("I am seshat — an Egyptian AI model built from scratch by Amr Ahmed. "
-                   "I chat in Arabic and English, do math, write code, and draw.")
+    # خ10: هوية النموذج النصي — بعد حذف نموذج الصور بطلب المستخدم،
+    # سؤال «انت مين» بيرجع هوية نصية صريحة: مفيش توليد صور خالص.
+    IDENTITY_AR = ("أنا seshat — النموذج النصي المحلي: حوار وحساب وتعلم ذاتي وبحث، "
+                   "ورسم نصي بالمربعات. مطوّريني عمرو أحمد، وكل حاجة فيا محلية، "
+                   "ومفيش توليد صور خالص.")
+    IDENTITY_EN = ("I am seshat — the local text model: chat, math, self-learning and "
+                   "search, plus text drawing with squares. Developed by Amr Ahmed, "
+                   "fully local, no image generation.")
 
     def __init__(self, engine=None):
         self.engine = engine            # ممكن يكون None في وضع المحلي الخالص
         self.cfg = BrainConfig()
         self.learned = LearnedMemory()
-        from imagegen import ImageMaker
-        self.images = ImageMaker()
 
     def status(self):
         return {"search": self.cfg.search_enabled, "api": bool(self.cfg.api_key),
                 "api_model": self.cfg.api_model if self.cfg.api_key else "",
                 "learned": len(self.learned.items),
-                "politeness": True, "images": True,
-                "images_engine": "خوفو (محلي)"}
+                "politeness": True, "images": False,
+                "images_engine": "مفيش — النموذج نصي بس"}
 
     def _out(self, response, source, source_label="", thinking="",
              confidence=1.0, fallback=False, matched="", suggestion="",
@@ -1008,7 +963,7 @@ class Brain:
     def reply(self, message, temperature=0.0, max_new_tokens=2000, **kw):
         t0 = time.time()
         out = self._reply(message, temperature=temperature,
-                          max_new_tokens=max_new_tokens, last_image=kw.get("last_image"))
+                          max_new_tokens=max_new_tokens)
         if not out.get("seconds"):
             out["seconds"] = round(time.time() - t0, 2)
         return out
@@ -1040,16 +995,13 @@ class Brain:
                              "identity", "هوية",
                              thinking="سؤال عن هويتي — بجاوب من تعريفي الموحد")
 
-        # 4) الصور.
-        #    • "ارسم / اعمل صورة …" → خوفو بيفهم الوصف العربي/الإنجليزي ويرسم على 750×750.
-        #      الرد بيرجع فورًا والصورة بتتولد لما المتصفح يطلبها من /generated/<id>.png.
-        #    • "ارسم بالمربعات …" أو المولّد مقفول → رسم seshat نفسه (النموذج المحلي).
-        #    • فيه صورة اتولدت قبل كده (last_image) والكلام تعديل عليها ("خليها بالليل") أو
-        #      "صورة تانية" → صورة جديدة مبنية على وصف القديمة.
+        # 4) الرسم — النموذج نصي بس: مفيش توليد صور خالص (نموذج الصور اتشال خ10).
+        #    • "ارسم بالمربعات …" → رسم seshat نفسه بحروف ومربعات (مخرج نصي في الشات).
+        #    • أي طلب صورة عادي ("ارسم قطة" / "اعمل صورة") → رد مؤدب بيقول إن النموذج نصي
+        #      وبيوجّه للرسم النصي بالمربعات — من غير أي ملف صور ولا مولّد.
         arabic = _is_arabic_text(msg)
         draw = try_draw(msg)
-        last = self.images.meta(kw.get("last_image")) if kw.get("last_image") else None
-        if draw and (draw["pixels"] or not self.cfg.external_images):
+        if draw and draw["pixels"]:
             own = self._own_drawing(msg, temperature, max_new_tokens)
             if own:
                 return self._out(own["response"], "draw", "رسم seshat",
@@ -1060,32 +1012,14 @@ class Brain:
                              "Drawing needs the local model, which is not loaded right now.",
                              "draw", "رسم seshat", fallback=True)
         if draw:
-            image_id = self.images.new(draw["prompt"])
-            return self._out(("بجهزلك صورة «%s»." if arabic else "Making an image of “%s”.")
-                             % draw["prompt"], "image", "صور",
-                             thinking=("طلب صورة: " if arabic else "image request: ") + draw["prompt"],
-                             image="generated/%s.png" % image_id, image_id=image_id, confidence=0.9)
-        if last and self.cfg.external_images:
-            change = parse_image_edit(msg)
-            if change and change[0] == "again":
-                image_id = self.images.new("", parent=last["id"])
-                return self._out(("صورة تانية لـ «%s»." if arabic else "Another image of “%s”.")
-                                 % last["prompt"], "image", "صور",
-                                 thinking="صورة تانية لنفس الوصف" if arabic
-                                 else "another image for the same description",
-                                 image="generated/%s.png" % image_id, image_id=image_id,
-                                 confidence=0.9)
-            if change:
-                image_id = self.images.new("", parent=last["id"], edit=change[1])
-                text = ("بعمل صورة جديدة بالوصف: «%s».\n(ده توليد من الأول بنفس البذرة مش تعديل "
-                        "على نفس البكسلات، فممكن تفاصيل تانية تتغير.)" if arabic else
-                        "Making a new image from: “%s”.\n(This regenerates the picture with the "
-                        "same seed; it does not edit the same pixels, so other details may change.)")
-                return self._out(text % self.images.meta(image_id)["prompt"], "image", "صور",
-                                 thinking=("تعديل بالوصف على آخر صورة: " if arabic
-                                           else "edit by description on the last image: ") + change[1],
-                                 image="generated/%s.png" % image_id, image_id=image_id,
-                                 confidence=0.8)
+            return self._out(
+                ("أنا مش بعمل صور — أنا نموذج نصي: بحاور وأحسب وأتعلم وببحث وبيرسم بالمربعات بس. "
+                 "لو عايز رسمة نصية قول: «ارسم %s بالمربعات»." if arabic else
+                 "I don't make images — I'm a text model: chat, math, learning and search, "
+                 "and text drawing with squares. Try: “draw %s with squares”.") % draw["prompt"],
+                "text", "النموذج نصي",
+                thinking="طلب صورة والنموذج نصي — توجه للرسم النصي بالمربعات",
+                confidence=1.0)
 
         # 5) تعليم يدوي: علمني: س: … ج: …
         teach = parse_teach(msg)

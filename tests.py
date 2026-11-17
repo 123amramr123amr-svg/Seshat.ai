@@ -190,11 +190,6 @@ check("صور: «بالمربعات» = رسم seshat نفسه",
 check("مش طلب صورة: كلام عن الرسم والصور", all(try_draw(m) is None for m in (
     "بتعرف ترسم", "مين رسم الموناليزا", "ايه في الصورة دي", "الصورة حلوة", "الرسم فن جميل",
     "بعتلك صورة امبارح", "drawing is fun")))
-from brain import parse_image_edit
-check("تعديل بالوصف", parse_image_edit("خليها بالليل") == ("edit", "خليها بالليل")
-      and parse_image_edit("add a hat") == ("edit", "add a hat")
-      and parse_image_edit("صورة تانية") == ("again", "")
-      and parse_image_edit("اسمك ايه") is None and parse_image_edit("خلاص شكرا") is None)
 check("مش رسم: يعني ايه رسم", try_draw("يعني ايه رسم") is None)
 
 tmp_dir = tempfile.mkdtemp()
@@ -223,78 +218,36 @@ check("المخ: الحساب مضمون", r["source"] == "math" and r["response
 r = b.reply("2 زائد 3 زائد 10")
 check("المخ: الحساب المتسلسل مضمون (خ8)", r["source"] == "math" and r["response"] == "2 + 3 + 10 = 15", r["response"])
 
-# --- الهوية الموحدة (خ8): «انت مين» بيرجع تعريف النموذج الموحد ---
-from seshat_unified import SeshatOne as _SeshatOneTest
-one = _SeshatOneTest(_DummyEngine())
-one.learned = LearnedMemory(os.path.join(tmp_dir, "learned3.json"))
-one.cfg.api_key = ""
-one.cfg.search_enabled = False
-r = one.reply("انت مين")
-check("خ8 الهوية: «انت مين» = seshat 1.0 من النموذج الموحد",
-      r["source"] == "identity" and "seshat 1.0" in r["response"] and "خوفو" in r["response"], r["response"])
-r = one.reply("who are you?")
-check("خ8 الهوية: إنجليزي", r["source"] == "identity" and "seshat 1.0" in r["response"], r["response"])
-r = one.reply("مين اخترع الراديو")
-check("خ8 الهوية: مش هيدخ سؤال معلومات في الهوية", r["source"] != "identity", r["source"])
-# --- الصور من خوفو المحلي (imagegen.py بعد خ8: التوحيد — مفيش أي خدمة خارجية) ---
-from imagegen import ImageMaker, image_kind, add_style, __file__ as imagegen_source_path
-JPEG = b"\xff\xd8\xff\xe0" + b"0" * 64
-b.images = ImageMaker(store_dir=os.path.join(tmp_dir, "generated"), size=96, steps=20)
+# --- الهوية النصية (خ10): «انت مين» بيرجع تعريف النموذج النصي — بعد حذف نموذج الصور ---
+r = b.reply("انت مين")
+check("خ10 الهوية: «انت مين» = نموذج نصي من غير صور",
+      r["source"] == "identity" and "seshat" in r["response"]
+      and "مفيش توليد صور" in r["response"], r["response"])
+r = b.reply("who are you?")
+check("خ10 الهوية: إنجليزي من غير صور", r["source"] == "identity"
+      and "no image generation" in r["response"], r["response"])
+r = b.reply("مين اخترع الراديو")
+check("الهوية: مش هيدخ سؤال معلومات في الهوية", r["source"] != "identity", r["source"])
+
+# --- خ10: نموذج الصور اتشال خالص — أي طلب صورة بيرجع رد نصي من غير ملف صور ---
 r = b.reply("ارسم قرد بيغني")
-check("المخ: «ارسم» بيرجع صورة من عنوان السيرفر نفسه (خوفو المحلي)، والرد مفيهوش اسم خدمة",
-      r["source"] == "image" and r["image"] == "generated/%s.png" % r["image_id"]
-      and "قرد بيغني" in r["response"] and "pollinations" not in str(r).lower(), str(r))
-first = r["image_id"]
-path, err = b.images.ensure(first)
-meta = b.images.meta(first)
-check("الصورة اتولدت محليًا من خوفو واتخزنت PNG سليمة",
-      err is None and open(path, "rb").read()[:8] == b"\x89PNG\r\n\x1a\n"
-      and meta["state"] == "ready" and meta["engine"] == "khufu", str(err))
-check("خوفو فهم الوصف العربي ورسم صنف/تركيبة حقيقية", bool(meta.get("resolved")), str(meta))
-check("مفيش أي خدمة صور خارجية في كود المولّد (pollinations اتشال خالص)",
-      "pollinations" not in open(imagegen_source_path, encoding="utf-8").read().lower())
-mt = os.path.getmtime(path)
-b.images.ensure(first)
-check("الصورة الجاهزة مبتتولدش تاني", os.path.getmtime(path) == mt)
-r = b.reply("خليه لابس قبعة", last_image=first)
-edited = b.images.meta(r["image_id"])
-check("تعديل بالوصف: صورة جديدة بنفس البذرة والوصف القديم + التعديل",
-      r["source"] == "image" and edited["seed"] == meta["seed"] and edited["parent"] == first
-      and edited["prompt"] == "قرد بيغني، خليه لابس قبعة" and "مش تعديل" in r["response"], str(r))
-path, err = b.images.ensure(r["image_id"])
-check("التعديل اترسم محليًا من خوفو كمان", err is None
-      and b.images.meta(r["image_id"])["state"] == "ready", str(err))
-r = b.reply("صورة تانية", last_image=first)
-again = b.images.meta(r["image_id"])
-check("صورة تانية: نفس الوصف وبذرة جديدة", again["prompt"] == "قرد بيغني"
-      and again["seed"] != meta["seed"], str(again))
-check("من غير صورة سابقة «خليه لابس قبعة» مش طلب صورة",
-      b.reply("خليه لابس قبعة")["source"] != "image")
-check("id غلط أو مسار ملفات: مرفوض", b.images.meta("../../etc/passwd") is None
-      and b.images.meta("zz") is None and b.images.ensure("0" * 16)[0] is None)
-check("نوع الملف من أول بايتات", image_kind(JPEG) == "jpeg" and image_kind(b"<html>") is None
-      and image_kind(b"\x89PNG\r\n\x1a\n....") == "png")
-check("الأسلوب: add_style بيضبط الوصف من غير ما يغيّره",
-      add_style("a cat, cartoon style") == "a cat, cartoon style"
-      and add_style("  سمكة   ملونة  ") == "سمكة ملونة")
+check("خ10: «ارسم» بيرجع رد نصي صريح — مش صورة",
+      r["source"] == "text" and not r["image"] and r["image_id"] is None
+      and "مش بعمل صور" in r["response"] and "بالمربعات" in r["response"], str(r))
+r = b.reply("اعمل صورة عربية حمرا")
+check("خ10: «اعمل صورة» نفس السلوك النصي",
+      r["source"] == "text" and not r["image"] and "مش بعمل صور" in r["response"], str(r))
+r = b.reply("please draw a dragon")
+check("خ10: طلب صورة إنجليزي → رد نصي إنجليزي",
+      r["source"] == "text" and "don't make images" in r["response"], str(r))
+check("خ10: مفيش ملفات توليد صور في المستودع",
+      not os.path.exists("imagegen.py") and not os.path.exists("seshat_unified.py")
+      and not os.path.exists("khufu"), "اتأكد إن ملفات الصور مازالت محذوفة")
+check("خ10: الحالة بتقول صراحة إن الصور مقفولة",
+      b.status()["images"] is False, str(b.status()))
 r = b.reply("ارسم بالمربعات قرد بيغني")
-check("«ارسم بالمربعات»: رسم seshat نفسه مش صورة من المولّد",
+check("خ10: «ارسم بالمربعات» لسه شغال — رسم نصي مش صورة",
       r["source"] == "draw" and not r["image"], str(r))
-b.cfg.external_images = False
-r = b.reply("ارسم قرد بيغني")
-check("المولّد مقفول (SESHAT_EXTERNAL_IMAGES=0): مفيش صورة خارجية",
-      r["source"] == "draw" and not r["image"], str(r))
-b.cfg.external_images = True
-# --- النموذج الموحّد seshat 1.0 (خ8): سي شات + خوفو في مدخل واحد ---
-from seshat_unified import SeshatOne, MODEL_NAME
-one = SeshatOne(None)
-check("النموذج الموحّد: الاسم والهوية", one.model_name == "seshat 1.0"
-      and MODEL_NAME == "seshat 1.0" and "محلي" in one.identify()["external_services"])
-check("النموذج الموحّد: الحالة بتوضح فهم نصي + صور محلية من خوفو",
-      one.status()["unified"] is True and "خوفو" in one.status()["image_engine"])
-check("النموذج الموحّد: نفس عقد المخ شغال (أدب + حساب)",
-      one.reply("انت اهبل")["source"] == "politeness"
-      and one.reply("3 + 4")["response"] == "3 + 4 = 7")
 r = b.reply("علمني: س: ايه هواية عمرو ج: البرمجة")
 check("المخ: التعلم اليدوي", r["source"] == "learn")
 r = b.reply("ايه هواية عمرو")
@@ -342,10 +295,7 @@ check("سؤال معلومة مش عنده: مبيألفش إجابة شريفة
       and any(w in r["response"] for w in ("مين اخترع المصعد", "مش متأكد", "مش هألف", "تقصد")),
       str(r))
 
-print("\n9) الرسم والصور (data/drawings.py + vision.py)")
-import base64
-import numpy as np
-import vision
+print("\n9) الرسم النصي (data/drawings.py)")
 
 rows = drawings.grid_for("heart", "R")
 check("شبكة الرسمة 16 × 16", len(rows) == 16 and all(len(x) == 16 for x in rows))
@@ -382,29 +332,6 @@ check("خ4: حاجة ماتعلمهاش → أقرب رسمة بيتعرضها �
       not r["fallback"] and "أقرب" in r["response"] and "ديناصور" in r["response"], str(r))
 check("خ4: الديناصور بيتفسر لأقرب رسمة (قطه)",
       drawings.nearest_objects("ارسم ديناصور")[0][0][0] == "cat", str(r))
-px = np.zeros((40, 60, 4), dtype=np.uint8)
-px[..., 3] = 255
-px[:20, :, :3] = (40, 110, 230)
-px[20:, :, :3] = (50, 160, 60)
-img = {"w": 60, "h": 40, "data": base64.b64encode(px.tobytes()).decode()}
-check("كل التعديلات بتشتغل", all(vision.apply_edit(px, op).shape[2] == 4
-                                 for op in vision.EDITS if op != "enlarge"))
-check("فهم أمر تعديل مركب", vision.find_edits("غبشها جدا واقلبها")[:2] == (["blur", "flip_h"], 2.0))
-check("ملف PNG سليم", vision.encode_png(px)[:8] == b"\x89PNG\r\n\x1a\n")
-r = vision.handle_image("خليها ابيض واسود ولفها يمين", img)
-check("تعديل صورة بيرجع صورة", r["edited"].startswith("data:image/png;base64,")
-      and (r["width"], r["height"]) == (40, 60))
-r = vision.handle_image("ايه ده", img)
-check("وصف صورة: الألوان", "أزرق" in r["response"] and "أخضر" in r["response"], r["response"])
-check("كلام ملوش علاقة بالصورة بيروح للشات", vision.handle_image("اسمك ايه", img) is None)
-check("سؤال عن الصورة × تعديل", vision.wants_look("ايه ده") and vision.wants_look("")
-      and not vision.wants_look("خليها ابيض واسود"))
-check("الصورة بتتحول PNG للمخ الخارجي",
-      vision.jpeg_free_data_url(img).startswith("data:image/png;base64,iVBOR"))
-from brain import BrainConfig, llm_vision
-cfg0 = BrainConfig()
-cfg0.api_key = ""
-check("من غير مفتاح مفيش مخ خارجي للصور", llm_vision("ايه ده", "data:image/png;base64,AA", cfg0) is None)
 
 print("\n10) السياق الموسّع: الرسايل الطويلة والسؤال جواها (engine.extract_question)")
 from engine import extract_question
