@@ -375,6 +375,110 @@ check("صفحة ملهاش علاقة لسه بترفض زي الأول",
 check("مهلة DDG أقصر من مهلة ويكي (مايعلقش الرد)",
       min(8, _brain._NET_TIMEOUT) == 8 and _brain._NET_TIMEOUT >= 8)
 
+print("\n12) جولة خ11: مولّد الأكواد الضخمة + تكوين الجمل + سياق المحادثة")
+
+# --- مولّد الأكواد الضخمة: قوالب بتتكوّن لحظيًا، مضمونة من غير نموذج ولا نت ---
+r = b.reply("اكتب كود لعبة اكس او")
+check("خ11 كود: «اكتب كود لعبة اكس او» = برنامج كامل من المولد",
+      r["source"] == "big_code" and "class TicTacToe" in r["response"]
+      and "def " in r["response"], str(r)[:120])
+check("خ11 كود: حجم الكود فعلاً ضخم (أكتر من 60 سطر وأكتر من 2500 حرف)",
+      r["response"].count("\n") > 60 and len(r["response"]) > 2500,
+      f"{r['response'].count(chr(10))} سطر — {len(r['response'])} حرف")
+
+r = b.reply("اكتب كود تطبيق مهام بفلاسك")
+check("خ11 كود: تطبيق مهام flask فيه مسارات REST",
+      r["source"] == "big_code" and "Flask" in r["response"]
+      and "app.route(" in r["response"].lower(), str(r)[:120])
+
+r = b.reply("اكتب كود نظام إدارة مكتبة")
+check("خ11 كود: نظام مكتبة بكلاسات ودوال كتير",
+      r["source"] == "big_code" and "class Library" in r["response"]
+      and r["response"].count("def ") >= 5, str(r)[:120])
+
+r = b.reply("اكتب كود خوارزميات الترتيب")
+check("خ11 كود: خوارزميات الترتيب والبحث",
+      r["source"] == "big_code" and "merge_sort" in r["response"]
+      and "binary_search" in r["response"], str(r)[:120])
+
+r = b.reply("اكتب كود آلة حاسبة")
+check("خ11 كود: آلة حاسبة بمحلل تعبيرات",
+      r["source"] == "big_code" and "class Calculator" in r["response"], str(r)[:120])
+
+r = b.reply("make me a python calculator")
+check("خ11 كود: طلب إنجليزي بيتفهم برضه",
+      r["source"] == "big_code" and "class Calculator" in r["response"], str(r)[:120])
+
+r = b.reply("اكتب كود مركب فضاء")
+check("خ11 كود: موضوع بره القوالب = دليل صريح بالقوايم (مش أكواد مخترعة)",
+      r["source"] == "big_code" and "تطبيق مهام" in r["response"]
+      and "لعبة إكس-أو" in r["response"], str(r)[:120])
+
+r = b.reply("يعني ايه كود نظيف")
+check("خ11 كود: كلام عام عن الأكواد ما بيدخلش المولد",
+      r["source"] != "big_code", r["source"])
+
+# --- تكوين الجمل: تركيبات جديدة بنفسه من بنوك الكلمات ---
+r = b.reply("كوّن جملة")
+check("خ11 جمل: «كوّن جملة» = تركيبة جديدة + شرح التركيب",
+      r["source"] == "compose" and "1)" in r["response"]
+      and ("فاعل" in r["response"]), str(r)[:120])
+
+r = b.reply("اكتب جملة عن البحر")
+check("خ11 جمل: الموضوع بيدخل جوه التركيبة",
+      r["source"] == "compose" and "البحر" in r["response"]
+      and "2)" in r["response"] and "3)" in r["response"], str(r)[:120])
+
+sent1 = b.reply("كوّن جملة")["response"]
+sent2 = b.reply("اكتب جملة عن الفضاء")["response"]
+check("خ11 جمل: كل نداء بيجيب تركيبة جديدة (مش منسوخة)",
+      sent1 != sent2 and "الفضاء" in sent2, sent2[:80])
+
+r = b.reply("compose a sentence about the sea")
+check("خ11 جمل: إنجليزي — subject + verb + object",
+      r["source"] == "compose" and "sea" in r["response"]
+      and "subject" in r["response"], str(r)[:120])
+
+# --- سياق المحادثة: المتابعات القصيرة بترجع لآخر موضوع ---
+b_ctx = Brain(_DummyEngine())
+b_ctx.learned = LearnedMemory(os.path.join(tmp_dir, "learned_ctx.json"))
+b_ctx.cfg.api_key = ""
+b_ctx.cfg.search_enabled = False
+b_ctx.reply("كلمني عن القاهرة")
+r = b_ctx.reply("كمان")
+check("خ11 سياق: «كمان» بعد موضوع بيرجع للموضوع نفسه",
+      r["source"] == "context" and "القاهرة" in r["response"], str(r)[:120])
+r = b_ctx.reply("طب")
+check("خ11 سياق: «طب» بيفضل على نفس الموضوع",
+      r["source"] == "context" and "القاهرة" in r["response"], str(r)[:120])
+check("خ11 سياق: سؤال جديد بيبدأ موضوع جديد",
+      _brain._topic_of("كلمني عن الاسكندرية") == "الاسكندرية"
+      and _brain._topic_of("كمان") == "", str(_brain._topic_of("كمان")))
+
+# --- سياق الإدخال والإخراج: رسايل طويلة جدًا وردود ضخمة ---
+big_msg = "مساء الخير يا سشات ازيك عامل ايه اتمنى تكون بخير انا دلوقتي قاعد في البيت " * 170
+r = b.reply(big_msg)                       # رسالة ~8000 حرف
+check("خ11 سياق: رسالة ~8000 حرف بتتقبل وبتترود",
+      isinstance(r, dict) and "response" in r, str(r)[:80])
+check("خ11 سياق: حد الإدخال في الواجهة 8000 حرف",
+      "SESHAT_MAX_MESSAGE_CHARS" in open("app.py", encoding="utf-8").read())
+
+# --- حمايات خ11: النموذج نصي + مفيش بقايا خوفو في البيانات الحية ---
+def _live_data_text():
+    blob = ""
+    for f in ("data/ar_chat.txt", "data/ar_knowledge.txt", "data/en_chat.txt"):
+        blob += open(f, encoding="utf-8").read().lower()
+    return blob
+
+live = _live_data_text()
+check("خ11 حماية: مفيش ادعاء خوفو/توليد صور في بيانات الحوار الحية",
+      "خوفو" not in live and "khufu" not in live
+      and "diffusion" not in live and "750px" not in live)
+check("خ11 حماية: ملفات المولدات الجديدة موجودة وبيان الحالة صحيح",
+      os.path.exists("data/big_code.py") and os.path.exists("data/sent_composer.py")
+      and b.status()["big_code"] is True and b.status()["compose"] is True
+      and b.status()["images"] is False)
+
 print("\n" + "—" * 40)
 if FAILURES:
     print(f"❌ {len(FAILURES)} اختبار فشل: {', '.join(FAILURES)}")

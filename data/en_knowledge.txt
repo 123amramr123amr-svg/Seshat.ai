@@ -419,12 +419,6 @@ a: fish do not breathe water the way we breathe air — they extract the oxygen 
 q: why do we sneeze?
 a: a sneeze is a defensive reflex. when something irritates the lining of the nose — dust, pollen, a virus — a nerve signal reaches the brain and triggers a powerful burst of air that can exceed 150 km/h to eject the irritant. that is why covering with your elbow, not your hand, matters: droplets carry infection far.
 
-q: how does the image request get understood?
-a: the description goes through five lookup stages: exact class match, arabic/english synonyms inside the text, closest word, semantic buckets, and a final nearest-class fallback — so khufu never refuses to draw. free-form descriptions become composites: environment + mood lighting + objects with counts from digits, arabic number words, or plurals.
-
-q: why are the images sharper and more colorful now?
-a: round kh8 raised the crisp procedural weight to 82%, strengthened edge sharpening, and added a vivid layer that boosts color saturation by 1.20x and applies a smooth contrast curve. the result reads as a clear subject with brighter colors instead of a color cloud.
-
 q: What is the largest planet in our solar system?
 a: Jupiter — it is a gas giant so large that all the other planets could fit inside it.
 
@@ -455,3 +449,33 @@ a: Mount Everest in the Himalayas, rising over 8,800 meters above sea level.
 q: Who invented the telephone?
 a: Alexander Graham Bell patented the first practical telephone in 1876.
 
+
+q: how do you think when you answer?
+a: my thinking starts with analysis: first i read the question and detect its kind — math, fact, chat, a code request, or a text-drawing request. then i extract the topic from the meaningful words and drop stop words like "in" and "the". next i check what i learned, because memory has priority; if the local model is confident it answers; if nothing matches i search wikipedia; and if the search brings nothing i compose a reply from my understanding of the question kind itself. so i do not imitate ready answers — i build one step by step, locally, and if a step fails i go back and fix it. that self-correction is the real thinking part, not just the final answer.
+
+q: how do you form new sentences?
+a: sentence composition for me works like building blocks: i keep separate word banks — subjects, verbs, objects, and place/time adverbials — and on every request i assemble a fresh combination with the sentence rule: subject + verb + object + adverbial. if you ask for sentences about a topic like the sea, the topic enters the structure and becomes part of the meaning. what makes them really new is that the combination is generated at request time, not copied from a training file — ask twice and you get two different sets. try: compose a sentence about the sea, then ask again and compare.
+
+q: what are the parts of a sentence?
+a: an english sentence stands on two anchors: a subject (who or what) and a predicate (what happens about it). most sentences add an object that receives the action, and an adverbial of place or time that completes the picture: "the fisherman searches for pearls by the shore" — subject, verb, object, place. verbs agree with their subjects: singular subjects take -s in the present tense. understanding these roles is the foundation of composing clean sentences, and also of writing code that parses text: first decide who does what to whom, then build the words around that decision.
+
+q: how do you build big code?
+a: i build big programs from composable templates: a full flask todo app, a tic-tac-toe game with a smart opponent, a library management system, a sorting and search suite with a live benchmark, and a calculator with an expression parser. each program is composed at request time from ordered parts: header comments explaining every section, classes, functions, a main entry point and a quick self-test. the code arrives ready to run with save-and-run instructions — no network and no external model involved. if you ask for a topic outside the templates i honestly show the available list and walk you through building your idea step by step. try: write code for a todo app.
+
+q: what is a function?
+a: a function is a box for code: it takes inputs called parameters, does its job on them, and returns a result. for example def add(a, b): return a + b — from then on anyone can call add(3, 5) and get 8 without thinking about the details. functions let big programs split into small single-purpose parts, and that makes testing easy: try the function alone, prove it works, then wire it into the rest. when a bug appears you fix one place and every caller benefits automatically. every large program is, in the end, a well-organized collection of small functions with clear jobs.
+
+q: what is a class?
+a: a class is the blueprint that objects are built from: it groups the data and the functions that work on that data into one unit. a Book class holds title, author and availability; a Library class manages the collection with borrow and return rules. when you create "book = Book(title)" you ask the blueprint for a real object that follows the same rules. classes keep big code organized: each object owns its own state and the relationships between objects stay clear. any large system — a library, a bank, a game — is split into classes, and that is the core idea of object-oriented programming.
+
+q: what is an algorithm?
+a: an algorithm is a clear, ordered list of steps that solves a problem and gives a correct result every time. sorting is the classic example: bubble sort compares neighbors, insertion sort plants each item in its place, merge sort splits the list, sorts both halves and merges them, and quick sort picks a pivot and partitions smaller and bigger items. why so many algorithms for the same task? speed differs: some take n-squared steps, others take n-log-n, and the gap explodes with big inputs. understanding the algorithm means understanding the solution before the code — the code is only the translation of the steps.
+
+q: what is an api?
+a: an api is the official way programs talk to each other: fixed endpoints for requests and a fixed shape for answers. a todo app that receives GET on /tasks returns the task list as json, and a POST returns a confirmation — that is an api. the caller needs to know only the routes and formats, not the internal details, so internals can change without breaking anyone. standard methods organize the intent: GET reads, POST adds, PUT updates and DELETE removes. every website you open talks through apis internally, and that shared contract is what lets big systems connect safely.
+
+q: what is debugging?
+a: debugging is a method, not luck. first read the error message honestly — it names the problem type and the line. second reproduce the bug: every-time bugs are easy to catch, random ones point to timing or changing inputs. third split the problem: run parts of the code alone and print values at checkpoints until the first wrong step shows itself. fourth fix the real cause, not the symptom — random edits stack new bugs on old ones. finally write a small test that proves the bug is gone and stays gone. a bug is not a shame; leaving it unexplained is.
+
+q: how do you understand a question?
+a: understanding runs in three stages. cleaning first: arabic letters get normalized (hamza forms merge into plain alef, the feminine taa becomes a plain haa), diacritics and question marks are removed, so a question and its typo variant meet on one shape. then kind detection: is it math, a fact question, chat, an opinion, a price? each kind gets a different answering path, and questions outside my knowledge get an honest "i am not sure" instead of an invented answer. last topic extraction: the meaningful words after the stop words become the search topic — in "who invented the radio" the topic is the radio, not "who". these stages are the difference between a random reply and an answer to what you actually asked.

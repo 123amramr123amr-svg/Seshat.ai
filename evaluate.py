@@ -58,8 +58,14 @@ def run_paraphrase(seshat, show):
         answers.setdefault(normalize_question(it.canonical), it.answer)
     seshat.memory = QuestionMemory(intents, include_holdout=False)
 
-    inside = [(q, {answers[normalize_question(c)] for c in ok},
-               {normalize_question(c) for c in ok}) for q, ok in pt.IN_SCOPE]
+    # تحصين: لو صيغة في paraphrase_tests بتشير لسؤال مش موجود في البيانات
+    # بنتخطاها بدل ما تنهار القياس كلها (اتضح ده باقٍ من جولات قديمة)
+    inside = []
+    for q, ok in pt.IN_SCOPE:
+        ok_ans = {answers[normalize_question(c)] for c in ok
+                  if normalize_question(c) in answers}
+        if ok_ans:
+            inside.append((q, ok_ans, {normalize_question(c) for c in ok}))
     outside = pt.OUT_OF_SCOPE + uq.AR_TEST + uq.EN_TEST
     print(f"{len(inside)} سؤال بصيغة جديدة يعرف ردها | {len(outside)} سؤال برّه اللي اتعلمه\n")
 

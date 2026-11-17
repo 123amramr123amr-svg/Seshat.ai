@@ -16,7 +16,14 @@ seshat.chet — المخ الجديد (brain.py)
   4. الرسم النصي — "ارسم بالمربعات …" → النموذج المحلي بيرسم بنفسه بحروف ومربعات
      (engine.draw) — مخرج نصي في الشات نفسه. مفيش توليد صور خالص (نموذج الصور اتشال
      بطلب المستخدم — أي طلب صورة بيرجع رد مؤدب بيقول إن النموذج نصي).
-  5. مخ خارجي اختياري — لو ضفت مفتاح API متوافق مع OpenAI (زرار الإعدادات
+  5. مولّد الأكواد الضخمة (خ11) — "اكتب كود لعبة اكس او / تطبيق مهام flask…" →
+     برنامج كامل (100+ سطر) بتتكوّن لحظيًا من قوالب data/big_code.py — مضمون
+     100% من غير نموذج ولا نت، بتعليقات عربية وطريقة تشغيل.
+  6. تكوين جمل جديدة (خ11) — "كوّن جملة عن…" → تركيبات جديدة بنفسه من بنوك
+     كلمات (data/sent_composer.py) مع شرح التركيب النحوي — مش منسوخة من الذاكرة.
+  7. سياق المحادثة (خ11) — المتابعات القصيرة («كمان / اكمل / ليه…») بترجع
+     لآخر موضوع اتكلم عنه بدل «مش فاهم قصدك».
+  8. مخ خارجي اختياري — لو ضفت مفتاح API متوافق مع OpenAI (زرار الإعدادات
      ⚙ في الواجهة أو متغيرات البيئة)، الردود بتشتغل بشبكة عصبية ضخمة بترد
      على أي سؤال في الدنيا — و seshat لسه بيحافظ على هويته (seshat من
      تطوير عمرو أحمد).
@@ -30,6 +37,7 @@ import json
 import os
 import random
 import re
+import sys
 import time
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
@@ -38,6 +46,13 @@ import requests
 from engine import extract_question
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+# خ11: مولّد الأكواد الضخمة + مكوّن الجمل — وحدات في data/ بتتكلم بالمسار نفسه
+_DATA_DIR = os.path.join(HERE, "data")
+if _DATA_DIR not in sys.path:
+    sys.path.insert(0, _DATA_DIR)
+from big_code import big_code_request, build_big_code, big_code_guide
+from sent_composer import try_compose
 LEARNED_PATH = os.path.join(HERE, "data", "learned.json")
 CONFIG_PATH = os.path.join(HERE, "data", "config.local.json")
 
@@ -261,6 +276,32 @@ STOP_WORDS = {
 def _sig_words(q):
     """الكلمات المهمة (اللي بتفرق سؤال عن سؤال) — بنستخدمها في مراجعة التشابه"""
     return [w for w in q.split() if len(w) >= 4 and w not in STOP_WORDS]
+
+
+# خ11: سياق المحادثة — متابعات قصيرة بترجع لآخر موضوع اتكلم عنه
+_FOLLOWUP_RE = re.compile(
+    r"^(?:كمان|وزياد[ةه]|زياد[ةه]|اكمل|كمّ?ل|ليه\??|وانت\??|وانت ايه\??|"
+    r"طب\??|طيب\??|more|continue|and you\??|why\??|go on)\W*$",
+    re.IGNORECASE)
+
+_TOPIC_STOP = STOP_WORDS | {
+    "كلمني", "احكيلي", "قوللي", "عايز", "عاوز", "ممكن", "لازم", "جرب",
+    "هات", "خلاص", "كفاية", "بصراحة", "تقصد", "معني", "يعني", "tell",
+    "want", "give", "please", "seshat",
+    # خ11: كلمات المتابعة نفسها ما تبقاش موضوع — عشان السياق يفضل على آخر حاجة حقيقية
+    "كمان", "وزياده", "زياده", "اكمل", "كمل", "طب", "طيب", "وانت",
+    "مش", "انا", "انت", "اوي", "جدا", "كده",
+    "more", "continue", "also", "still",
+}
+
+
+def _topic_of(message):
+    """موضوع الرسالة: أول كلمات معنوية — بيتسجل عشان سياق المحادثة (خ11).
+    الرسايل القصيرة زي «كمان» مش بتجيب موضوع، فآخر موضوع بيفضل قايم."""
+    words = re.findall(r"[\w\u0600-\u06FF]{3,}", message or "")
+    core = [w for w in words
+            if w.lower() not in _TOPIC_STOP and not w.isdigit()]
+    return " ".join(core[:3]) if core else ""
 
 
 class LearnedMemory:
@@ -924,22 +965,25 @@ class Brain:
     # خ10: هوية النموذج النصي — بعد حذف نموذج الصور بطلب المستخدم،
     # سؤال «انت مين» بيرجع هوية نصية صريحة: مفيش توليد صور خالص.
     IDENTITY_AR = ("أنا seshat — النموذج النصي المحلي: حوار وحساب وتعلم ذاتي وبحث، "
-                   "ورسم نصي بالمربعات. مطوّريني عمرو أحمد، وكل حاجة فيا محلية، "
-                   "ومفيش توليد صور خالص.")
+                   "ورسم نصي بالمربعات، وبكوّن أكواد برمجية ضخمة وجمل جديدة بنفسي. "
+                   "مطوّريني عمرو أحمد، وكل حاجة فيا محلية، ومفيش توليد صور خالص.")
     IDENTITY_EN = ("I am seshat — the local text model: chat, math, self-learning and "
-                   "search, plus text drawing with squares. Developed by Amr Ahmed, "
+                   "search, plus text drawing with squares — and i build big code "
+                   "and compose new sentences by myself. Developed by Amr Ahmed, "
                    "fully local, no image generation.")
 
     def __init__(self, engine=None):
         self.engine = engine            # ممكن يكون None في وضع المحلي الخالص
         self.cfg = BrainConfig()
         self.learned = LearnedMemory()
+        self.last_topic = ""            # خ11: آخر موضوع في المحادثة (للسياق)
 
     def status(self):
         return {"search": self.cfg.search_enabled, "api": bool(self.cfg.api_key),
                 "api_model": self.cfg.api_model if self.cfg.api_key else "",
                 "learned": len(self.learned.items),
                 "politeness": True, "images": False,
+                "big_code": True, "compose": True,
                 "images_engine": "مفيش — النموذج نصي بس"}
 
     def _out(self, response, source, source_label="", thinking="",
@@ -964,6 +1008,11 @@ class Brain:
         t0 = time.time()
         out = self._reply(message, temperature=temperature,
                           max_new_tokens=max_new_tokens)
+        # خ11: تسجيل آخر موضوع من الرسالة عشان المتابعات القصيرة تحفظ السياق
+        # («كمان» و«ليه» مش بتجيبوا موضوع، فآخر موضوع بيفضل قايم)
+        topic = _topic_of(message)
+        if topic:
+            self.last_topic = topic
         if not out.get("seconds"):
             out["seconds"] = round(time.time() - t0, 2)
         return out
@@ -994,6 +1043,18 @@ class Brain:
             return self._out(self.IDENTITY_AR if _is_arabic_text(msg) else self.IDENTITY_EN,
                              "identity", "هوية",
                              thinking="سؤال عن هويتي — بجاوب من تعريفي الموحد")
+
+        # 3.6) خ11: متابعة قصيرة («كمان / اكمل / ليه…») — بترجع لآخر موضوع اتكلم عنه
+        if self.last_topic and _FOLLOWUP_RE.match(msg):
+            if _is_arabic_text(msg):
+                text = ("ماشي — لسه معاك في موضوع «%s». اسألني أي سؤال واضح عنه "
+                        "وأنا جاهز، أو لو عايز تفاصيل أكتر اكتب السؤال كامل." % self.last_topic)
+            else:
+                text = ("Still on \"%s\" with you — ask me any clear question "
+                        "about it." % self.last_topic)
+            return self._out(text, "context", "سياق المحادثة",
+                             thinking="متابعة قصيرة — رجعت لآخر موضوع في الكلام",
+                             confidence=1.0)
 
         # 4) الرسم — النموذج نصي بس: مفيش توليد صور خالص (نموذج الصور اتشال خ10).
         #    • "ارسم بالمربعات …" → رسم seshat نفسه بحروف ومربعات (مخرج نصي في الشات).
@@ -1052,6 +1113,22 @@ class Brain:
             return self._out(learned["a"], "learned", "ذاكرة التعلم",
                              thinking="من اللي اتعلمته: «%s»" % learned["q"])
         web_cached = learned if learned and learned.get("src") == "web" else None
+
+        # 6.5) خ11: مولّد الأكواد الضخمة — قوالب بتتكوّن لحظيًا، مضمونة 100% من غير نموذج ولا نت
+        code_req = big_code_request(msg)
+        if code_req:
+            if code_req["kind"] == "template":
+                return self._out(build_big_code(code_req, arabic),
+                                 "big_code", "مولّد الأكواد",
+                                 thinking="كوّنت كود كامل من قوالب التركيب — جاهز للتشغيل")
+            return self._out(big_code_guide(arabic), "big_code", "مولّد الأكواد",
+                             thinking="طلب كود من غير موضوع معروف — عرضت القوايم الجاهزة")
+
+        # 6.6) خ11: تكوين جمل جديدة بنفسه — من بنوك الكلمات، تركيبة جديدة كل مرة
+        sent = try_compose(msg)
+        if sent:
+            return self._out(sent["response"], "compose", "تكوين الجمل",
+                             thinking="كوّنت جمل جديدة من بنوك الكلمات — مش منسوخة من الذاكرة")
 
         # 7) النموذج المحلي: الهوية والأكواد وكل اللي اتعلمه — لو واثق ممنقلش
         local = None
