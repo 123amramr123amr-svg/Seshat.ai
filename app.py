@@ -253,7 +253,7 @@ def chat():
         try:
             from nawah_integration import get_nawah_brain
             nawah_brain = get_nawah_brain()
-            enhanced = nawah_brain.enhance_reply(msg, out.get("response", ""), temperature)
+            enhanced = nawah_brain.enhance_reply(msg, out.get("response", ""), temperature, is_fallback=bool(out.get("fallback")))
             out["response"] = enhanced["reply"]
             out["nawah_analysis"] = enhanced["analysis"]
         except Exception as e:
@@ -350,6 +350,42 @@ def khufu_status():
     st["ready"] = os.path.exists(os.path.join(KHUFU_DIR, "data", "khufu_latest.pt"))
     st["classes"] = [{"id": c[0], "ar": c[1]} for c in khufu_scenes.CLASSES]
     return jsonify(st)
+
+
+
+
+# ---------------- routes لنواة-1 (البنية التحتية المتقدمة) ----------------
+
+@app.route("/nawah-status")
+def nawah_status():
+    try:
+        from nawah_integration import get_nawah_brain
+        nb = get_nawah_brain()
+        st = nb.get_stats()
+        st["ready"] = True
+        st["enabled_in_chat"] = os.environ.get("SESHAT_USE_NAWAH", "0") == "1"
+        return jsonify(st)
+    except Exception as e:
+        return jsonify(ready=False, error=str(e)), 500
+
+
+@app.route("/nawah-analyze", methods=["POST"])
+def nawah_analyze():
+    data = request.get_json(silent=True) or {}
+    text = str(data.get("text") or data.get("question") or "").strip()
+    if not text:
+        return jsonify(error="اكتب نصًا أو سؤالًا للتحليل أولًا"), 400
+    try:
+        temperature = min(1.5, max(0.0, float(data.get("temperature", 0.75))))
+    except (TypeError, ValueError):
+        temperature = 0.75
+    try:
+        from nawah_integration import get_nawah_brain
+        nb = get_nawah_brain()
+        result = nb.analyze_only(text, temperature=temperature, save_to_db=True)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
 
 
 if __name__ == "__main__":

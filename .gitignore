@@ -18,3 +18,5 @@ data/learned.json
 # سجلات التدريب المؤقتة
 train_*.log
 data/generated/
+
+nawah/*.db

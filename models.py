@@ -6,12 +6,28 @@ Add future model versions here when their checkpoints and runtime adapters exist
 
 MODEL_CATALOG = (
     {
+        "id": "khufu-1.0",
+        "name": "خوفو (khufu 1.0)",
+        "family": "seshat.chet",
+        "status": "active",
+        "engine": "local-ddpm-hybrid",
+        "description": "نموذج توليد الصور المحلي (DDPM 96×96 + الرسم الهجين خ7 حتى 750×750، 19 صنف وتركيبات حرة).",
+    },
+    {
         "id": "seshat-1.0",
         "name": "seshat 1.0",
         "family": "seshat.chet",
         "status": "active",
         "engine": "local",
-        "description": "أول نموذج محلي تجريبي ضمن منصة seshat.chet.",
+        "description": "نموذج المحادثة المحلي (1.33M معامل، سياق 4096 حرف) مع المخ والبحث والتعلم الذاتي.",
+    },
+    {
+        "id": "nawah-1.0",
+        "name": "نواة-1 (nawah 1.0)",
+        "family": "seshat.chet",
+        "status": "active",
+        "engine": "local-nlp-pipeline",
+        "description": "البنية التحتية المتقدمة لتحليل الكلمات العربية والانتباه الذاتي 16D واستخراج المفاهيم وقياس الأصالة.",
     },
 )
 

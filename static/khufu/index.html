@@ -176,7 +176,7 @@
   <div class="hero">
     <div class="hero-badge">🔺</div>
     <div>
-      <h1>خوفو <span class="ver">جولة خ5 · الرسم الهجين</span></h1>
+      <h1>خوفو <span class="ver">جولة خ7 · الرسم الهجين والتركيبات (19 صنف)</span></h1>
     </div>
   </div>
   <p class="sub">نموذج صور محلي 100% — من غير أي خدمة خارجية. خوفو بيولّد أجواء المشهد من أوزانه (DDPM)، ويرسم الأشكال بدقة كاملة، وبيركّب الاتنين في صورة واحدة واضحة — لحد <b style="color:var(--gold)">750×750</b>. اكتب أي حاجة حتى لو مش في القايمة — خوفو عمره ما يرفض، بيرسم أقرب حاجة يعرفها.</p>
@@ -187,7 +187,7 @@
 
   <div class="card">
     <h2><span class="dot"></span> اكتب اللي عايز ترسمه</h2>
-    <input type="text" id="subjectText" placeholder="مثال: ارسم قطة… أو أي حاجة تخطر في بالك">
+    <input type="text" id="subjectText" placeholder="مثال: قارب في البحر وقت الغروب · 3 طيارات ورق على الشاطئ">
     <label>أو اختار صنف متعلم</label>
     <div class="chips" id="chips"></div>
 
@@ -231,7 +231,7 @@
 <script>
 const EMOJI = {sunset:"🌅", night:"🌃", dawn:"🌄", day:"☀️", desert:"🏜️", sea:"🌊",
                forest:"🌲", mountains:"⛰️", city:"🏙️", rain:"🌧️", snow:"❄️",
-               flowers:"🌸", boat:"⛵", birds:"🐦", balloons:"🎈", road:"🛣️"};
+               flowers:"🌸", boat:"⛵", birds:"🐦", balloons:"🎈", road:"🛣️", beach:"🏖️", fish:"🐟", kite:"🪁"};
 let size = 750, steps = 50, picked = null;
 
 async function loadStatus() {

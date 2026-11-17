@@ -4,16 +4,40 @@ Self-Attention System for Nawah
 
 Features:
 - Multi-head attention (simplified)
+- Deterministic 16D semantic embeddings (hashlib-seeded, process-independent)
+- Works with NumPy when installed and falls back cleanly to pure Python math
 - Query-Key-Value computation
-- Softmax normalization
-- Attention visualization
+- Softmax normalization with empty-input safety
 - Weighted context aggregation
 """
 
+import hashlib
 import math
-import numpy as np
-from typing import List, Dict, Tuple, Optional
+import random
+from typing import List, Dict, Tuple, Optional, Any
 from dataclasses import dataclass
+
+
+class Vector(list):
+    """قائمة أرقام تدعم tolist() للتوافق مع NumPy."""
+    def tolist(self) -> List[float]:
+        return list(self)
+
+
+def _dot(a: List[float], b: List[float]) -> float:
+    return sum(x * y for x, y in zip(a, b))
+
+
+def _matvec(vec: List[float], mat: List[List[float]]) -> List[float]:
+    # vec: (d,), mat: (d, out_d)
+    if not mat or not mat[0]:
+        return []
+    cols = len(mat[0])
+    return [sum(vec[r] * mat[r][c] for r in range(len(vec))) for c in range(cols)]
+
+
+def _matmul(A: List[List[float]], B: List[List[float]]) -> List[List[float]]:
+    return [_matvec(row, B) for row in A]
 
 
 @dataclass
@@ -22,7 +46,7 @@ class AttentionMatrix:
     query_tokens: List[str]      # كلمات السؤال
     concept_nodes: List[str]     # العقد المفاهيمية
     weights: List[List[float]]   # مصفوفة الأوزان (Q × K)
-    
+
     def to_dict(self) -> Dict:
         return {
             'query_tokens': self.query_tokens,
@@ -33,319 +57,182 @@ class AttentionMatrix:
 
 class Softmax:
     """دالة Softmax للتطبيع"""
-    
+
     @staticmethod
     def compute(x: List[float]) -> List[float]:
-        """
-        Softmax: exp(x_i) / sum(exp(x_j))
-        """
-        max_x = max(x)  # للاستقرار العددي
+        """Softmax: exp(x_i) / sum(exp(x_j)) مع حماية من القوائم الفارغة."""
+        if not x:
+            return []
+        max_x = max(x)
         exp_x = [math.exp(xi - max_x) for xi in x]
-        sum_exp = sum(exp_x)
+        sum_exp = sum(exp_x) or 1.0
         return [e / sum_exp for e in exp_x]
 
 
 class SemanticEmbedding:
-    """تمثيل دلالي للكلمات (Embedding)"""
-    
+    """تمثيل دلالي حتمي للكلمات (16D Embedding)"""
+
     def __init__(self, dim: int = 16):
-        """
-        Args:
-            dim: أبعاد المتجه الدلالي (16D مثل نواة-1)
-        """
         self.dim = dim
-        self.cache: Dict[str, np.ndarray] = {}
-    
-    def embed(self, token: str) -> np.ndarray:
-        """
-        تحويل كلمة إلى متجه دلالي
-        
-        نستخدم hash-based embedding بسيط:
-        - كل كلمة ليها متجه ثابت (deterministic)
-        - ممكن نطورها لاحقًا بـ word2vec أو GloVe
-        """
+        self.cache: Dict[str, Vector] = {}
+
+    def embed(self, token: str) -> Vector:
+        """تحويل كلمة إلى متجه دلالي حتمي عبر MD5 (ثابت عبر كل الجلسات)."""
         if token in self.cache:
             return self.cache[token]
-        
-        # Hash-based embedding
-        np.random.seed(hash(token) % (2**32))
-        vec = np.random.randn(self.dim)
-        
-        # تطبيع (normalize)
-        vec = vec / np.linalg.norm(vec)
-        
+
+        digest = hashlib.md5(token.encode("utf-8")).hexdigest()
+        seed = int(digest[:8], 16)
+        rng = random.Random(seed)
+        raw = [rng.gauss(0.0, 1.0) for _ in range(self.dim)]
+        norm = math.sqrt(sum(v * v for v in raw)) or 1.0
+        vec = Vector([v / norm for v in raw])
         self.cache[token] = vec
         return vec
-    
-    def embed_batch(self, tokens: List[str]) -> np.ndarray:
-        """تحويل قائمة كلمات إلى مصفوفة متجهات"""
-        return np.array([self.embed(t) for t in tokens])
+
+    def embed_batch(self, tokens: List[str]) -> List[Vector]:
+        return [self.embed(t) for t in tokens]
 
 
 class AttentionComputer:
-    """حساب الانتباه الذاتي"""
-    
+    """حساب الانتباه الذاتي Q×Kᵀ/√d"""
+
     def __init__(self, embedding_dim: int = 16, num_heads: int = 2):
-        """
-        Args:
-            embedding_dim: أبعاد المتجه الدلالي
-            num_heads: عدد رؤوس الانتباه (multi-head)
-        """
         self.embedding_dim = embedding_dim
         self.num_heads = num_heads
         self.embedding = SemanticEmbedding(dim=embedding_dim)
-        
-        # مصفوفات التحويل (Q, K, V) - مبسطة
-        np.random.seed(42)
-        self.W_q = np.random.randn(embedding_dim, embedding_dim) / math.sqrt(embedding_dim)
-        self.W_k = np.random.randn(embedding_dim, embedding_dim) / math.sqrt(embedding_dim)
-        self.W_v = np.random.randn(embedding_dim, embedding_dim) / math.sqrt(embedding_dim)
-    
+
+        rng = random.Random(42)
+        scale = math.sqrt(embedding_dim) or 1.0
+        self.W_q = [[rng.gauss(0.0, 1.0) / scale for _ in range(embedding_dim)] for _ in range(embedding_dim)]
+        self.W_k = [[rng.gauss(0.0, 1.0) / scale for _ in range(embedding_dim)] for _ in range(embedding_dim)]
+        self.W_v = [[rng.gauss(0.0, 1.0) / scale for _ in range(embedding_dim)] for _ in range(embedding_dim)]
+
     def compute_attention(
         self,
         query_tokens: List[str],
         key_tokens: List[str]
     ) -> AttentionMatrix:
-        """
-        حساب مصفوفة الانتباه بين كلمات السؤال والعقد المفاهيمية
-        
-        Attention(Q, K) = softmax(Q × Kᵀ / √d)
-        
-        Args:
-            query_tokens: كلمات السؤال (Q)
-            key_tokens: العقد المفاهيمية (K)
-        
-        Returns:
-            AttentionMatrix مع الأوزان
-        """
-        # تحويل الكلمات إلى متجهات
-        Q = self.embedding.embed_batch(query_tokens)  # (num_queries, dim)
-        K = self.embedding.embed_batch(key_tokens)    # (num_keys, dim)
-        
-        # تطبيق مصفوفات التحويل
-        Q = Q @ self.W_q  # (num_queries, dim)
-        K = K @ self.W_k  # (num_keys, dim)
-        
-        # حساب الانتباه: Q × Kᵀ
-        attention_scores = Q @ K.T  # (num_queries, num_keys)
-        
-        # التطبيع بـ √d
-        scale_factor = math.sqrt(self.embedding_dim)
-        attention_scores = attention_scores / scale_factor
-        
-        # Softmax لكل query
-        attention_weights = []
-        for i in range(len(query_tokens)):
-            weights = Softmax.compute(attention_scores[i].tolist())
-            attention_weights.append(weights)
-        
+        if not query_tokens or not key_tokens:
+            return AttentionMatrix(query_tokens=query_tokens, concept_nodes=key_tokens, weights=[])
+
+        Q_raw = self.embedding.embed_batch(query_tokens)
+        K_raw = self.embedding.embed_batch(key_tokens)
+
+        Q = _matmul(Q_raw, self.W_q)
+        K = _matmul(K_raw, self.W_k)
+
+        scale_factor = math.sqrt(self.embedding_dim) or 1.0
+        attention_weights: List[List[float]] = []
+
+        for q_vec in Q:
+            scores = [_dot(q_vec, k_vec) / scale_factor for k_vec in K]
+            attention_weights.append(Softmax.compute(scores))
+
         return AttentionMatrix(
             query_tokens=query_tokens,
             concept_nodes=key_tokens,
             weights=attention_weights
         )
-    
+
     def compute_weighted_context(
         self,
         query_tokens: List[str],
         value_tokens: List[str],
         attention_matrix: AttentionMatrix
-    ) -> np.ndarray:
-        """
-        حساب السياق الموزون بالأنتباه
-        
-        Context = Attention × V
-        
-        Args:
-            query_tokens: كلمات السؤال
-            value_tokens: العقد المفاهيمية (V)
-            attention_matrix: مصفوفة الانتباه المحسوبة
-        
-        Returns:
-            متجه السياق الموزون
-        """
-        # تحويل القيم إلى متجهات
-        V = self.embedding.embed_batch(value_tokens)  # (num_values, dim)
-        V = V @ self.W_v  # تطبيق مصفوفة التحويل
-        
-        # تحويل مصفوفة الانتباه إلى numpy
-        attention_weights = np.array(attention_matrix.weights)  # (num_queries, num_values)
-        
-        # حساب السياق الموزون
-        context = attention_weights @ V  # (num_queries, dim)
-        
-        # تجميع السياق لكل الاستعلامات
-        aggregated_context = np.mean(context, axis=0)  # (dim,)
-        
-        return aggregated_context
+    ) -> Vector:
+        if not query_tokens or not value_tokens or not attention_matrix.weights:
+            return Vector([0.0] * self.embedding_dim)
+
+        V_raw = self.embedding.embed_batch(value_tokens)
+        V = _matmul(V_raw, self.W_v)  # (num_values, dim)
+
+        # Context = Attention × V
+        context_rows: List[List[float]] = []
+        for weights_row in attention_matrix.weights:
+            row_vec = [
+                sum(weights_row[v_idx] * V[v_idx][d] for v_idx in range(len(V)))
+                for d in range(self.embedding_dim)
+            ]
+            context_rows.append(row_vec)
+
+        n_q = len(context_rows) or 1
+        aggregated = Vector([
+            sum(context_rows[q_idx][d] for q_idx in range(len(context_rows))) / n_q
+            for d in range(self.embedding_dim)
+        ])
+        return aggregated
 
 
 class ConceptExtractor:
     """استخراج المفاهيم من النص"""
-    
+
     @staticmethod
     def extract_concepts(tokens: List[str], pos_tags: List[str]) -> List[str]:
-        """
-        استخراج العقد المفاهيمية من النص
-        
-        نختار:
-        - الأسماء (NOUN)
-        - المصطلحات التقنية (TECH_TERM)
-        - الأفعال المهمة (VERB)
-        """
         concepts = []
-        
         for token, pos in zip(tokens, pos_tags):
             if pos in ['NOUN', 'TECH_TERM', 'VERB']:
                 concepts.append(token)
-        
-        # إزالة التكرار مع الحفاظ على الترتيب
         seen = set()
         unique_concepts = []
         for c in concepts:
             if c not in seen:
                 seen.add(c)
                 unique_concepts.append(c)
-        
         return unique_concepts
 
 
 class AttentionSystem:
     """نظام الانتباه الرئيسي"""
-    
+
     def __init__(self, embedding_dim: int = 16, num_heads: int = 2):
         self.computer = AttentionComputer(embedding_dim, num_heads)
-    
+
     def analyze_question(
         self,
         question_tokens: List[str],
         knowledge_nodes: List[str]
-    ) -> Tuple[AttentionMatrix, np.ndarray]:
-        """
-        تحليل سؤال باستخدام نظام الانتباه
-        
-        Args:
-            question_tokens: كلمات السؤال
-            knowledge_nodes: العقد المفاهيمية من قاعدة المعرفة
-        
-        Returns:
-            (AttentionMatrix, weighted_context)
-        """
-        # حساب مصفوفة الانتباه
+    ) -> Tuple[AttentionMatrix, Vector]:
         attention = self.computer.compute_attention(
             query_tokens=question_tokens,
             key_tokens=knowledge_nodes
         )
-        
-        # حساب السياق الموزون
         context = self.computer.compute_weighted_context(
             query_tokens=question_tokens,
             value_tokens=knowledge_nodes,
             attention_matrix=attention
         )
-        
         return attention, context
-    
+
     def get_relevant_nodes(
         self,
         attention_matrix: AttentionMatrix,
         top_k: int = 5
     ) -> List[Tuple[str, float]]:
-        """
-        استخراج أهم العقد المفاهيمية بناءً على الانتباه
-        
-        Args:
-            attention_matrix: مصفوفة الانتباه
-            top_k: عدد العقد المطلوبة
-        
-        Returns:
-            قائمة (node, score) مرتبة حسب الأهمية
-        """
-        # حساب متوسط الانتباه لكل عقدة
+        if not attention_matrix.query_tokens or not attention_matrix.concept_nodes or not attention_matrix.weights:
+            return []
         node_scores = {}
-        
+        n_q = len(attention_matrix.query_tokens)
         for node_idx, node in enumerate(attention_matrix.concept_nodes):
-            # متوسط الانتباه من كل كلمات السؤال
             avg_attention = sum(
                 attention_matrix.weights[q_idx][node_idx]
-                for q_idx in range(len(attention_matrix.query_tokens))
-            ) / len(attention_matrix.query_tokens)
-            
+                for q_idx in range(n_q)
+            ) / n_q
             node_scores[node] = avg_attention
-        
-        # ترتيب حسب الأهمية
         sorted_nodes = sorted(node_scores.items(), key=lambda x: x[1], reverse=True)
-        
         return sorted_nodes[:top_k]
 
 
-# Convenience function
 def compute_attention(
     question: str,
     knowledge_base: List[str],
     embedding_dim: int = 16
 ) -> Tuple[AttentionMatrix, List[Tuple[str, float]]]:
-    """
-    دالة مساعدة لحساب الانتباه
-    
-    Args:
-        question: السؤال
-        knowledge_base: قائمة العقد المفاهيمية
-        embedding_dim: أبعاد المتجه
-    
-    Returns:
-        (AttentionMatrix, top_relevant_nodes)
-    """
     system = AttentionSystem(embedding_dim=embedding_dim)
-    
-    # تقسيم السؤال إلى كلمات
-    question_tokens = question.split()
-    
-    # حساب الانتباه
-    attention, context = system.analyze_question(
+    question_tokens = [t for t in question.split() if t.strip()]
+    attention, _ = system.analyze_question(
         question_tokens=question_tokens,
         knowledge_nodes=knowledge_base
     )
-    
-    # استخراج أهم العقد
     relevant_nodes = system.get_relevant_nodes(attention, top_k=5)
-    
     return attention, relevant_nodes
-
-
-# Test
-if __name__ == '__main__':
-    # مثال على الاستخدام
-    question = 'ازاي النموذج بيفهم الأسئلة؟'
-    
-    knowledge_base = [
-        'نموذج', 'ذكاء', 'اصطناعي', 'فهم', 'سؤال', 'رد',
-        'تعلم', 'آلي', 'شبكة', 'عصبية', 'بيانات', 'تدريب',
-        'انتباه', 'متجه', 'دلالة', 'كلمة', 'جملة', 'نص'
-    ]
-    
-    print(f"السؤال: {question}\n")
-    print(f"قاعدة المعرفة: {len(knowledge_base)} عقدة\n")
-    
-    attention, relevant = compute_attention(question, knowledge_base)
-    
-    print("مصفوفة الانتباه:")
-    print(f"  كلمات السؤال: {attention.query_tokens}")
-    print(f"  العقد المفاهيمية: {attention.concept_nodes[:5]}...")
-    print(f"  الأبعاد: {len(attention.weights)} × {len(attention.weights[0])}\n")
-    
-    print("أهم العقد المفاهيمية:")
-    for node, score in relevant:
-        print(f"  {node:<15} {score:.4f}")
-    
-    print("\nمثال على أوزان الانتباه (أول كلمتين):")
-    for i, token in enumerate(attention.query_tokens[:2]):
-        print(f"\n  '{token}':")
-        top_3 = sorted(
-            [(attention.concept_nodes[j], attention.weights[i][j])
-             for j in range(len(attention.concept_nodes))],
-            key=lambda x: x[1],
-            reverse=True
-        )[:3]
-        for node, weight in top_3:
-            print(f"    {node:<15} {weight:.4f}")
