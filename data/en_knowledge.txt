@@ -682,3 +682,45 @@ A: Plain steel oxidizes with moisture, and the rust eats into the metal. Adding 
 # ---------- خ14: long context cover ----------
 Q: i am a civil engineer preparing a lecture on energy and infrastructure for final-year students, and this lecture is graded by an evaluation committee so any scientific slip would damage my professional standing in front of them, i have gathered scattered sources and each gives different efficiency and cost figures, i need the working principle explained rather than just numbers, and i must be able to answer committee questions that begin with why and how rather than figures, since the topic crosses physics and economics together, so the precise question i need answered carefully and directly is: how does a solar cell work, and why is solar energy important for developing countries?
 A: A solar cell uses a semiconductor property: photons knock electrons loose in silicon, generating electric current directly with no moving parts and no fuel — one physical principle behind a whole economy, which is exactly the framing a committee respects. For developing countries the importance is practical: panels run anywhere with sun without a central grid, manufacturing costs keep falling year after year, and solar has become the cheapest new electricity source in many nations — clean, distributed energy, the opposite of centralized oil.
+Q: How many times does the human heart beat per day?
+A: About 100,000 beats a day pumping roughly 7,500 liters of blood, which is around 35 million beats a year without stopping.
+Q: How much blood is in an adult human body?
+A: About 5 liters, 7-8% of body weight; plasma makes up about 55% and cells about 45%, and it is constantly renewed in bone marrow.
+Q: How many bones are in the adult human body?
+A: 206; babies start with about 300 and some fuse during growth. The femur is the longest and the stapes in the ear is the smallest at about 3 mm.
+Q: What is the largest organ of the human body?
+A: The skin: about 2 square meters and roughly 4 kg, the first barrier against germs; the liver is the largest internal organ.
+Q: How many neurons are in the human brain?
+A: About 86 billion neurons connected by hundreds of trillions of synapses, consuming about 20% of the body's energy despite being only 2% of its weight.
+Q: How fast do nerve signals travel?
+A: Up to about 120 meters per second (430 km/h) in thick myelinated nerves, which is why your reactions feel instant.
+Q: How strong is human stomach acid?
+A: pH between 1.5 and 3.5, strong enough to dissolve metal; a mucus layer protects the stomach wall from digesting itself.
+Q: How many alveoli are in human lungs?
+A: About 300-500 million air sacs with a total surface near 70 square meters, a whole apartment folded inside the chest for gas exchange.
+Q: What does the liver do?
+A: More than 500 jobs: filtering toxins, storing glycogen and vitamins, producing bile for fat digestion, and it is the only organ that fully regenerates.
+Q: How many muscles are in the human body?
+A: Over 600 muscles; the masseter in the jaw is strongest for its size and the gluteus maximus is the largest, burning most of the body's energy in motion.
+Q: How many colors can the human eye distinguish?
+A: About 10 million shades; the retina holds 120 million rods for dim light and 6 million cones for color and detail.
+Q: What is normal fasting blood sugar?
+A: 70-100 mg/dL regulated by insulin from the pancreas; repeated fasting values above 126 suggest possible diabetes.
+Q: What is normal blood pressure?
+A: Around 120/80 mmHg for adults: the first number is systolic during heart contraction and the second is diastolic during relaxation; regular checks matter more than one reading.
+Q: How does the immune system work?
+A: White blood cells recognize and attack microbes, and the lymphatic system builds antibody memory so old infections are recognized instantly and cleared fast.
+Q: Why do allergies happen?
+A: The immune system overreacts to a harmless substance like dust or pollen and releases histamine causing congestion and itching; the reaction, not the substance, is the problem.
+Q: How many hours of sleep do adults need?
+A: 7-9 hours; deep sleep consolidates memory and releases growth hormone, while chronic sleep loss raises the risk of heart disease and obesity.
+Q: How much of the human body is water?
+A: About 60% of adult weight and about 73% of the brain; we lose 2.5 liters a day through urine, sweat and breath, so drinking 2-3 liters is essential.
+Q: How does the body make vitamin D?
+A: Skin produces it from UVB sunlight in 10-20 minutes a day; it helps absorb calcium for strong bones, and deficiency is very common with little sun.
+Q: What is hemoglobin?
+A: A protein in red blood cells that carries oxygen from the lungs to the tissues; it needs iron, and iron deficiency is the most common cause of anemia.
+Q: How fast does human hair grow?
+A: About 1 cm per month, faster in summer; the scalp has around 100,000 follicles out of about 5 million on the whole body.
+Q: I am a school nurse preparing a 10-minute talk for a parents evening, and the headmaster asked me to include real numbers that surprise people, not generic advice. I want to cover five things: how much blood an adult carries and what it is made of, the real number of bones and why babies have more, how much the heart works per day in beats and liters, how fast nerve signals actually travel, and why sleep matters with concrete hours and effects. Can you give me one striking accurate fact for each of these five points that I can quote directly, plus one practical takeaway for busy parents about sleep and screens?
+A: Here are five striking, accurate facts. Blood: an adult carries about 5 liters, 7-8% of body weight, with plasma around 55% and cells 45%. Bones: adults have 206 while babies start near 300 because some fuse during growth. Heart: about 100,000 beats and roughly 7,500 liters pumped every single day. Nerves: signals travel up to 120 meters per second, faster than a racing car. Sleep: adults need 7-9 hours; deep sleep consolidates memory and chronic loss raises heart risk. Takeaway for parents: keep screens off for the last hour before bed, because bright light delays the sleep hormone and steals the deepest sleep hours.

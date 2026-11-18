@@ -16,6 +16,15 @@ def detect_tool_request(message: str) -> Optional[Dict[str, Any]]:
         dict: {'tool': اسم الأداة, 'params': المعاملات} أو None
     """
     msg_lower = message.lower().strip()
+
+    # 0. خ15 — أدوات نصية متقدمة محلية (وحدات/إحصاء/تلخيص/أرقام/تواريخ/كلمات مرور)
+    try:
+        from text_tools import try_text_tool
+        _tt = try_text_tool(message)
+        if _tt:
+            return {'tool': 'text_tool', 'params': {'result': _tt[0]}}
+    except Exception:
+        pass
     
     # 1. تصفح الويب المتقدم
     browse_patterns = [
@@ -184,6 +193,9 @@ def execute_tool_request(tool_request: Dict[str, Any]) -> str:
                 return response
             else:
                 return f"❌ فشل تحليل الصورة: {result['error']}"
+        
+        elif tool == 'text_tool':
+            return params['result']
         
         elif tool == 'remember':
             memory = tools.remember(**params)

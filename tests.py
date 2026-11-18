@@ -542,6 +542,39 @@ check("خ12: سيرفر فيه /api/long وحد السياق ٢م",
       "api/long" in open("app.py", encoding="utf-8").read()
       and "16 * 1024 * 1024" in open("app.py", encoding="utf-8").read())
 
+# ============================================================
+# خ15 — الأدوات النصية المتقدمة المحلية (text_tools)
+# ============================================================
+print("\n16) خ15 — الأدوات المتقدمة: وحدات/أرقام بالحروف/إحصاء/تلخيص/تواريخ/كلمات مرور")
+from text_tools import (try_text_tool, convert_units, number_to_arabic_words,
+                        summarize, text_stats, num_stats, gen_password,
+                        password_strength, date_diff, digits_convert, day_of_year)
+
+check("خ15: طول كم→م", convert_units("حوّل 5 كيلومتر الى متر") and "5000" in convert_units("حوّل 5 كيلومتر الى متر"))
+check("خ15: حرارة F→C", "37.7" in convert_units("حوّل 100 فهرنهايت الى سيلسيوس"))
+check("خ15: بيانات GB→MB", "3072" in convert_units("حوّل 3 جيجابايت الى ميجابايت"))
+check("خ15: سرعة كم/س→م/ث", "25" in convert_units("حوّل 90 كم/ساعة الى متر/ثانية"))
+check("خ15: متر إلى كم بالعكس", convert_units("حوّل 7 متر الى كم") and "0.007" in convert_units("حوّل 7 متر الى كم"))
+check("خ15: رقم بالحروف مركب", number_to_arabic_words(125) == "مائة وخمسة وعشرون")
+check("خ15: آلاف الجمع", "آلاف" in number_to_arabic_words(3005))
+check("خ15: صفر بالحروف", number_to_arabic_words(0) == "صفر")
+check("خ15: إحصاء numpy", num_stats([4, 8, 15, 16, 23, 42]) and "المتوسط: 18" in num_stats([4, 8, 15, 16, 23, 42]))
+_s15 = ("مصر بلد فيه تاريخ كبير. النيل بيمر في وسطها وسكانها كتير جدًا. "
+        "القاهرة عاصمتها وأكبر مدنها على الإطلاق. الزراعة بتعتمد على النيل من آلاف السنين. "
+        "السياحة من أهم مصادر الدخل القومي والاقتصاد بيحاول ينمو بسرعة.")
+check("خ15: تلخيص استخراجي", summarize(_s15) and len(summarize(_s15).splitlines()) <= 4)
+check("خ15: تحليل نص", "عدد الكلمات" in text_stats("مرحبا بكم في النص التجريبي السريع"))
+check("خ15: فرق تواريخ", "59 يوم" in date_diff((2026, 1, 1), (2026, 3, 1)))
+check("خ15: رقم اليوم في السنة", "اليوم رقم" in day_of_year((2026, 11, 19)))
+_pw15 = gen_password(20)
+check("خ15: توليد كلمة مرور", len(_pw15) == 20 and any(c.isdigit() for c in _pw15) and any(c.isupper() for c in _pw15))
+check("خ15: قياس قوة المرور", "قوية" in password_strength("Abc123!@#xY"))
+check("خ15: أرقام هندية→إنجليزية", "65" in digits_convert("سعر ٦٥ جنيه"))
+check("خ15: الموزع العام للأدوات", try_text_tool("حوّل 5 كيلومتر الى متر") and "5000" in try_text_tool("حوّل 5 كيلومتر الى متر")[0])
+_rb15 = b.reply("حوّل 3 جيجابايت الى ميجابايت")
+check("خ15: المخ بيوجه للأداة المتقدمة", _rb15.get("source") == "tools" and "3072" in _rb15.get("response", ""),
+      str(_rb15.get("source")))
+
 print("\n" + "—" * 40)
 if FAILURES:
     print(f"❌ {len(FAILURES)} اختبار فشل: {', '.join(FAILURES)}")

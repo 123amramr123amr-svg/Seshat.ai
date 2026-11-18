@@ -1043,6 +1043,17 @@ class Brain:
         if math:
             return self._out(math, "math", "حساب", thinking="حسبتها بنفسي بدقة")
 
+        # 3.1) خ15 — أدوات نصية متقدمة محلية: وحدات، إحصاء، تلخيص، أرقام بالحروف،
+        #      تواريخ، كلمات مرور، تحليل نص — كلها بلا إنترنت وبلا مكتبات جديدة
+        try:
+            from text_tools import try_text_tool
+            _tool = try_text_tool(msg)
+        except Exception:
+            _tool = None
+        if _tool:
+            return self._out(_tool[0], "tools", "أداة متقدمة",
+                             thinking=_tool[1], confidence=1.0)
+
         # 3.5) سؤال الهوية — من تعريف النموذج الموحد نفسه مش من الكوربس
         if _IDENTITY_Q.search(msg) and len(msg) <= 60:
             return self._out(self.IDENTITY_AR if _is_arabic_text(msg) else self.IDENTITY_EN,
