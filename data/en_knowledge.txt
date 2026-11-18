@@ -612,3 +612,73 @@ A: Mass is the amount of matter in an object and stays constant everywhere; weig
 # ---------- خ13: long context cover ----------
 Q: i am a journalist preparing a report on materials that changed history, and every source i read covers a different material with conflicting numbers, while this report will be read by millions of readers so any factual error will be visible to all of them, and i need exact years instead of estimates, plus a modern-material comparison readers always enjoy, so the precise question i need answered carefully and directly is: what is plastic made of, and does it decompose in the environment?
 A: Plastics are polymers built from oil and natural gas after cracking into small molecules and linking them, numbered from 1 to 7 (PET bottles, HDPE containers and more). The key point for your report: plastic barely decomposes — it fragments into microplastics polluting seas and wildlife, so reducing and recycling are the real solutions, unlike older materials such as paper and glass which re-enter the production cycle far more easily.
+
+
+# ---------- خ14: nature, energy & everyday inventions (20 entries) ----------
+Q: why does lightning come before thunder | lightning and thunder | see lightning before hearing sound
+A: Both happen at the same moment, but light travels far faster than sound: light at 300,000 km per second, sound at 340 meters per second. So we see the flash first — and the gap tells you the storm's distance: every 3 seconds between flash and thunder means roughly one kilometer.
+
+Q: why do earthquakes happen | what causes earthquakes | what does the richter scale measure
+A: Earthquakes happen when stress accumulates in rock from moving tectonic plates and releases suddenly as seismic waves. The Richter scale and the moment magnitude scale measure that energy — each full step means roughly 32 times more energy released.
+
+Q: why do volcanoes erupt | magma vs lava difference | what is an active volcano
+A: Magma is molten rock beneath the crust; when it reaches the surface it becomes lava. Eruptions happen when gases trapped in thick, sticky magma build pressure and blast out, while runny magma erupts more gently in flows. The Pacific Ring of Fire holds about 75% of the world's volcanoes.
+
+Q: why is the sea salty | what makes ocean water salty | where does seawater come from
+A: Ocean salt came from rain washing minerals out of rocks over hundreds of millions of years and carrying them to the sea, with rivers adding more daily. Fresh water evaporates from the surface while salt stays behind, concentrating to about 3.5% — nearly a spoon of salt per cup of seawater.
+
+Q: how do clouds form | why are clouds white or black | what are cumulus clouds
+A: Clouds form when water vapor condenses around tiny particles as air cools. Thin clouds look white because they scatter light evenly; when they thicken with heavy water content, light cannot pass through and they turn grey or dark. Cumulus clouds are the ones bringing heavy rain and storms.
+
+Q: where does wind come from | what causes wind | what is the prevailing wind
+A: Wind is air moving from high-pressure to low-pressure zones, and the pressure difference comes from uneven solar heating: land heats faster than sea, air rises, and other air replaces it. In Egypt the northwesterly wind prevails and moderates summer heat, while the khamsin is a southern wind carrying sand and heat.
+
+Q: why does honey never spoil | does honey expire | properties of honey
+A: Honey barely spoils because its moisture is very low, its acidity high, and its sugar extremely concentrated — bacteria and mold cannot grow there. Bee enzymes add extra protective properties. Sealed away from humidity it stays good for years, which made it a symbol of permanence in ancient times.
+
+Q: why is salt important | history of salt | why was salt once so valuable
+A: Salt was real money: some Roman soldiers were paid in it, which is where the word salary comes from. Beyond food, it was the only way to preserve fish and meat before refrigeration, so whoever controlled salt sources controlled trade. The body needs it in small amounts for fluid balance and nerve function.
+
+Q: where did tea come from | history of tea | green tea vs black tea difference
+A: Tea came from China — legend says around 2737 BC — and spread worldwide through trade. The types differ by processing, not by plant: green tea is quickly dried without fermentation and keeps its color; black tea is fully fermented, darker and stronger; oolong sits halfway between them.
+
+Q: how was coffee discovered | history of coffee | origin of coffee
+A: Tradition says an Ethiopian goatherd noticed his goats becoming energetic after eating berries from a certain tree. Coffee traveled from Ethiopia to Yemen and then across world ports. Egyptian and Arabic coffee is lightly roasted, Turkish is simmered, and Italian espresso is forced through under high pressure in seconds.
+
+Q: where did silk come from | history of silk | what was the silk road
+A: Silk was discovered in China over 4,000 years ago from the cocoon of the silkworm, and its making stayed a state secret punished by death. World demand opened the historic Silk Road: a network linking China to Asia, the Middle East and Europe, moving goods, ideas and science for centuries.
+
+Q: where does rubber come from | history of rubber | natural vs synthetic rubber
+A: Natural rubber is the sap of a South American tree that local peoples called the weeping tree. Vulcanization made it elastic in heat and stable in cold, opening the age of tires; synthetic rubber was developed from oil during World War II when natural supply was cut off.
+
+Q: how does petroleum form | where does oil come from | why is oil an important fuel
+A: Petroleum formed from the remains of tiny sea creatures buried for geological ages, their biological energy stored under pressure and heat. It is now the core fuel of transport and industry, but burning it releases carbon dioxide — which is why the world is gradually shifting to renewable energy.
+
+Q: how does coal form | where does coal come from | types of coal
+A: Coal is ancient plants buried fast enough that they did not fully decay, then compressed for ages: brown lignite gives less heat and more smoke, while anthracite is the purest and most energetic. It powered the industrial revolution's factories and trains, and is now declining as the dirtiest fuel.
+
+Q: how does solar power work | what is a solar cell | why is solar energy important
+A: A solar cell uses a property of semiconductors: light knocks electrons loose in silicon, generating electric current directly — no motion, no fuel. Panels are clean and work anywhere with sun, and manufacturing costs keep falling, making solar the cheapest new electricity source in many countries.
+
+Q: how do batteries work | disposable vs rechargeable batteries | why does my phone battery degrade
+A: A battery is a chemical reaction between two electrodes through an electrolyte; charging reverses it. Lithium-ion cells age because each cycle slightly breaks down the electrode structure. To extend life: keep charge between 20% and 80%, avoid heat, and avoid keeping it at 100% constantly.
+
+Q: how do elevators work | who invented the elevator | when did elevators become safe
+A: Elevator ideas are old, but the decisive invention was Elisha Graves Otis's 1852 safety brake that stops the car if the cable snaps. That safety brake opened the age of skyscrapers — a vertical city is impossible without it. Modern elevators use counterweights and electronic control for speed and load.
+
+Q: where did mechanical clocks come from | pendulum clock invention | how did timekeeping improve
+A: Mechanical clocks appeared in Europe around the 13th century; accuracy leapt when Galileo and Huygens harnessed the pendulum's steady swing, cutting error from minutes per day to seconds. Today's atomic clocks are accurate to a billionth of a second — and they keep internet and GPS time aligned.
+
+Q: how do satellites work | why doesn't a satellite fall | uses of satellites
+A: A satellite is not flying — it is permanently falling around Earth with enough horizontal speed to keep missing it. Uses cover communications, broadcasting, GPS, weather and Earth observation. A geostationary satellite at 36,000 km orbits at Earth's rotation speed, so it appears fixed in the sky.
+
+Q: counting seconds after lightning | how far away is the storm | flash to thunder distance
+A: We see light before we hear sound because light travels many times faster. Every 3 seconds between the flash and the thunder means the storm is about one kilometer away — and if the gap is under 30 seconds, go indoors immediately because the lightning is already close.
+
+Q: what is stainless steel | why does steel rust | what does chromium do in steel
+A: Plain steel oxidizes with moisture, and the rust eats into the metal. Adding at least 10.5% chromium lets the steel form a thin invisible layer of chromium oxide that seals the surface and blocks oxidation — and it self-repairs if scratched, which is why kitchens, washing machines and hospitals all use it.
+
+
+# ---------- خ14: long context cover ----------
+Q: i am a civil engineer preparing a lecture on energy and infrastructure for final-year students, and this lecture is graded by an evaluation committee so any scientific slip would damage my professional standing in front of them, i have gathered scattered sources and each gives different efficiency and cost figures, i need the working principle explained rather than just numbers, and i must be able to answer committee questions that begin with why and how rather than figures, since the topic crosses physics and economics together, so the precise question i need answered carefully and directly is: how does a solar cell work, and why is solar energy important for developing countries?
+A: A solar cell uses a semiconductor property: photons knock electrons loose in silicon, generating electric current directly with no moving parts and no fuel — one physical principle behind a whole economy, which is exactly the framing a committee respects. For developing countries the importance is practical: panels run anywhere with sun without a central grid, manufacturing costs keep falling year after year, and solar has become the cheapest new electricity source in many nations — clean, distributed energy, the opposite of centralized oil.
