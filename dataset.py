@@ -45,6 +45,11 @@ CAT_WEIGHTS = {
 }
 UNKNOWN_FIXED_WEIGHT = 14.0     # الأنواع اللي من غير موضوع: رد واحد وراه عشرات الأسئلة
 
+# خ13 — هدف خ12 المسجل: المهارة (longdoc) لسه 0% بالتوليد الحر، فالتدريب ده
+# بيعرض أمثلتها ×10 زي أسئلة الهوية بالظبط (المستندات أطول من النافذة فالموديل
+# محتاج يشوفها مرات كتير عشان يتعلم يجيب التفصيلة من آخر المستند).
+LONGDOC_BOOST = 10.0
+
 # أسئلة الهوية (الاسم والمطوّر) لازم تتحفظ كويس جدًا → وزنها بيتضرب في الرقم ده
 IDENTITY_BOOST = 10.0
 IDENTITY_QUESTIONS = {
@@ -365,6 +370,8 @@ def build_intents(holdout=True, verbose=True):
         it.weight = CAT_WEIGHTS.get(it.cat, 1.0) * (it.weight if it.cat == "draw" else 1.0)
         if it.cat == "unknown" and not it.topic:
             it.weight = UNKNOWN_FIXED_WEIGHT
+        if it.cat == "longdoc":               # خ13: عرض ×10 زي هدف خ12 المسجل
+            it.weight *= LONGDOC_BOOST
         if normalize_question(it.canonical) in IDENTITY_QUESTIONS:
             it.weight *= IDENTITY_BOOST
         if not it.think:                       # سطر التفكير: النوع | السؤال بصيغته الأساسية

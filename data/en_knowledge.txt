@@ -542,3 +542,73 @@ a: a long list reads best as organized columns: name, value, note. presentation 
 
 q: what is a backup
 a: a backup is a known-good copy kept so a corrupted current version can be reverted. two principles carry most of the value: take the copy before the risky change, not after, and name it with the date so the right version is obvious later. the habit that saves projects: before any big edit, snapshot with a clear label. restoring from a pre-problem copy is almost always cheaper than repairing a file that broke while you were halfway through fixing it.
+
+
+# ---------- خ13: science, materials & inventions (20 entries) ----------
+Q: who invented paper | history of paper | what is paper made of
+A: Paper was invented by the Chinese court official Cai Lun around 105 AD, made from tree bark and hemp fibers. The method stayed a Chinese secret for centuries before it spread through the Islamic world into Europe.
+
+Q: how does a compass work | why does a compass point north | what is a compass
+A: A compass needle is a free-rotating magnet that aligns with Earth's magnetic field lines, pointing approximately toward geographic north. The Chinese invented it, and sailors later used it to navigate open oceans — it is still the simplest reliable direction tool.
+
+Q: what is a laser | laser uses | how does a laser work
+A: A laser produces coherent, single-color light traveling in an extremely narrow beam. Applications range from eye surgery and barcode scanners to fiber-optic internet links and industrial cutting — one invention serving medicine, communication and manufacturing at once.
+
+Q: what is reinforced concrete | why is steel put inside concrete
+A: Reinforced concrete embeds steel bars inside concrete: concrete resists compression strongly and steel resists tension, so the combination takes the best of both. It is the structural basis of modern bridges, towers and dams.
+
+Q: what is glass made of | who invented glass | history of glass
+A: Glass is made mainly from sand (silicon dioxide) with soda ash and limestone melted above 1500 degrees Celsius. Ancient Egyptians and Phoenicians knew early forms, and the invention of clear, blown glass opened the door to lenses, telescopes and microscopes.
+
+Q: what is steel | difference between iron and steel | why is steel stronger than iron
+A: Steel is iron with a small amount of carbon added (usually under 2%); the carbon blocks iron layers from slipping, multiplying strength. Adding chromium creates stainless steel, the rust-resistant version used in kitchens and bridges.
+
+Q: who invented gunpowder | history of gunpowder | what is gunpowder made of
+A: Gunpowder was invented by Chinese alchemists searching for an elixir of immortality: potassium nitrate, charcoal and sulfur. It transformed warfare and the world, and also enabled fireworks and precise demolition engineering.
+
+Q: how does radar work | what is radar | who invented radar
+A: Radar sends radio waves and receives their reflections from objects; from the return time it computes distance, direction and speed. It matured during World War II and now guides aircraft and ships, tracks weather, and monitors rainfall.
+
+Q: what are microorganisms | bacteria vs viruses | are all germs harmful
+A: Microorganisms are microscopic life: bacteria are single cells that live independently, while viruses are not true cells and need a host cell to multiply. Most are harmless or helpful — they digest food in your gut and make bread and yogurt — only a small fraction cause disease.
+
+Q: how do vaccines work | what is vaccination | why do we need booster doses
+A: A vaccine trains the immune system safely: it presents a harmless form or fragment of the pathogen so the body builds antibodies and immune memory. If the real pathogen arrives, the response starts within hours, before illness develops; boosters strengthen that memory.
+
+Q: how does the brain work | how many neurons in the brain | what does the brain do
+A: The human brain holds about 86 billion neurons communicating through electrical and chemical signals at synapses. It uses 20% of the body's oxygen while weighing only 2%, with specialized regions for movement, senses, language, memory and thinking — and every new learning rewires the network.
+
+Q: why do we dream | what causes dreams | what do dreams mean
+A: Dreams are mental experiences occurring mostly during REM sleep, where the brain replays and emotionally processes the day's memories. The strongest theory says REM sleep consolidates memory and regulates emotion, which explains why REM deprivation harms mood and concentration.
+
+Q: what is the immune system | why do we get sick once and not again | why does immunity weaken
+A: The immune system is a network of cells and proteins that distinguishes foreign microbes from your own cells and attacks them, building memory that prevents re-infection. It weakens with poor sleep, poor diet and stress, and with age — which is why rest, nutrition and vaccination all protect it.
+
+Q: what are vitamins | water-soluble vs fat-soluble vitamins | vitamin deficiency symptoms
+A: Vitamins are small organic compounds the body needs in tiny amounts and cannot fully produce. Water-soluble ones like vitamin C and the B group flush out quickly and need daily intake; fat-soluble A, D, E and K are stored. Deficiencies show distinct signs: low D weakens bones, low C causes scurvy, low A harms night vision.
+
+Q: why is calcium important | foods high in calcium | calcium deficiency effects
+A: Calcium is the body's most abundant mineral: 99% sits in bones and teeth while the rest controls muscle contraction, blood clotting and heartbeat. Milk products, sardines, leafy greens and sesame are rich sources, and absorption requires vitamin D — the two work as a team.
+
+Q: what is plastic made of | does plastic decompose | types of plastic
+A: Plastics are polymers built from oil and natural gas after cracking into small molecules and linking them. Types are numbered 1 to 7: PET for bottles, HDPE for containers, and more. Its greatest strength is also its worst flaw: it barely decomposes, fragmenting into microplastics — so reducing and recycling matter most.
+
+Q: what is gravity | newton's law of universal gravitation | why do things fall
+A: Gravity is the attraction between any two masses; Newton's law says the force grows with the masses and shrinks with the square of the distance. It keeps apples falling, the Moon orbiting Earth and Earth orbiting the Sun — and Einstein later deepened the picture as the bending of spacetime itself.
+
+Q: how do magnets work | what is a magnetic field | why do magnets attract iron
+A: A magnet has north and south poles and attracts iron thanks to the synchronized motion of its electrons. Like poles repel, opposite poles attract, and Earth itself is a giant magnet, which is why compasses work. Motors, generators, speakers and disk drives all run on this principle.
+
+Q: what does a telescope do | who invented the telescope | space vs ground telescopes
+A: A telescope collects light and magnifies the image, revealing what the naked eye cannot see. Galileo first turned one to the sky in 1609 and saw Jupiter's moons. Space telescopes like Hubble and James Webb outperform ground ones because they sit above the atmosphere — no distortion, and access to wavelengths air blocks.
+
+Q: what is a microscope | who invented the microscope | what did the microscope open for science
+A: The microscope revealed an invisible world: pioneer Antonie van Leeuwenhoek ground his own lenses in the 17th century and became the first person ever to see bacteria and protozoa. That discovery opened germ theory and modern medicine; today's electron microscopes resolve individual molecules.
+
+Q: difference between weight and mass | is mass constant | what does mass mean
+A: Mass is the amount of matter in an object and stays constant everywhere; weight is the gravitational force acting on that mass (weight = mass x gravity acceleration). A person with 70 kg mass keeps that mass on the Moon, but their weight there drops to about 11.6 kg-force, one sixth of Earth's.
+
+
+# ---------- خ13: long context cover ----------
+Q: i am a journalist preparing a report on materials that changed history, and every source i read covers a different material with conflicting numbers, while this report will be read by millions of readers so any factual error will be visible to all of them, and i need exact years instead of estimates, plus a modern-material comparison readers always enjoy, so the precise question i need answered carefully and directly is: what is plastic made of, and does it decompose in the environment?
+A: Plastics are polymers built from oil and natural gas after cracking into small molecules and linking them, numbered from 1 to 7 (PET bottles, HDPE containers and more). The key point for your report: plastic barely decomposes — it fragments into microplastics polluting seas and wildlife, so reducing and recycling are the real solutions, unlike older materials such as paper and glass which re-enter the production cycle far more easily.

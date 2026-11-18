@@ -369,3 +369,65 @@ a: it starts with slicing: the document is cut into small chunks and each chunk'
 
 q: if my document is a sales report full of tables and lists and lots of numbers, do you handle it correctly or do numbers get mixed up? | tables and numbers
 a: they keep their arrangement exactly as sent — a table streams line by line and columns hold their positions, so the row-to-column relationship never slips. when you ask what the downtown branch sold in the third quarter, i take a small journey: find the line holding the branch name, take the cell at the crossing of the third-quarter column with that row, and answer with the number exactly as written — no guessing, no rounding. the same applies to numbers inside a long list. if the question is a comparison, i bring both numbers and compare them in front of you. my rule is simple: a number travels from your document to my reply character by character, and if the number you ask about is not in the document, i say it is not there instead of inventing a pretty-looking one.
+
+
+# ---------- خ13: everyday situations (20 entries) ----------
+Q: i feel exhausted today | i am so drained | completely worn out
+A: Take a deep breath and rest a little — when your body says enough, listen. If work is compressed, split it into small chunks with breaks between, and if it lasts several days, start with your sleep and meals first.
+
+Q: i am upset with you | you annoyed me | hurt by your reply
+A: I am really sorry if my reply upset you — that was never my intention. Tell me exactly what bothered you and I will try to fix it and answer you better this time.
+
+Q: i want to change my life | need a fresh start | starting over
+A: A good start is one small steady step, not a giant decision in one day: pick one thing — regular sleep, a daily walk, or a new skill — and do it for 21 days without stopping. Consistency builds confidence, and confidence opens the rest of the road.
+
+Q: i feel useless | feeling stuck in life | nothing works for me
+A: That feeling arrives at milestones, not at truth — exhaustion magnifies failure and hides progress. Write down three things you did this week, however small; you will find more than you expected, and start there.
+
+Q: i have an interview tomorrow | nervous about a job interview | scared of the new job
+A: Nervousness means the matter matters, not that you are weak. Read about the company, answer a few expected questions out loud twice, and sleep early. The first five minutes of the interview are the hardest part — after that the rhythm relaxes on its own.
+
+Q: i feel sad and don't know why | sad for no reason | bad mood without cause
+A: This happens a lot and does not need a big cause — off-balance sleep, too little daylight, or unspoken words can do it. Walk outside in fresh air, call someone you love, and if the feeling lasts two weeks or more, seeing a specialist is self-care, not weakness.
+
+Q: my child is learning to read | how do i teach my kid to read | making children love books
+A: Shared reading works best: fifteen minutes daily reading together and asking "what do you think happens next?" — questions turn the story into a dialogue, not a lesson. Keep books within reach, and never stop him from rereading the same book a hundred times; that repetition is the learning itself.
+
+Q: the driving test is hard | afraid of my driving test | how to pass the driving exam
+A: The test is more nerves than difficulty: practice the known routes, review traffic signs two days before, and during the test take a slow breath before every maneuver and watch the mirrors — most failures are small details, not driving itself.
+
+Q: my friend is upset with me | conflict with a friend | how to fix a broken friendship
+A: The first message that unties the knot is usually "I feel there is distance between us, and I don't want it to grow." You don't need to establish who was wrong — start from common ground and rebuild gradually; healthy friendships survive one honest, polite round.
+
+Q: today is my first day at work | nervous about the first day | starting a new job
+A: Day one is for meeting people, not achieving: memorize your new colleagues' names, write them down afterward, and ask the questions on your mind — whoever doesn't ask in week one pays for it a month later. Keep a small notebook: every system note gets recorded and helps later.
+
+Q: anxious about the result | waiting for exam results | afraid of an important answer
+A: The result ended the moment you submitted — worrying now will not change it, only your mood and focus for the rest of your day. Plan a small project to start right after hearing the news, whatever it is, so the day of the answer begins with something you control.
+
+Q: one day off and don't know what to do | spend my day off at home or go out | making the most of a single free day
+A: The best single day off is half a change of scenery and half real rest: visit somewhere new within three hours, return early, and enjoy something you love guilt-free. New scenery wakes the mind up; rest restocks the body.
+
+Q: my wife is upset with me | my wife hasn't spoken for days | conflict with my wife
+A: Most likely she needs to feel heard before any solution. Sit beside her and say "I can see you're tired — tell me what's on your heart and I'll listen without interrupting." After she has said it fully, ask "what can I do right now to make it easier?" Listening first dissolves the tension.
+
+Q: my mother is ill and i am worried | my parent is in hospital | scared for a family member
+A: Worry becomes useful when it turns into steps: write your questions for the doctor on one sheet — clinic time moves fast — put medication times in a written schedule, and ask a relative to cover one night with you. And guard your own sleep and food; the caregiver needs strength too.
+
+Q: drowning in paperwork | the paperwork is killing me | organizing too many documents
+A: Sort papers into three piles immediately: act now (under two minutes), postpone (with a written date on the back), discard. Any paper with none of these three fates is dead paper — and the rule that keeps order: every new paper gets its verdict the same day.
+
+Q: i want to learn cooking | beginner in the kitchen | what dish should i start with
+A: Start with a dish in clear stages, like pasta with sauce or lentil soup — they teach the basics: sautéing onion, balancing salt, and controlling heat. The rule that speeds learning: prepare all ingredients before turning on the flame (chefs call it mise en place), and reread the recipe the moment you feel lost.
+
+Q: i want to use my phone less | can't stop checking my phone | addicted to screens
+A: The pull is in the design, so the fix is not pure willpower: mute notifications for every non-essential app, keep the phone out of the bedroom at night, and give one golden hour daily with no screen at all. The first week is hard, then the brain genuinely relaxes — and that relaxation is your proof it works.
+
+Q: my sleep schedule is broken | sleeping by day awake by night | fixing my sleep
+A: The fastest fix is morning light: in the first hour after waking, get into sunlight or sit by a bright window, stop screens an hour before bed, and keep the wake-up time fixed even on weekends — the body needs about two weeks to believe the new schedule, then it relaxes on its own.
+
+Q: beginner at the gym | first time at the gym | workout plan for beginners
+A: Start with three days a week: a push day (chest, shoulders, triceps), a pull day (back, biceps), and a legs-and-core day, three sets each — learning correct form before heavy weights. Form is the best investment in the first two months; the weight increases by itself after that.
+
+Q: i miss my school days | feeling nostalgic | remembering the old times
+A: Nostalgia is sweet, but sometimes it carries a message: you miss relationships or energy you had then and lack now. Reaching out is the nearest road to that same feeling — a simple morning message to an old friend reopens a page that was never truly closed.
