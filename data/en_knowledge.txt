@@ -724,3 +724,45 @@ Q: How fast does human hair grow?
 A: About 1 cm per month, faster in summer; the scalp has around 100,000 follicles out of about 5 million on the whole body.
 Q: I am a school nurse preparing a 10-minute talk for a parents evening, and the headmaster asked me to include real numbers that surprise people, not generic advice. I want to cover five things: how much blood an adult carries and what it is made of, the real number of bones and why babies have more, how much the heart works per day in beats and liters, how fast nerve signals actually travel, and why sleep matters with concrete hours and effects. Can you give me one striking accurate fact for each of these five points that I can quote directly, plus one practical takeaway for busy parents about sleep and screens?
 A: Here are five striking, accurate facts. Blood: an adult carries about 5 liters, 7-8% of body weight, with plasma around 55% and cells 45%. Bones: adults have 206 while babies start near 300 because some fuse during growth. Heart: about 100,000 beats and roughly 7,500 liters pumped every single day. Nerves: signals travel up to 120 meters per second, faster than a racing car. Sleep: adults need 7-9 hours; deep sleep consolidates memory and chronic loss raises heart risk. Takeaway for parents: keep screens off for the last hour before bed, because bright light delays the sleep hormone and steals the deepest sleep hours.
+Q: What causes wind?
+A: Wind is air moving from high pressure areas to low pressure ones; uneven heating of the Earth by the sun creates those pressure differences, so wind is basically the planet balancing its heat.
+Q: What is the water cycle?
+A: Water evaporates from oceans, rises, condenses into clouds, falls as rain or snow, and flows back to the sea; the same water has been cycling for billions of years.
+Q: What is a food chain?
+A: The path of energy in nature: plants capture sunlight, herbivores eat plants, predators eat herbivores, and decomposers recycle the remains back into the soil.
+Q: What is an ecosystem?
+A: A community of living things interacting with each other and their environment, like a pond, forest or reef; damage one part, like removing a predator, and the whole system shifts.
+Q: What is acid rain?
+A: Rain mixed with sulfur and nitrogen pollution from factories and vehicles; it lowers the pH of lakes, damages forests and slowly eats away buildings and statues.
+Q: What is the greenhouse effect?
+A: Gases like CO2 and methane trap heat that Earth would radiate back to space; natural greenhouse gases keep Earth livable, but human emissions are amplifying it and warming the planet.
+Q: What is erosion?
+A: The slow wearing away and transport of soil and rock by water, wind and ice; it carves canyons over millions of years but also steals farmland when it runs too fast.
+Q: What is the difference between weather and climate?
+A: Weather is what happens outside right now or this week; climate is the long-term average over decades, so one cold day does not disprove a warming climate.
+Q: What is the equator?
+A: An imaginary line around the middle of Earth at zero latitude, where sunlight hits most directly; countries there have almost equal day and night all year and little seasonal change.
+Q: Why do we have time zones?
+A: Earth rotates 360 degrees in 24 hours, so the sun rises at different moments around the globe; the world is split into 24 main zones, each roughly 15 degrees of longitude wide.
+Q: What is the Grand Canyon?
+A: A colossal gorge in Arizona carved by the Colorado River over about 6 million years; it is up to 1.8 km deep and exposes nearly two billion years of rock layers.
+Q: What is an archipelago?
+A: A chain or cluster of islands, like Indonesia with about 17,000 islands or the Philippines with about 7,600; most form from volcanic activity or rising seas drowning mountains.
+Q: What is desertification?
+A: Fertile land turning into desert from overgrazing, deforestation and drought; it threatens food supplies for millions and can be slowed by planting windbreaks and managing grazing.
+Q: What is permafrost?
+A: Ground that stays frozen for two or more years, mostly in Siberia, Alaska and northern Canada; it stores huge amounts of carbon, and thawing it releases greenhouse gases.
+Q: What is a fjord?
+A: A long, deep sea inlet carved by an ancient glacier, with steep cliffs on both sides; Norway has hundreds of them, and some are more than 200 km long.
+Q: What are the layers of the atmosphere?
+A: Five main layers: troposphere where weather happens, stratosphere with the ozone layer, mesosphere, thermosphere with auroras and satellites, and exosphere fading into space.
+Q: What is latitude and longitude?
+A: A global grid: latitude lines measure distance north or south of the equator, longitude lines measure east or west of Greenwich; together they pin down any spot on Earth.
+Q: What is a savanna?
+A: Tropical grassland with scattered trees, wet and dry seasons, found in Africa; it hosts great migrations of wildebeest and zebra and some of the largest land animals.
+Q: What is a rain shadow?
+A: The dry zone behind a mountain range: moist air rises, drops its rain on the windward side, then descends dry on the other side, creating deserts like the Atacama.
+Q: What is El Nino?
+A: A periodic warming of the central Pacific that shifts rainfall and temperature worldwide, causing floods in some regions and droughts in others every few years.
+Q: I am a travel writer drafting a magazine piece about the Pacific Ocean for readers who love numbers, and my editor rejected my draft because it was vague. I need accurate, quotable facts on six points: the Pacific's area compared to Earth's surface, the Mariana Trench depth with a vivid comparison, how ocean currents like the Kuroshio move heat, the coral triangle and its biodiversity, how many islands the Pacific holds and how they formed, and one honest note about plastic pollution with a real figure. Give me tight sentences I can lift directly into the article, each fact correct and sourced in spirit, written like a magazine, not an encyclopedia entry.
+A: Facts ready to lift. The Pacific covers about 165 million square kilometers, nearly half of Earth's water surface and bigger than all land combined. The Mariana Trench bottoms out near 10,935 meters; drop Everest in and its peak stays more than two kilometers underwater. The Kuroshio current moves warm water past Japan at up to several kilometers per hour, shaping Japanese rainfall the way the Gulf Stream warms Europe. The Coral Triangle between Indonesia, the Philippines and Papua New Guinea holds some 76 percent of known coral species and thousands of fish. The Pacific holds tens of thousands of islands, many born from underwater volcanoes rising over hotspots. Honest note: millions of tons of plastic enter the ocean yearly, and the Great Pacific Garbage Patch between Hawaii and California shows what accumulates when currents converge.
