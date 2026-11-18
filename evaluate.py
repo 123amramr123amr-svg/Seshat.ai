@@ -12,6 +12,7 @@
 """
 
 import argparse
+import os
 import random
 import sys
 import time
@@ -207,6 +208,9 @@ def run_accuracy(seshat, limit, seed):
     from dataset import build_intents
 
     intents = build_intents(holdout=True, verbose=False)
+    # خ12: المستندات الطويلة ليها قياسها الخاص (--long) — مش هتعدّي من حدم
+    # إدخال reply() العادي (أحدث ١٠٠٠ حرف) لأنها أصلاً بتتقرا بالنافذة المنزلقة
+    intents = [it for it in intents if it.cat != "longdoc"]
     rng = random.Random(seed)
     seen = [(rng.choice(it.questions), it, "اتدرب عليها") for it in intents
             if it.questions and it.cat != "unknown"]
@@ -245,12 +249,50 @@ def run_accuracy(seshat, limit, seed):
     print(f"\nالوقت: {time.time() - t0:.0f} ثانية")
 
 
+def run_long(seshat, n=24, seed=777):
+    """
+    خ12 — قياس السياق الممتد: مستندات جديدة تمامًا (بـ seed تاني عن التدريب)
+    والسؤال عن تفصيلة في آخرها. القياس بيكون بالرد الصح بالحرف + سرعة التدفق.
+    """
+    import numpy as _np
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"))
+    import long_docs
+    rng_tests = long_docs.build(seed=seed, count=n)
+    by_kind = {}
+    t0 = time.time()
+    for ex in rng_tests:
+        doc, q = ex["question"].rsplit("\n", 1)
+        r = seshat.reply_long(doc, q, use_fallback=False)
+        s = by_kind.setdefault(ex["kind"], [0, 0, 0.0])
+        s[0] += r["response"] == ex["answer"]
+        s[1] += 1
+        s[2] += r["seconds"]
+        if r["response"] != ex["answer"]:
+            print(f"  ✗ [{ex['kind']}] {q[:60]!r}")
+            print(f"      المطلوب: {ex['answer']!r}")
+            print(f"      الرد:    {r['response'][:100]!r} (ثقة {r['confidence']})")
+    names = {"make_roster": "بطاقة فريق", "make_code": "ملف كود",
+             "make_list": "قايمة تعليمات", "make_log": "سجل جلسة"}
+    total_ok = total_n = 0
+    for kind, (ok, cnt, secs) in sorted(by_kind.items()):
+        print(f"  {names.get(kind, kind):<14} رد صح {ok}/{cnt} = {ok / cnt * 100:.0f}% "
+              f"| متوسط {secs / cnt:.2f} ث")
+        total_ok += ok
+        total_n += cnt
+    print(f"  الإجمالي: {total_ok}/{total_n} = {total_ok / max(1, total_n) * 100:.1f}% "
+          f"| متوسط طول المستند: "
+          f"{int(_np.mean([len(ex['question']) for ex in rng_tests]))} حرف")
+    print(f"الوقت: {time.time() - t0:.0f} ثانية")
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--samples", action="store_true")
     p.add_argument("--paraphrase", action="store_true")
     p.add_argument("--draw", action="store_true")
     p.add_argument("--understand", action="store_true")
+    p.add_argument("--long", action="store_true", help="قياس السياق الممتد (مستندات جديدة + سؤال)")
+    p.add_argument("--long-n", type=int, default=24, help="عدد مستندات قياس --long")
     p.add_argument("--model", default=None, help="ملف نموذج تاني غير الافتراضي")
     p.add_argument("--show", action="store_true", help="مع --paraphrase أو --draw: اطبع اللي غلط فيه")
     p.add_argument("--limit", type=int, default=0)
@@ -268,6 +310,8 @@ def main():
         run_draw(seshat, args.show, args.limit)
     elif args.understand:
         run_understand(seshat, args.limit, args.show)
+    elif args.long:
+        run_long(seshat, args.long_n)
     else:
         run_accuracy(seshat, args.limit, args.seed)
 

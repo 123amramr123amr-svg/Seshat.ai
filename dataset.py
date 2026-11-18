@@ -41,6 +41,7 @@ CAT_WEIGHTS = {
     "math": 0.3,
     "draw": 2.5,          # 896 رد رسم (44 رسمة × 11 لون × لغتين) ≈ 38% من التدريب
     "unknown": 0.3,       # فهم سؤال برّه معلوماته: رد لكل (نوع، موضوع) — وهم كتير
+    "longdoc": 3.0,       # خ12: مستندات طويلة والسؤال عن تفصيلة في أي مكان فيها
 }
 UNKNOWN_FIXED_WEIGHT = 14.0     # الأنواع اللي من غير موضوع: رد واحد وراه عشرات الأسئلة
 
@@ -61,6 +62,7 @@ THINK_LABELS = {
     "capital": ("عاصمة", "capital"),
     "math": ("حساب", "math"),
     "draw": ("رسم", "drawing"),
+    "longdoc": ("مستند", "document"),
 }
 
 
@@ -277,6 +279,28 @@ def load_draw_intents(held_out=False):
 
 
 # ============================================================
+# 6.5) خ12 — المستندات الطويلة (السياق الممتد)
+# ============================================================
+def load_longdoc_intents(seed=20260, count=160):
+    """
+    مستندات (بطاقة فريق، ملف كود، قايمة تعليمات، سجل) والسؤال عن تفصيلة
+    في آخر المستند. نص المستند بيتخزن RAW من غير تطبيع عشان يفضل زي ما
+    المحرك هيبعته وقت التشغيل بالظبط (شوف engine.reply_long).
+    """
+    sys.path.insert(0, DATA_DIR)
+    import long_docs
+    intents = []
+    for ex in long_docs.build(seed=seed, count=count):
+        it = Intent([ex["question"].split("\n")[-1]], ex["answer"], "longdoc",
+                    aug=False, typo=False)
+        it.questions = [ex["question"]]          # النص الكامل: مستند + \n + سؤال
+        it.think = ex["think"]
+        it.mem = False                            # المستندات مبتدخلش ذاكرة الأسئلة
+        intents.append(it)
+    return intents
+
+
+# ============================================================
 # 6) أسئلة برّه اللي اتعلمه
 # ============================================================
 def make_unknown_intents():
@@ -317,6 +341,7 @@ def build_intents(holdout=True, verbose=True):
             print(f"  {name:<22} {len(got):>5} رد")
     for label, loader in (("أكواد", load_code_intents), ("ترجمة وعواصم", load_wordlist_intents),
                           ("حساب", make_math_intents), ("رسومات", load_draw_intents),
+                          ("مستندات طويلة", load_longdoc_intents),
                           ("برّه اللي اتعلمه", make_unknown_intents)):
         got = loader()
         intents += got
@@ -505,13 +530,18 @@ class Dataset:
             Y[i, :len(y)] = torch.tensor(y)
         return X.to(device), Y.to(device)
 
-    def batches(self, batch_size, block_size, device, max_cells=1_000_000, pool=16):
+    def batches(self, batch_size, block_size, device, max_cells=1_000_000, pool=16,
+                window=None, n_sink=8):
         """
         مولّد لا نهائي للباتشات. بنجمع الأمثلة اللي أطوالها قريبة من بعض في نفس الباتش
         عشان منضيعش وقت على الحشو (الأكواد طويلة والمحادثات قصيرة).
 
         max_cells = أقصى (عدد الأمثلة × الطول²) في الباتش الواحد. مصفوفة الانتباه حجمها
         بيزيد مع مربع الطول، فالأمثلة الطويلة لازم تتاخد بعدد أقل عشان الرام متتمليش.
+        window (خ12): لو مش None، كل الحروف بتتدرب بقناع النافذة المنزلقة
+        (كل حرف يشوف آخر window حرف + المراسي — نفس وضع التدفق في التشغيل).
+        للأمثلة الأقصر من النافذة القناع بيطلع قناع سببي عادي تمامًا،
+        فالسلوك بتاع الردود القصيرة ما بيتأثرش خالص.
         """
         self._pad_limit = block_size
         while True:
@@ -524,7 +554,10 @@ class Dataset:
             chunks, cur = [], []
             for p in pairs:
                 T = len(p[0])
-                if T * T > max_cells:            # خ4: مثال ضخم لوحده → تجاهله (حماية رام)
+                # خ12: التقدير بيفضل T² (الحساب الكثيف بيبني المصفوفة كاملة حتى مع
+                # النافذة) — القناع المنزلق بيظبط *السلوك* مش حجم المصفوفة،
+                # والأمثلة الطويلة بتتاخد لوحدها (batch صغير) فالرام محمية.
+                if T * T > max_cells:            # مثال ضخم لوحده → تجاهله (حماية رام)
                     continue
                 if cur and (len(cur) >= batch_size or (len(cur) + 1) * T * T > max_cells):
                     chunks.append(cur)

@@ -479,3 +479,66 @@ a: debugging is a method, not luck. first read the error message honestly — it
 
 q: how do you understand a question?
 a: understanding runs in three stages. cleaning first: arabic letters get normalized (hamza forms merge into plain alef, the feminine taa becomes a plain haa), diacritics and question marks are removed, so a question and its typo variant meet on one shape. then kind detection: is it math, a fact question, chat, an opinion, a price? each kind gets a different answering path, and questions outside my knowledge get an honest "i am not sure" instead of an invented answer. last topic extraction: the meaningful words after the stop words become the search topic — in "who invented the radio" the topic is the radio, not "who". these stages are the difference between a random reply and an answer to what you actually asked.
+
+q: what is a context window
+a: a context window is the stretch of text a model can attend to at once. classic models had a hard limit: text beyond it got cut and everything before the cut vanished. extended context replaces that cut with streaming: the document flows through a fixed-size memory slot by slot, so a two-million-character document is readable on hardware that could never hold it in one pass. the window is measured in tokens or characters, and its size decides how much surrounding detail the model sees while answering.
+
+q: what is a sliding window attention
+a: sliding window attention keeps only the last N positions in full detail while older positions rotate out of memory. each new token occupies the seat of the oldest token, so the window crawls along the text like a carriage window on a train. the compute cost per chunk stays constant no matter how long the document is, which is exactly why streaming a million characters is possible on a small machine. training with the same window keeps training and inference consistent.
+
+q: what are attention sinks
+a: attention sinks are the first few positions of the context that stay resident forever, even as the sliding window rotates everything else. language models like to park a chunk of their attention mass on early tokens — removing those seats makes the attention distribution drift and long streams degrade badly. keeping sink tokens anchored keeps softmax weights stable over unbounded streams, which is the key trick that lets streaming generation run indefinitely without quality collapse.
+
+q: how does streaming text processing work
+a: streaming processes text in consecutive chunks instead of one giant pass. the document is sliced into chunks of a few hundred characters; each chunk is embedded, its keys and values are written into fixed memory seats, and the next chunk follows. because the seat count never grows, memory use is flat from the first character to the millionth. the model then answers from the rolling window plus the anchored sinks, having effectively read every character along the way.
+
+q: extractive vs abstractive summarization
+a: extractive summarization picks real sentences from the source and assembles them; abstractive summarization writes new sentences in the model's own words. extractive output is guaranteed faithful — every sentence exists in the original — which suits contracts and legal text. abstractive output is shorter and smoother but can drift from the source. a good rule: when facts and numbers matter, extract; when readability matters most, abstract, then verify every claim against the original.
+
+q: what is retrieval augmented answering
+a: retrieval-augmented answering splits the problem: an index finds the passages relevant to the question, and the model reads only those passages to answer. it works like a good librarian — you don't read the whole library to answer one question, you open the right page. retrieval plus long context combine well: the index locates where the answer lives, and the long window keeps enough surrounding text for the model to reason about it correctly.
+
+q: how does self attention work
+a: self attention lets every token look at every earlier token and decide what matters. each token produces a query, a key, and a value; queries are compared against keys to score relevance, and values are blended by those scores. this is how a pronoun at the end of a paragraph can pull information from a name at the start. multiple heads run in parallel so different heads can track different relations — one head follows coreference, another follows word order, another follows numbers.
+
+q: what is tokenization
+a: tokenization converts raw text into numbers the model can process. large models typically tokenize into words or subword pieces; character-level models like seshat use one token per character, which is simpler, memory-light, and immune to unknown words, at the cost of longer sequences. because tokens are characters here, context is measured in characters: a 4096-character training window with streaming support up to two million characters of input and output at inference time.
+
+q: what is a kv cache
+a: a kv cache stores the keys and values computed for prompt tokens so they never have to be recomputed. when the first chunk of a prompt is processed, its representations are saved; each subsequent token computes only its own representation and attends to everything stored. this turns generation from quadratic into near-linear per token. seshat also caches attention masks — the same mask is rebuilt once per shape and reused across layers and steps, saving noticeable training and inference time.
+
+q: ram versus persistent storage
+a: ram is fast memory that empties when power is cut; persistent storage is slower but survives restarts. the working rule: live computations live in ram, and anything you cannot afford to lose is written to storage immediately. in seshat the model weights sit in a saved file and load into ram at startup; training checkpoints are written every hundred steps so an interrupted run loses at most that much work, not the whole session.
+
+q: bytes kilobytes megabytes gigabytes
+a: a byte stores roughly one character; a kilobyte is a thousand bytes, a megabyte a million, a gigabyte a billion. a million-character arabic text takes about two megabytes in utf-8 because arabic characters cost two bytes each. so a two-million-character document — the streaming limit here — is only a few megabytes as a file, tiny for storage but enormous for a single attention pass, which is why chunked streaming rather than one-pass attention is the right architecture.
+
+q: what is a log file
+a: a log file is an append-only record where each line carries a timestamp and one event. unlike user-facing messages, logs exist for diagnosis after the fact. lines are usually graded: info for normal flow, warning for something odd, error for a real failure. smart debugging starts at the last error and walks backward in context, because a failure is usually the downstream result of an event seconds earlier, not the first thing that went wrong.
+
+q: what is a database index
+a: an index is a helper structure that keeps one column of data sorted so lookups skip scanning every row. without an index a query inspects each row in turn; with one, the search jumps straight to the matching range, like a book index jumping to the right page. the tradeoffs: indexes cost extra storage and slightly slow writes, so you index the columns you actually search, not every column by reflex.
+
+q: what is continual learning
+a: continual learning means absorbing new knowledge without erasing the old. the classic failure is catastrophic forgetting: heavy training on new material overwrites old skills. the standard defense is data mixing — new examples train alongside a sample of the old — plus a small learning rate, few steps, and a quality gate that re-measures old accuracy afterward; if it drops beyond tolerance, the previous model is restored and only the code changes are kept.
+
+q: what is spaced repetition
+a: spaced repetition schedules reviews at the moment forgetting is about to start: first within a day, then after three days, a week, a month. each successful recall stretches the interval, because memory strength compounds with effortful retrieval rather than passive rereading. the forgetting curve shows most loss happens on day one, which is why the first quick review matters more than all later ones. the same principle justifies re-sampling old examples during model training.
+
+q: how to write a good report
+a: a strong report opens with the conclusion in three lines, then walks through background, data, analysis, and recommendations. the key inversion: the summary goes first, not last, because a busy reader should get the answer in ten seconds. numbers must carry comparisons and sources — 'sales reached 120 thousand, up 15 percent over last month' beats 'sales were good'. every figure names where it came from, and the recommendations say who does what by when.
+
+q: why project documentation matters
+a: documentation lets a new person understand the work without interviewing everyone. the essential pieces: a readme that gets the project running in five minutes, then an architecture note explaining the big decisions and why they were made. the deadliest documentation mistake is writing it once and letting it rot — an outdated document that lies is worse than no document. rule: any significant code change gets documented the same day, while the reasoning is still fresh.
+
+q: how to split long code into functions
+a: a good function does exactly one thing, and its name states that thing. once a function passes about forty lines or nests deeply, a natural seam usually exists: prepare the inputs, compute, return the result. the payoff is more than aesthetics — small functions get clear names, so the code reads like sentences; each function earns its own test covering normal and edge cases; and a bug found inside one function is fixable without touching the rest.
+
+q: what is utf-8 encoding
+a: utf-8 is the universal text encoding: english letters cost one byte, arabic and chinese characters cost two or three, and every writing system coexists in one scheme. the practical rule: open and write text files as utf-8 always. if an arabic file opens as garbled symbols, the file is fine — the reader used the wrong encoding. in python, pass encoding='utf-8' to every file open, and the problem disappears before it starts.
+
+q: how to organize long data lists
+a: a long list reads best as organized columns: name, value, note. presentation rules: any list over ten rows needs a stated sort order — alphabetical, chronological, or by value — so the reader knows how to find things. repetition kills readability: if the same label appears in thirty rows, restructure it into one column of thirty values, or group rows under headers, rather than thirty near-identical lines the eye must wade through.
+
+q: what is a backup
+a: a backup is a known-good copy kept so a corrupted current version can be reverted. two principles carry most of the value: take the copy before the risky change, not after, and name it with the date so the right version is obvious later. the habit that saves projects: before any big edit, snapshot with a clear label. restoring from a pre-problem copy is almost always cheaper than repairing a file that broke while you were halfway through fixing it.

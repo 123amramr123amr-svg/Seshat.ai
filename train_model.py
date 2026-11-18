@@ -40,6 +40,8 @@ def parse_args():
     p.add_argument("--dropout", type=float, default=0.05)
     p.add_argument("--block-size", type=int, default=4096)
     p.add_argument("--eval-every", type=int, default=250)
+    p.add_argument("--warmup", type=int, default=-1,
+                   help="خطوات التسخين (-1 = تلقائي: خطوات/٢٠ بحد ٢٠٠)")
     p.add_argument("--threads", type=int, default=0, help="عدد أنوية الـ CPU (0 = تلقائي)")
     p.add_argument("--resume", action="store_true", help="يكمل من الملف المحفوظ")
     p.add_argument("--no-holdout", action="store_true", help="يدرب على كل صيغ الأسئلة")
@@ -155,8 +157,12 @@ def main():
 
     seen_set, unseen_set = ds.eval_sets()
     total_steps = start_step + args.steps
-    warmup = min(200, max(1, args.steps // 20))
+    warmup = args.warmup if args.warmup >= 0 else min(200, max(1, args.steps // 20))
     budget = args.minutes * 60 if args.minutes else None
+    # خ12 — إعداد النافذة المنزلقة بيتحفظ في الملف عشان التشغيل الطويل
+    # (> block_size) يستخدم نفس القيم، والتدريب نفسه بيفضل انتباه كامل.
+    stream_window = int(getattr(cfg, "stream_window", 768))
+    n_sink = int(getattr(cfg, "n_sink", 8))
 
     def progress(step, elapsed):
         p = (step - start_step) / max(1, args.steps)
@@ -175,6 +181,7 @@ def main():
     print("\n--- بدء التدريب ---")
     model.train()
     # كل خانة في مصفوفة الانتباه بتاخد حوالي 24 بايت وقت التدريب (لكل رأس ولكل طبقة)
+    # — خ12: مع النافذة المنزلقة العرض الفعلي بيتبلى min(T, window+n_sink)
     max_cells = int(args.ram_gb * 1e9 / 24 / (cfg.n_head * cfg.n_layer))
     batches = ds.batches(args.batch, cfg.block_size, device, max_cells=max_cells)
     # بنحسب وقت التدريب الفعلي بس: لو الجهاز نام أو اتوقف شوية، الوقت ده مبيتحسبش
@@ -196,6 +203,10 @@ def main():
                 g["lr"] = lr
 
             xb, yb = next(batches)
+            # خ12: المستندات الطويلة بتتدرب بانتباه كامل (زي أي مثال) — الحقيقة
+            # بتقد تفصيلة في أي مكان في المستند. النافذة المنزلقة في التشغيل
+            # بتستخدم بس للنصوص الأطول من block_size (شوف engine.reply_long) —
+            # دي نفس معمارية StreamingLLM: تدريب كامل + تدفق بالنافذة وقت التشغيل.
             _, loss = model(xb, yb)
             opt.zero_grad(set_to_none=True)
             loss.backward()

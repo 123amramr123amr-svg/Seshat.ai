@@ -276,7 +276,68 @@ class BaseSeshat:
             "trained_steps": self.step,
             "engine": self.engine_name,
             "memory_questions": len(self.memory) if self.memory else 0,
+            # خ12 — السياق الممتد (إدخال وإخراج) بالنافذة المنزلقة
+            "max_context": int(c.get("max_context", 2_000_000)),
+            "n_sink": int(c.get("n_sink", 8)),
+            "stream_window": int(c.get("stream_window", 768)),
         }
+
+    def _generate_long(self, prompt, max_new_tokens, temperature):
+        """التوليد الطويل (خ12) — بيتعرّف في المحركين"""
+        raise NotImplementedError
+
+    # ------------------------------------------------------------
+    # خ12 — السياق الممتد: مستند ضخم + سؤال عنه
+    # ------------------------------------------------------------
+    def reply_long(self, document, question, temperature=0.0, max_new_tokens=2000,
+                   use_fallback=True):
+        """
+        المستند بيتدفق كله في ذاكرة النافذة المنزلقة (لحد max_context = ٢٠٠٠٠٠٠
+        حرف)، والسؤال بيتحط في الآخر — نفس شكل تدريب longdoc بالظبط
+        (<user> المستند \n السؤال <bot> سطر التفكير الرد <end>).
+        الرد بنفس شكل رد _model_reply (response/thinking/confidence/fallback)
+        + doc_chars (عدد حروف المستند اللي اتعالجت فعلًا).
+        """
+        t0 = time.time()
+        question = (question or "").strip()
+        doc = (document or "").strip()
+        cap = int(self.config.get("max_context", 2_000_000))
+        if len(doc) > cap:                  # نحتفظ بالآخر — السؤال والسياق الجديد
+            doc = doc[-cap:]
+        if not question or not doc:
+            return {"response": "ابعت المستند والسؤال مع بعض."
+                    if is_arabic(doc + question) else
+                    "Send the document and the question together.",
+                    "thinking": "", "confidence": 1.0, "fallback": True,
+                    "source": "long", "doc_chars": 0, "seconds": 0.0}
+        # نفس صيغة التدريب: المستند ثم سطر جديد ثم السؤال
+        body = doc + "\n" + question
+        ids_body = self.tok.encode(body)[-cap:]
+        prompt = [self.tok.user_id] + ids_body + [self.tok.bot_id]
+        with self._lock:
+            ids, probs = self._generate_long(prompt, max_new_tokens, temperature)
+        # نفس تحليل سطر التفكير والثقة اللي في _model_reply
+        thinking, n_think, lost = "", 0, False
+        et = self.tok.end_think_id
+        if et is not None and et in ids:
+            n_think = ids.index(et) + 1
+            thinking = self.tok.decode(ids[:n_think]).strip()
+        elif et is not None and self.tok.think_id in ids:
+            lost = True
+        confidence = 0.0 if lost else confidence_from(probs, n_think)
+        text = "" if lost else fix_code_indent(self.tok.decode(ids[n_think:]).strip())
+        fallback = lost or thinking in (UNKNOWN_AR, UNKNOWN_EN)
+        if fallback:
+            text = FALLBACK_AR if is_arabic(question) else FALLBACK_EN
+        elif use_fallback and (not text or confidence < CONFIDENCE_THRESHOLD):
+            text = FALLBACK_AR if is_arabic(question) else FALLBACK_EN
+            fallback = True
+        return {"response": text, "thinking": thinking,
+                "confidence": round(float(confidence), 3), "fallback": fallback,
+                "source": "long", "matched": "", "suggestion": "",
+                "doc_chars": len(doc),
+                "prompt_tokens": len(prompt),
+                "seconds": round(time.time() - t0, 2)}
 
     def _max_input_chars(self):
         """أقصى طول للسؤال اللي بيدخل النموذج فعلاً — آخر جزء من الرسالة.
@@ -743,6 +804,129 @@ class NumpySeshat(BaseSeshat):
             step_in = [nxt]
         return out, out_probs
 
+    # ------------------------------------------------------------
+    # خ12 — التدفق الطويل: نفس حسابات model.py بس بـ numpy
+    # ------------------------------------------------------------
+    def _stream_cache(self):
+        """ذاكرة التدفق: مقاعد ثابتة = المراسي + النافذة (نفس ظروف التدريب)"""
+        n_sink = max(1, min(int(self.config.get("n_sink", 8)), self.config["block_size"] - 1))
+        win = int(self.config.get("stream_window", 0)) or (self.config["block_size"] - n_sink)
+        win = max(1, min(win, self.config["block_size"] - n_sink))
+        return {"n_sink": n_sink, "window": win, "capacity": n_sink + win,
+                "count": 0, "order": [],
+                "k": [np.zeros((self.n_head, n_sink + win, self.head_dim), dtype=np.float32)
+                      for _ in self.layers],
+                "v": [np.zeros((self.n_head, n_sink + win, self.head_dim), dtype=np.float32)
+                      for _ in self.layers]}
+
+    @staticmethod
+    def _slot_of(t, n_sink, window):
+        return t if t < n_sink else n_sink + (t - n_sink) % window
+
+    def _stream_plan(self, cache, T):
+        """خطة كتابة T حرف: بتحدّث count والترتيب مرة واحدة (زي model.plan)"""
+        t0 = cache["count"]
+        cap, n_sink = cache["capacity"], cache["n_sink"]
+        slots = [self._slot_of(t, n_sink, cache["window"]) for t in range(t0, t0 + T)]
+        fill_end = min(t0 + T, cap)
+        split = max(0, min(T, fill_end - t0))
+        if split > 0:
+            cache["order"] += slots[:split]
+        if split < T:
+            wrap = slots[split:]
+            del cache["order"][n_sink:n_sink + len(wrap)]
+            cache["order"] += wrap
+        cache["count"] += T
+        return t0, slots, fill_end
+
+    def _stream_write(self, cache, layer, k, v, slots, fill_end, t0):
+        """بيكتب k و v في مقاعدهم (k, v: (H, T, hd))"""
+        split = max(0, min(len(slots), fill_end - t0))
+        if split > 0:
+            cache["k"][layer][:, slots[:split]] = k[:, :split]
+            cache["v"][layer][:, slots[:split]] = v[:, :split]
+        if split < len(slots):
+            cache["k"][layer][:, slots[split:]] = k[:, split:]
+            cache["v"][layer][:, slots[split:]] = v[:, split:]
+
+    def _forward_stream(self, ids, cache):
+        """خطوة تدفق: ids حروف جديدة → logits آخر حرف (نفس _long_step في model.py)"""
+        H, hd, C = self.n_head, self.head_dim, self.n_embd
+        T = len(ids)
+        t0, slots, fill_end = self._stream_plan(cache, T)
+        occ_after = min(t0 + T, cache["capacity"])
+        q_pos0 = occ_after - T
+        x = self.tok_emb[ids] + self.pos_emb[q_pos0:occ_after]          # (T, C)
+        for layer_i, layer in enumerate(self.layers):
+            h = _layer_norm(x, *layer["ln1"])
+            q, k, v = np.split(h @ layer["c_attn"], 3, axis=1)
+            q = q.reshape(T, H, hd).transpose(1, 0, 2)                   # (H, T, hd)
+            k = k.reshape(T, H, hd).transpose(1, 0, 2)
+            v = v.reshape(T, H, hd).transpose(1, 0, 2)
+            self._stream_write(cache, layer_i, k.astype(np.float32), v.astype(np.float32),
+                               slots, fill_end, t0)
+            order = cache["order"]
+            ko = cache["k"][layer_i][:, order]                           # (H, occ, hd)
+            vo = cache["v"][layer_i][:, order]
+            occ = ko.shape[1]
+            att = (q @ ko.transpose(0, 2, 1)) / math.sqrt(hd)            # (H, T, occ)
+            mask = np.triu(np.ones((T, occ), dtype=bool), k=q_pos0 + 1)  # قناع سببي
+            att[:, mask] = -np.inf
+            att = np.exp(att - att.max(-1, keepdims=True))
+            att /= att.sum(-1, keepdims=True)
+            y = (att @ vo).transpose(1, 0, 2).reshape(T, C)
+            x = x + y @ layer["c_proj"]
+            h = _layer_norm(x, *layer["ln2"])
+            x = x + _gelu(h @ layer["fc1"]) @ layer["fc2"]
+        x = _layer_norm(x[-1], *self.ln_f)
+        return x @ self.out_w
+
+    def _generate_long(self, prompt, max_new_tokens, temperature, top_k=10, chunk=512):
+        """
+        التوليد الطويل (خ12) بفرعين زي معمارية StreamingLLM:
+          • البرومبت ≤ block_size → المسار الكلاسيكي بنفس انتباه التدريب بالظبط
+            (ده حال مستندات التدريب كلها — طولها ≤ ٢١٠٠ حرف).
+          • أطول من كده → ذاكرة النافذة المنزلقة + المراسي: تدفق بذاكرة ثابتة
+            لحد max_context (٢م حرف) — النافذة بتحتفظ بآخر stream_window حرف.
+        """
+        block = self.config["block_size"]
+        prompt = list(prompt)
+        cap = int(self.config.get("max_context", 2_000_000))
+        prompt = prompt[:cap]
+        if not prompt:
+            return [], []
+        # هامش صغير للردود القصيرة في المسار الكلاسيكي
+        if len(prompt) + max(0, min(max_new_tokens, 128)) <= block:
+            return self._generate(prompt, max_new_tokens, temperature)
+        cache = self._stream_cache()
+        max_new = max(0, min(max_new_tokens, cap - len(prompt)))
+        chunk = max(1, min(chunk, cache["window"]))
+        banned = list(self._banned)
+        out, out_probs = [], []
+        logits = None
+        for s in range(0, len(prompt), chunk):
+            logits = self._forward_stream(prompt[s:s + chunk], cache)
+        for _ in range(max_new):
+            logits = logits.astype(np.float64)
+            logits[banned] = -np.inf
+            e = np.exp(logits - logits.max())
+            probs = e / e.sum()
+            if temperature <= 0:
+                nxt = int(np.argmax(probs))
+            else:
+                scaled = logits / temperature
+                if top_k and top_k < scaled.size:
+                    kth = np.partition(scaled, -top_k)[-top_k]
+                    scaled[scaled < kth] = -np.inf
+                e = np.exp(scaled - scaled.max())
+                nxt = int(self._rng.choice(scaled.size, p=e / e.sum()))
+            if nxt == self.tok.end_id:
+                break
+            out_probs.append(float(probs[nxt]))
+            out.append(nxt)
+            logits = self._forward_stream([nxt], cache)
+        return out, out_probs
+
 
 # ============================================================
 # محرك torch — نفس الملف، بس بيشغّل model.py (ينفع GPU)
@@ -770,6 +954,17 @@ class TorchSeshat(BaseSeshat):
         return self.model.generate(prompt, max_new_tokens=max_new_tokens,
                                    temperature=temperature, end_id=self.tok.end_id,
                                    banned_ids=self._banned)
+
+    def _generate_long(self, prompt, max_new_tokens, temperature):
+        """نفس الفرعين: ≤ block_size كلاسيكي، أطول → تدفق بالنافذة المنزلقة"""
+        prompt = list(prompt)
+        block = self.config["block_size"]
+        cap = int(self.config.get("max_context", 2_000_000))
+        if len(prompt) + max(0, min(max_new_tokens, 128)) <= block:
+            return self._generate(prompt, max_new_tokens, temperature)
+        return self.model.generate_long(prompt[:cap], max_new_tokens=max_new_tokens,
+                                        temperature=temperature, end_id=self.tok.end_id,
+                                        banned_ids=self._banned)
 
 
 def Seshat(path=DEFAULT_MODEL, engine=None):

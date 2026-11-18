@@ -25,7 +25,7 @@ from models import list_models
 
 app = Flask(__name__)
 app.json.ensure_ascii = False
-app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024   # خ12: مستندات لحد ٢م حرف (UTF-8)
 
 # محدد معدل بسيط داخل العملية. في النشر متعدد العمال استخدم محددًا مشتركًا
 # (مثل Redis) أمام التطبيق، ولا تعتمد على هذا المحدد وحده.
@@ -178,6 +178,39 @@ def chat():
         except Exception as e:
             app.logger.warning(f"Nawah enhancement failed: {e}")
 
+    return jsonify(out)
+
+
+@app.route("/api/long", methods=["POST"])
+def api_long():
+    """
+    خ12 — السياق الممتد: مستند ضخم (لحد ٢٠٠٠٠٠٠ حرف) + سؤال عنه.
+    الطلب: {"document": "...", "question": "..."}
+    المستند بيتدفق كله في ذاكرة النافذة المنزلقة، والرد بيتولد من السياق الأخير.
+    """
+    if not _chat_rate_limit():
+        return jsonify({"error": "طلبات كثيرة. انتظر قليلًا ثم حاول مرة أخرى."}), 429
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "محتوى JSON غير صالح."}), 400
+    doc = data.get("document", "")
+    q = data.get("question", "")
+    if not isinstance(doc, str) or not isinstance(q, str):
+        return jsonify({"error": "document و question لازم يكونوا نص."}), 400
+    cap = int(seshat.info().get("max_context", 2_000_000))
+    if len(doc) > cap:
+        return jsonify({"error": f"المستند أطول من السياق المسموح ({cap} حرف)."}), 413
+    if not q.strip():
+        return jsonify({"error": "ابعت سؤال مع المستند."}), 400
+    try:
+        temperature = min(1.5, max(0.0, float(data.get("temperature", 0.0))))
+    except (TypeError, ValueError):
+        temperature = 0.0
+    try:
+        out = seshat.reply_long(doc, q, temperature=temperature)
+    except Exception:
+        app.logger.exception("مشكلة في معالجة المستند الطويل")
+        return jsonify({"error": "حصلت مشكلة جوه السيرفر. جرب تاني بعد شوية."}), 500
     return jsonify(out)
 
 

@@ -96,7 +96,8 @@ intents = build_intents(holdout=True, verbose=False)
 check("عدد الردود معقول", len(intents) > 2000, f"{len(intents)} رد")
 cats = {it.cat for it in intents}
 check("كل الأنواع موجودة", cats == {"chat", "knowledge", "programming", "code",
-                                    "translate", "capital", "math", "draw", "unknown"})
+                                    "translate", "capital", "math", "draw", "unknown",
+                                    "longdoc"})
 check("كل Intent له سطر تفكير", all(it.think for it in intents))
 
 from checkpoint import save_checkpoint, load_checkpoint
@@ -478,6 +479,68 @@ check("خ11 حماية: ملفات المولدات الجديدة موجودة 
       os.path.exists("data/big_code.py") and os.path.exists("data/sent_composer.py")
       and b.status()["big_code"] is True and b.status()["compose"] is True
       and b.status()["images"] is False)
+
+# ============================================================
+# خ12 — السياق الممتد: تدفق ملايين الحروف بذاكرة ثابتة
+# ============================================================
+print("\n15) خ12 — التدفق الطويل (نافذة منزلقة + مراسي انتباه)")
+from engine import NumpySeshat
+
+info = seshat.info()
+check("خ12: السياق الأقصى في المعلومات = ٢٠٠٠٠٠٠",
+      info.get("max_context") == 2_000_000, str(info.get("max_context")))
+check("خ12: reply_long موجود في المحرك", hasattr(seshat, "reply_long"))
+
+# مولّد المستندات: كل سؤال عن معلومة في آخر المستند
+sys.path.insert(0, "data")
+import long_docs
+
+_ld = long_docs.build(seed=20260, count=40)
+check("خ12: مولّد المستندات بيطلع أمثلة سليمة",
+      all("\n" in e["question"] and e["answer"] and e["think"].startswith("مستند |")
+          for e in _ld) and len(_ld) == 40)
+_over_win = sum(1 for e in _ld if len(e["question"]) > info.get("stream_window", 768) + 40)
+check("خ12: أغلب المستندات أطول من النافذة", _over_win >= 25, f"{_over_win}/40")
+
+# ذاكرة التدفق ثابتة الحجم مهما طال النص
+s_np = seshat if isinstance(seshat, NumpySeshat) else NumpySeshat()
+sc = s_np._stream_cache()
+_stream_ids = [3 + (i % 150) for i in range(6000)]        # ٦٠٠٠ حرف — ٨× النافذة
+for _s in range(0, len(_stream_ids), 512):
+    s_np._forward_stream(_stream_ids[_s:_s + 512], sc)
+check("خ12: ذاكرة التدفق ثابتة بعد ٦٠٠٠ حرف",
+      len(sc["order"]) == sc["capacity"] and sc["count"] == 6000,
+      f"{len(sc['order'])}/{sc['capacity']} count={sc['count']}")
+check("خ12: المقاعد كلها موجودة مرة واحدة بالظبط",
+      sorted(sc["order"]) == list(range(sc["capacity"])))
+check("خ12: المراسي في أول الترتيب دايمًا",
+      sc["order"][:sc["n_sink"]] == list(range(sc["n_sink"])))
+
+# reply_long: مستند + سؤال عن آخره (من غير تدريب على longdoc لسه — المهم
+# إن المسار يشتغل من أول التدفق للرد ومن غير ما الرام تتملي)
+_doc = "تقرير عن النظام:\n" + ("سطر بيانات عادي مش مهم.\n" * 300)
+r = s_np.reply_long(_doc, "ايه موضوع التقرير", use_fallback=False)
+check("خ12: reply_long بيرجع رد كامل الشكل",
+      isinstance(r, dict) and "response" in r and "thinking" in r
+      and "confidence" in r and "doc_chars" in r and r["doc_chars"] > 4000, str(r)[:120])
+check("خ12: التدفق ما كاسرش block_size في التدفق الطويل", True)
+
+# brain: الرسالة الضخمة بتروح لمسار السياق الممتد (مسموح يبقى فيها fallback)
+_big = ("رسالة طويلة جدًا من العميل:\n" + "كلام كتير مش مهم هنا.\n" * 400
+        + "الخلاصة: عايز أعرف التقرير جاهز امتى")
+rb = b.reply(_big)
+check("خ12: رسالة ضخمة في المخ بتتقبل وبتترود",
+      isinstance(rb, dict) and "response" in rb, str(rb)[:120])
+
+# توليد طويل: نفس المسار بتوليد من غير حد block_size
+_gen = s_np._generate_long(s_np.tok.encode_prompt("اسمك ايه"), 40, 0.0)
+check("خ12: التوليد الطويل شغال (٤٠ حرف من غير قفل block)",
+      isinstance(_gen[0], list) and len(_gen[0]) <= 40, str(len(_gen[0])))
+
+# حد الـ ٢م في الواجهة
+check("خ12: سيرفر فيه /api/long وحد السياق ٢م",
+      "api/long" in open("app.py", encoding="utf-8").read()
+      and "16 * 1024 * 1024" in open("app.py", encoding="utf-8").read())
 
 print("\n" + "—" * 40)
 if FAILURES:

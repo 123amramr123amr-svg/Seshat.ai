@@ -66,8 +66,13 @@ SOURCE_LABELS = {
     "memory": "ذاكرة",
     "memory+model": "ذاكرة + نموذج",
     "model": "نموذج محلي",
+    "long": "سياق ممتد",
     "none": "",
 }
+
+# خ12 — السياق الممتد: الرسايل الأطول من الحد ده بتتعامل كمستند + سؤال
+# وبتتقرا بالنافذة المنزلقة (لحد ٢٠٠٠٠٠٠ حرف) بدل ما بيتقص منها آخر جزء بس.
+LONG_MESSAGE_CHARS = 1400
 
 
 # ============================================================
@@ -1129,6 +1134,22 @@ class Brain:
         if sent:
             return self._out(sent["response"], "compose", "تكوين الجمل",
                              thinking="كوّنت جمل جديدة من بنوك الكلمات — مش منسوخة من الذاكرة")
+
+        # 6.8) خ12: الرسايل الضخمة (مستند/ملف/سجل + سؤال في آخرها) — بتتقرا
+        #      كاملة بالنافذة المنزلقة لحد ٢٠٠٠٠٠٠ حرف بدل ما تتقص لآخر ١٠٠٠.
+        if (self.engine is not None and hasattr(self.engine, "reply_long")
+                and len(msg) > LONG_MESSAGE_CHARS):
+            try:
+                long_out = self.engine.reply_long(msg, extract_question(msg),
+                                                  temperature=temperature,
+                                                  max_new_tokens=max_new_tokens)
+            except Exception:
+                long_out = None
+            if long_out and not long_out.get("fallback"):
+                long_out.setdefault("image", None)
+                long_out.setdefault("source_label", SOURCE_LABELS.get("long", "سياق ممتد"))
+                long_out["seconds"] = round(time.time() - t0, 2)
+                return long_out
 
         # 7) النموذج المحلي: الهوية والأكواد وكل اللي اتعلمه — لو واثق ممنقلش
         local = None
