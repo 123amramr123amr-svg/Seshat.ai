@@ -152,6 +152,32 @@ def chat():
         return jsonify({"response": "اكتب حاجة الأول 🙂", "thinking": "", "confidence": 1.0,
                         "seconds": 0, "fallback": False, "source": "none", "matched": "",
                         "suggestion": ""})
+    
+    # ========================================
+    # الأدوات المتقدمة (Advanced Tools)
+    # ========================================
+    try:
+        from tools_integration import detect_tool_request, execute_tool_request
+        
+        tool_request = detect_tool_request(msg)
+        if tool_request:
+            tool_response = execute_tool_request(tool_request)
+            return jsonify({
+                "response": tool_response,
+                "thinking": f"استخدمت أداة: {tool_request['tool']}",
+                "confidence": 1.0,
+                "seconds": time.time() - t0,
+                "fallback": False,
+                "source": "tool",
+                "matched": tool_request['tool'],
+                "suggestion": ""
+            })
+    except Exception as e:
+        app.logger.warning(f"Tools detection failed: {e}")
+    
+    # ========================================
+    # الرد العادي (Normal Reply)
+    # ========================================
     try:
         temperature = min(1.5, max(0.0, float(data.get("temperature", 0.0))))
     except (TypeError, ValueError):
@@ -251,6 +277,189 @@ def nawah_analyze():
         return jsonify(result)
     except Exception as e:
         return jsonify(error=str(e)), 500
+
+
+# ========================================
+# أدوات seshat المتقدمة (Advanced Tools)
+# ========================================
+
+@app.route("/tools/browse", methods=["POST"])
+def tools_browse():
+    """تصفح الويب المتقدم"""
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url") or "").strip()
+    if not url:
+        return jsonify(error="الرابط مطلوب"), 400
+    
+    if not url.startswith('http'):
+        url = 'https://' + url
+    
+    try:
+        from tools import browse_web
+        result = browse_web(
+            url,
+            extract_tables=bool(data.get("extract_tables", True)),
+            follow_links=bool(data.get("follow_links", False)),
+            max_links=int(data.get("max_links", 3))
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+@app.route("/tools/execute", methods=["POST"])
+def tools_execute():
+    """تشغيل الأكواد"""
+    data = request.get_json(silent=True) or {}
+    code = str(data.get("code") or "").strip()
+    if not code:
+        return jsonify(error="الكود مطلوب"), 400
+    
+    try:
+        from tools import execute_code
+        result = execute_code(
+            code,
+            language=str(data.get("language", "python")),
+            timeout=int(data.get("timeout", 10))
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+@app.route("/tools/file", methods=["POST"])
+def tools_create_file():
+    """إنشاء ملفات (Text/PDF)"""
+    data = request.get_json(silent=True) or {}
+    content = str(data.get("content") or "").strip()
+    if not content:
+        return jsonify(error="المحتوى مطلوب"), 400
+    
+    file_type = str(data.get("type", "text")).lower()
+    
+    try:
+        if file_type == "pdf":
+            from tools import create_pdf_file
+            result = create_pdf_file(
+                content,
+                title=str(data.get("title", "مستند")),
+                filename=data.get("filename")
+            )
+        else:
+            from tools import create_text_file
+            result = create_text_file(
+                content,
+                filename=data.get("filename")
+            )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+@app.route("/tools/memory", methods=["GET", "POST", "DELETE"])
+def tools_memory():
+    """الذاكرة طويلة المدى"""
+    try:
+        from tools import tools
+        
+        if request.method == "GET":
+            # جلب الذكريات
+            limit = int(request.args.get("limit", 100))
+            memories = tools.memory.get_all(limit=limit)
+            return jsonify(memories=memories, count=len(memories))
+        
+        elif request.method == "POST":
+            # حفظ ذكرى جديدة
+            data = request.get_json(silent=True) or {}
+            content = str(data.get("content") or "").strip()
+            if not content:
+                return jsonify(error="المحتوى مطلوب"), 400
+            
+            memory = tools.remember(
+                content,
+                tags=data.get("tags"),
+                importance=int(data.get("importance", 5))
+            )
+            return jsonify(memory)
+        
+        elif request.method == "DELETE":
+            # حذف ذكرى
+            data = request.get_json(silent=True) or {}
+            memory_id = str(data.get("id") or "").strip()
+            if not memory_id:
+                return jsonify(error="المعرف مطلوب"), 400
+            
+            success = tools.memory.forget(memory_id)
+            return jsonify(success=success)
+    
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+@app.route("/tools/recall", methods=["POST"])
+def tools_recall():
+    """استرجاع ذكريات"""
+    data = request.get_json(silent=True) or {}
+    query = str(data.get("query") or "").strip()
+    if not query:
+        return jsonify(error="الاستعلام مطلوب"), 400
+    
+    try:
+        from tools import tools
+        memories = tools.recall(
+            query,
+            limit=int(data.get("limit", 5))
+        )
+        return jsonify(memories=memories, count=len(memories))
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+@app.route("/tools/image", methods=["POST"])
+def tools_understand_image():
+    """فهم الصور"""
+    # دعم رفع الملفات أو مسار الملف
+    if 'file' in request.files:
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify(error="مفيش ملف"), 400
+        
+        # حفظ الملف مؤقتاً
+        import tempfile
+        from pathlib import Path
+        
+        temp_dir = Path(tempfile.gettempdir()) / 'seshat_uploads'
+        temp_dir.mkdir(exist_ok=True)
+        
+        filename = f"{int(time.time())}_{file.filename}"
+        filepath = temp_dir / filename
+        file.save(str(filepath))
+        
+        image_path = str(filepath)
+    else:
+        data = request.get_json(silent=True) or {}
+        image_path = str(data.get("path") or "").strip()
+        if not image_path:
+            return jsonify(error="المسار أو الملف مطلوب"), 400
+    
+    try:
+        from tools import understand_image
+        result = understand_image(image_path)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+@app.route("/download/<path:filename>")
+def download_file(filename):
+    """تحميل ملف من data/files"""
+    from pathlib import Path
+    
+    filepath = Path('data/files') / filename
+    if not filepath.exists():
+        return jsonify(error="الملف غير موجود"), 404
+    
+    return send_file(str(filepath), as_attachment=True)
 
 
 if __name__ == "__main__":
