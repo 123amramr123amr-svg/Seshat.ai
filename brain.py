@@ -53,6 +53,7 @@ if _DATA_DIR not in sys.path:
     sys.path.insert(0, _DATA_DIR)
 from big_code import big_code_request, build_big_code, big_code_guide
 from sent_composer import try_compose
+from nawah import growth
 LEARNED_PATH = os.path.join(HERE, "data", "learned.json")
 CONFIG_PATH = os.path.join(HERE, "data", "config.local.json")
 
@@ -1145,6 +1146,12 @@ class Brain:
         if sent:
             return self._out(sent["response"], "compose", "تكوين الجمل",
                              thinking="كوّنت جمل جديدة من بنوك الكلمات — مش منسوخة من الذاكرة")
+
+        # 6.65) خ18 بطلب المستخدم: تقرير البنية الذاتية من نواة النمو — أرقام
+        #       حية من ملفات النموذج والبيانات بتتحدث لوحدها مع كل تكبير
+        if growth.matches_growth_question(msg):
+            return self._out(growth.growth_summary(), "nawah", "نواة النمو",
+                             thinking="قريت بنيتي الحية من مصفوفات النموذج وملفات البيانات مباشرة")
 
         # 6.8) خ12: الرسايل الضخمة (مستند/ملف/سجل + سؤال في آخرها) — بتتقرا
         #      كاملة بالنافذة المنزلقة لحد ٢٠٠٠٠٠٠ حرف بدل ما تتقص لآخر ١٠٠٠.

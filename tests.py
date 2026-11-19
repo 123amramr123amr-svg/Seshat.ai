@@ -590,6 +590,23 @@ check("خ17: «ايه رأيك في X» بيولد رأي مؤلف معلن", "�
 _c17e = b.reply("اتكلم عن النيل")
 check("خ17: «اتكلم عن X» بيربط الموضوع بمكانه الطبيعي", "النيل" in _c17e.get("response", "")
       and "قرب النهر" in _c17e.get("response", ""), _c17e.get("response", "")[:70])
+
+# خ18 — نواة النمو الذاتي: بنية حية بتتقري من الملفات وتكبر مع البيانات والمعاملات (طلب المستخدم)
+from nawah import growth as _growth
+_gr = _growth.growth_report()
+check("خ18: تقرير البنية بيقرا المعاملات حية", _gr["model_exists"] and _gr["params"] > 1_000_000,
+      str(_gr.get("params")))
+_sum_files = sum(_gr["data"][f] for f in ("ar_knowledge.txt", "en_knowledge.txt",
+                "ar_chat.txt", "en_chat.txt", "ar_programming.txt", "en_programming.txt"))
+check("خ18: عدد المدخلات مطابق للملفات فعليًا (بتكبر مع البيانات)", _gr["data_total"] == _sum_files and _sum_files > 800,
+      "%d vs %d" % (_gr["data_total"], _sum_files))
+_g17 = b.reply("بنيتك ايه وعدد معاملاتك قد ايه؟")
+check("خ18: المخ بيوجه لنواة النمو", _g17.get("source") == "nawah" and "معامل" in _g17.get("response", ""),
+      str(_g17.get("source")))
+_g17b = b.reply("انت مين")
+check("خ18: سؤال الهوية ما اتخطفش من نواة النمو", "seshat" in _g17b.get("response", "").lower()
+      and _g17b.get("source") != "nawah", str(_g17b.get("source")))
+check("خ18: فرق التقريرين بيقيس النمو", _growth.growth_diff(_gr) is not None)
 _rb15 = b.reply("حوّل 3 جيجابايت الى ميجابايت")
 check("خ15: المخ بيوجه للأداة المتقدمة", _rb15.get("source") == "tools" and "3072" in _rb15.get("response", ""),
       str(_rb15.get("source")))

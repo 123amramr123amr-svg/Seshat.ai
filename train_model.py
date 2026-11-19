@@ -46,6 +46,8 @@ def parse_args():
     p.add_argument("--resume", action="store_true", help="يكمل من الملف المحفوظ")
     p.add_argument("--freeze", type=int, default=0,
                    help="خ17: تجميد الـembeddings وأول N طبقات — الطبقات العلوية بس اللي بتتعلم (مقاومة النسيان)")
+    p.add_argument("--freeze-blocks", type=int, default=0,
+                   help="خ18: تجميد أول N بلوكات بس مع إبقاء الـembeddings قابلة للتدريب — بيصلح خلل خ17: صفوف المفردات الجديدة بتتعلم بدل ما تفضل عشوائية متجمدة")
     p.add_argument("--no-holdout", action="store_true", help="يدرب على كل صيغ الأسئلة")
     p.add_argument("--out", default=os.path.join(HERE, "seshat_chet_model.npz"))
     p.add_argument("--seed", type=int, default=1234)
@@ -115,15 +117,19 @@ def main():
         vocab_grew = cfg.vocab_size > old_vocab
         if vocab_grew:
             # المفردات كبرت: بنكبّر جدول التضمين ونسيب الصفوف القديمة زي ما هي.
-            # توكنز الإزاحة بتبدأ بنفس تضمين المسافة عشان النموذج يتعلمها بسرعة.
+            # خ18: الصفوف الجديدة بتاخد تهيئة دافئة بمتوسط الصفوف القديمة بدل
+            # العشوائي — الحروف الجديدة تبدأ من نقطة منطقية في فضاء التضمين
+            # وتتعلم أسرع، ولو الـembeddings اتجمّدت تبقى شغالة من أول خطوة
+            # بدل ما تفضل قيم عشوائية متجمدة (خلل خ17 الموثق).
             emb = model.tok_emb.weight.detach().clone()
             emb[:old_vocab] = state["tok_emb.weight"]
+            emb[old_vocab:] = state["tok_emb.weight"].mean(dim=0)
             space = tok.stoi[" "]
             for t in ("    ", "  "):
                 if tok.stoi[t] >= old_vocab:
                     emb[tok.stoi[t]] = state["tok_emb.weight"][space]
             state["tok_emb.weight"] = state["lm_head.weight"] = emb
-            print(f"🔤 المفردات كبرت من {old_vocab} لـ {cfg.vocab_size} توكن")
+            print(f"🔤 المفردات كبرت من {old_vocab} لـ {cfg.vocab_size} توكن (تهيئة دافئة للمقاعد الجديدة)")
 
         # توسيع السياق: جدول المواقع القديم أصغر من السياق الجديد → بنكرر الصفوف
         # (توسيع دوره). المواقع الجديدة بتبدأ من قيم متعلمة، والتدريب على الأمثلة
@@ -145,7 +151,20 @@ def main():
     # خ17 — تجربة مقاومة النسيان: تجميد أول N طبقات + جدول المواقع. الـembeddings
     # بتتجميد بس لو المفردات ما كبرتش — لو كبرت لازم تتدرب عشان التوكنز الجديدة
     # ما تفضلش معلقة على قيم البداية طول العمر.
-    if args.freeze > 0:
+    if args.freeze_blocks > 0:
+        # خ18 — تجميد البلوكات السفلية فقط: الـembeddings وجدول المواقع والبلوكات
+        # العلوية كلها بتتعلم، فصفوف المفردات الجديدة (زي نمو 177→186) بتاخد
+        # قيم حقيقية بدل ما تفضل عشوائية متجمدة زي خلل خ17.
+        frozen = 0
+        for pname, p in model.named_parameters():
+            head = pname.split(".")[0]
+            idx = int(pname.split(".")[1]) if head == "blocks" else -1
+            if head == "blocks" and idx < args.freeze_blocks:
+                p.requires_grad_(False)
+                frozen += 1
+        print(f"🧊 خ18 تجميد بلوكات: أول {args.freeze_blocks} بلوكات بس — "
+              f"الـembeddings والمواقع والبلوكات العلوية بتتعلم ({frozen} موتر متجمد)")
+    elif args.freeze > 0:
         grew = bool(ckpt and vocab_grew)
         frozen = 0
         for pname, p in model.named_parameters():

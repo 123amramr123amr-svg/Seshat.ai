@@ -653,3 +653,83 @@ Q: I only have 10 minutes a day. How do I train?
 A: Ten focused minutes work: two minutes squats, one push-ups, one plank, one jogging in place, repeated twice; consistency beats waiting for a free hour.
 Q: I want to join a football team at my age. Can I?
 A: Most cities have amateur leagues for all ages; start with a beginner-level team, prepare with jogging and jumping before the first training, and enjoy it rather than aim pro.
+Q: I smell gas in the kitchen. What do I do?
+A: Do not switch lights or phones on or off in that room, open windows immediately, shut the gas valve at the source, leave the room before using any device, and call emergency services from outside.
+Q: A pan caught fire on the stove. What now?
+A: Never pour water — it splashes the fire; turn off the burner, cover the pan with a metal lid or tray and leave it to cool; if it spreads, evacuate and call the fire service.
+Q: Power went out in the whole house. Where do I start?
+A: Check if neighbors lost power too; if only your home, inspect the main breaker and fuses, unplug sensitive devices first, and keep the fridge closed in hot weather.
+Q: Water is leaking under the sink. First steps?
+A: Shut the sink's valve or the main, catch the drip with cloth and a bowl, unplug nearby appliances, then call a plumber — speed saves your floor.
+Q: My toddler played with cleaning products. What do I do?
+A: Do not force vomiting, read the label, rinse the mouth area with water, call poison control or emergency right away with the product name and amount, and store products high from today.
+Q: The iron was left face-down on clothes. Dangerous?
+A: Yes — cut power immediately, move clothes and iron to a non-flammable surface, check for smoke or melted spots, and get old irons inspected before reuse.
+Q: A storm may cut power tonight. What do I prepare?
+A: Charge phones and a backup battery, use flashlights not candles, store water for two days, and unplug sensitive devices to protect them from returning surges.
+Q: Smoke came out of the oven while baking. What now?
+A: Keep the oven closed, turn it off, open windows, wait for it to cool before checking; heavy smoke or an electrical smell means leave and call emergency.
+Q: How should I organize home medicine safely?
+A: A high locked cabinet away from children and heat, separate adult and child medicines, and dispose of expired ones yearly via a pharmacy, never the trash.
+Q: I mixed two cleaning agents and it stings. Safe?
+A: Stop immediately, ventilate, leave the room, breathe fresh air; throat burning or dizziness needs a doctor now — cleaners never mix.
+Q: Where should I put a smoke detector?
+A: In every bedroom, plus the kitchen but away from the stove area, on the ceiling; test monthly, replace batteries yearly — it buys the golden minutes of waking up.
+Q: What goes in a home emergency kit?
+A: Flashlight and batteries, basic first aid, water and canned food for two days, copies of key medicines and written emergency numbers, somewhere the whole family knows.
+Q: Power was out for hours — is fridge food safe?
+A: A closed fridge holds 4 hours, a full freezer 24-48; food still cold with ice crystals is safe; any odd smell or color, discard without regret.
+Q: I am stuck in an elevator. What do I do?
+A: Never try to exit between floors, press the alarm button and call maintenance or the nearest contact, stay calm and seated if needed — elevators rest on safe brakes, they do not fall.
+Q: A small fire started in the trash. How do I put it out?
+A: If small and controlled: cover with a damp cloth or an ABC extinguisher, approach from behind the wind direction, and if it spreads leave and call the fire service.
+Q: It is very hot and the heater is on. Safe?
+A: Closed spaces with burning heaters produce carbon monoxide; keep a ventilation gap, and if anyone gets headaches or unusual drowsiness, shut the heater and get outside air immediately.
+Q: My child put something in his mouth and cannot breathe. First move?
+A: Do not push blindly: for children over one year, five back blows then abdominal thrusts; for infants, back blows and chest thrusts; if it continues, call emergency immediately.
+Q: The breaker keeps tripping. Why?
+A: It is protecting you: overload on a line, an earth leak, or a faulty device; unplug everything and reconnect one by one to find the cause, and never bypass the breaker.
+Q: How do I make a child-safe kitchen?
+A: Pot handles turned inward, knobs at the back, safety latches on drawers, knives and hot liquids kept high, and a fixed rule: kids stay out of the cooking zone.
+Q: The bathroom has a constant mold smell. Problem?
+A: Mold means constant moisture: ventilate after showers, clean spots with diluted bleach and gloves, and if it returns fast, inspect the heater or plumbing leak.
+Q: I procrastinate even when I know I should start. How do I break it?
+A: Use the two-minute rule: begin with the tiniest possible step, like opening the book and reading two lines; motivation usually follows action, and shrinking the task kills the fear that fuels avoidance.
+Q: I wake up after 5 hours and feel broken all day. How do I fix my schedule?
+A: One fixed wake time with the alarm across the room, morning light and water, no caffeine after noon, and a fixed bedtime; your body clock resets in about two weeks of consistency.
+Q: My tasks pile up and I scatter between them. How do I prioritize?
+A: Every evening write only three tasks: one that matters most and two supporting ones; finishing those three beats a 15-item list that functions as inventory, not a plan.
+Q: I heard about the Pomodoro technique. Does it work?
+A: 25 minutes of focused work, 5 minutes off, a longer 20-minute break after four rounds; the timer is the judge, not your mood, and parking distracting thoughts on paper keeps the session clean.
+Q: Meetings eat my whole workday. How do I cut them?
+A: Ask for a written agenda before accepting any meeting, demand one clear goal, propose half the requested time, and offer an email update instead when there is no real goal.
+Q: Notifications pull me away every five minutes. What do I do?
+A: Silence everything during deep-work blocks, check messages at three fixed times daily, and tell people your unavailability window; they adapt faster than you expect.
+Q: I make important decisions exhausted at the end of the day. How should I organize?
+A: Reserve the first two morning hours for important decisions, leave routine shallow tasks for the evening, and if a big call must wait, sleep on it and decide fresh.
+Q: I skip breaks because I have too much work. Is that right?
+A: It is a math error: focus decays after about 90 minutes, and a 10-minute break protects the quality of the next hours; grinding through fatigue burns more time than it saves.
+Q: I want to build a new habit but it never sticks. How?
+A: Attach it to an existing habit (after coffee, 10 minutes of study), start tiny and grow every two weeks, and mark each day on a paper chain; visible streaks motivate better than willpower.
+Q: My manager keeps adding tasks and my week is full. How do I decline politely?
+A: Show the cost of each addition: 'I can do it if we postpone X or Y; which is the priority?' A decline framed as priority management reads as professionalism, not refusal.
+Q: I keep forgetting appointments and deadlines. How do I organize my memory?
+A: One rule: the moment any date is agreed, it goes into the calendar with two alerts (one day and one hour before); no human memory should store dates, let the calendar be your external brain.
+Q: I study or work late at night but I am unfocused. Is that a problem?
+A: For most people deep thinking peaks in the morning; shallow evening tasks fit tired hours, so move demanding work to your peak window and keep nights for light chores.
+Q: After a vacation I cannot get back to work speed. What helps?
+A: Day one: clear inbox and lists only, no heavy tasks; day two: one clear task finished within two hours; momentum returns gradually, not dramatically.
+Q: I over-plan and end up doing nothing. How do I stop?
+A: Cap planning at 10 minutes each morning and spend the rest executing; over-planning is comfortable procrastination, and an imperfect executed plan beats a perfect stored one.
+Q: A big project of mine has been frozen for years. How do I revive it?
+A: Break it into stages ending with tangible outputs, pick one you can finish in two weeks, and show it to someone; partial publishing breaks the psychological barrier.
+Q: Working from home, work-life borders are gone. How do I organize?
+A: A fixed work spot even if it is one corner, real clothes during work hours, and explicit start and end rituals; the brain follows signals, not intentions.
+Q: Many small tasks keep accumulating. How do I handle them?
+A: Apply the two-minute rule: anything finishable in two minutes gets done immediately instead of being listed; clear the backlog in two 30-minute batch sessions per week.
+Q: I decide to study daily and never execute. What breaks the loop?
+A: Pre-decide place, time, and content: 'Saturday 9:00, the library, chapter three'; pre-made decisions consume no willpower at execution time, and two weeks build the identity.
+Q: Time passes and I feel I achieve nothing. How do I measure productivity?
+A: Every evening write one honest line: what actually got done, not what was planned; after a week you will see your real pattern of leaks and peak hours, and honest measurement is step one of any improvement.
+Q: I am writing a talk for our company's onboarding day about why focused work beats long hours, aimed at new hires who believe being busy equals being productive. My manager asked for accurate quotable research numbers with practical techniques. Cover six beats: the cost of context switching with a real minutes figure, the attention span reality of about 90-minute cycles, why multitasking measurably lowers output quality, the two-minute rule and the Pomodoro technique as easy starters, how fixed deep-work windows beat scattered effort, and one closing line that reframes productivity as finished outcomes rather than hours logged. Keep every sentence tight and spoken-word ready.
+A: Six beats, ready to speak. Context switching: research suggests it takes roughly 23 minutes to fully refocus after an interruption, so ten interruptions cost you a working afternoon. Attention runs in natural cycles of about 90 minutes; planning rest inside the cycle protects quality. Multitasking measurably lowers output quality because each switch reloads the whole task into your head. Two easy starters: the two-minute rule (anything under two minutes, do it now) and Pomodoro (25 on, 5 off). Fixed deep-work windows — same hour, same place, notifications off — beat scattered effort because your brain learns the signal. Closing line: productivity is what you finished, not how long you stayed.
