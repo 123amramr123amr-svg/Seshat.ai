@@ -932,3 +932,43 @@ Q: What did Edwin Hubble discover?
 A: In 1929 that galaxies recede with speed proportional to distance, evidence the universe is expanding; the great space telescope is named for him.
 Q: Who was Rosalind Franklin?
 A: Her 1952 X-ray diffraction images of DNA were the crucial evidence for the double-helix structure published by Watson and Crick in 1953; her role is now recognized as essential.
+Q: What is gravity?
+A: A force pulling any two masses together; Earth's pull keeps you on the ground and holds the Moon in orbit. Free fall accelerates at about 9.8 meters per second squared, and the same rule that drops an apple steers the whole solar system.
+Q: Is friction good or wasteful?
+A: Both: without friction you could not walk, hold a pen, or brake a car, because it transmits force between surfaces; but it also wastes energy as heat, so lubrication cuts the harmful part and keeps the useful one.
+Q: Why does static electricity spike in winter?
+A: Dry air stops accumulated charge from leaking away, so walking on carpets builds charge on your body until a touch releases it as a tiny spark; touching metal first or a humidifier keeps the charge from piling up.
+Q: Does sound travel through space?
+A: No. Sound is a wave in a material medium like air, water, or metal, and space has none, which is why space is silent despite violent stellar explosions. Sound moves about 340 meters per second in air, much faster in water.
+Q: Why does a spoon in a glass look broken?
+A: Refraction: light changes speed between air and water and bends at the surface; your brain assumes light travels straight, so it places the underwater part in the wrong spot. The same bending powers glasses and camera lenses.
+Q: Why is the sky blue but sunsets red?
+A: Sunlight contains all colors, and short blue wavelengths scatter in air far more than red; at sunset light crosses much more atmosphere, so blue is scattered away along the path and only warm reds reach your eyes.
+Q: Does steam burn worse than hot water?
+A: Yes. When steam touches skin it condenses and releases its latent heat of vaporization on top of being hot; that extra energy is huge, turning water to steam takes roughly five times the energy of heating it from room temperature to boiling.
+Q: How does kinetic energy scale?
+A: With half the mass times speed squared: double a car's speed and its kinetic energy quadruples, so braking distance grows with the square of speed too; that is why speed limits are physics, not bureaucracy.
+Q: What do magnets actually attract?
+A: Ferromagnetic metals such as iron, nickel, and cobalt, whose electron domains can align; aluminum and copper barely respond. Every magnet has a north and south pole, and a single isolated pole has never been found.
+Q: Why do ears pop when driving up a mountain?
+A: Outside air pressure drops faster than the pressure trapped in your middle ear, so the difference pushes on the eardrum; swallowing or yawning opens the Eustachian tube and equalizes it, and descending usually needs more equalizing.
+Q: Why do ships float but coins sink?
+A: Archimedes: a submerged body feels an upward force equal to the weight of fluid it displaces; densities below water float, above sink. A steel ship floats because it displaces an enormous volume, and salt raises density so swimmers float higher.
+Q: How does a magnifying glass work?
+A: A convex lens bends light rays so they meet closer, forming a larger image of an object placed inside the focal distance; magnification is capped by curvature and distance, and the same math fixes vision in eyeglasses.
+Q: Why does a metal handle feel hotter than wood?
+A: Both sit on the same pot, but metal conducts heat fast, passing vibrating molecules to neighbors; wood is an insulator so heat stalls. The same effect makes tile floors feel colder than carpet at identical room temperature.
+Q: How does a fuse protect a circuit?
+A: It is a thin wire sized to melt and break the circuit when current exceeds a limit, before wiring overheats; modern breakers repeat the idea with magnetic or thermal triggers you can reset. Both guard against overload and short circuits.
+Q: How does a battery store energy?
+A: Not as electricity but as chemistry: reactions at two electrodes push electrons toward one side, and a connected circuit lets them flow around. Charging runs the reactions backward, and capacity fades as side reactions accumulate.
+Q: How does radar measure distance?
+A: It sends a microwave pulse and times the echo; time times light speed, divided by two, gives distance. Frequency shifts reveal speed too, the same principle behind speed cameras and hospital Doppler heart monitors.
+Q: Is laser light just brighter light?
+A: It is organized light: photons share one direction, one phase, and one color, so it stays narrow and concentrated over distances ordinary light cannot; that is the secret behind precision cutting, optical drives, and fiber-optic internet.
+Q: Why does a spinning gyroscope resist tipping?
+A: A spinning wheel has angular momentum that holds its direction, and forcing a tilt produces a reaction force at a right angle; aircraft, ships, and phones use it to sense orientation, and a moving bicycle balances on a related principle.
+Q: How does a nuclear reactor stay controlled?
+A: Splitting uranium releases heat and neutrons that continue the chain; control rods absorb excess neutrons to throttle the rate, water carries heat to turbines, and safety comes from layered barriers plus automatic shutdown systems.
+Q: How do solar panels turn light into power?
+A: A photovoltaic semiconductor releases electrons when photons strike it, and built-in fields steer them into a circuit; practical efficiency is 15 to 22 percent, and cooling the panel with airflow measurably raises output.
