@@ -21,3 +21,6 @@ data/generated/
 
 nawah/*.db
 
+
+# خ23 — checkpoint الـ50M حجمه ~204MB أعلى من حد git (100MB) فبيفضل محلي
+seshat_50m.npz

@@ -32,6 +32,9 @@ PRESETS = {
     "small":  dict(n_layer=6,  n_head=6,  n_embd=192),   # ~2.8M  — CPU كويس
     "medium": dict(n_layer=8,  n_head=8,  n_embd=256),   # ~6.5M  — GPU أو صبر
     "large":  dict(n_layer=12, n_head=12, n_embd=384),   # ~21M   — GPU
+    # خ23 — مسار التوسع لهدف 50M معامل (أمر مباشر من المستخدم: دربه لغايت ميصبح 50M)
+    # سياق 1024 كافي لأزواج سؤال/رد، والسياق بيكبر بعدين بتهيئة دافئة بتكرار الصفوف.
+    "50m":    dict(n_layer=16, n_head=8,  n_embd=512),   # ~51M   — CPU بباتش صغير وصبر
 }
 
 
