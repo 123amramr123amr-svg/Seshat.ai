@@ -972,3 +972,37 @@ Q: How does a nuclear reactor stay controlled?
 A: Splitting uranium releases heat and neutrons that continue the chain; control rods absorb excess neutrons to throttle the rate, water carries heat to turbines, and safety comes from layered barriers plus automatic shutdown systems.
 Q: How do solar panels turn light into power?
 A: A photovoltaic semiconductor releases electrons when photons strike it, and built-in fields steer them into a circuit; practical efficiency is 15 to 22 percent, and cooling the panel with airflow measurably raises output.
+Q: How big is the Sun compared to Earth?
+A: About 1.3 million Earths would fit inside the Sun; its diameter is roughly 109 times Earth's, and it holds 99.8 percent of all mass in the solar system.
+Q: How far away is the Moon?
+A: About 384,400 kilometers on average, roughly 30 Earth-diameters away; light takes 1.3 seconds to travel that distance, which is why Moon missions take about three days.
+Q: What is a light year?
+A: The distance light travels in one year, about 9.5 trillion kilometers; it measures distance, not time, so a star 100 light years away shows us how it looked a century ago.
+Q: Why is Mars red?
+A: Iron oxide, plain rust, covers its surface dust and rocks; the planet has no protective magnetosphere now, so solar wind stripped most of its atmosphere over billions of years.
+Q: How hot is Venus and why?
+A: About 465 degrees Celsius day and night, hotter than Mercury despite being farther from the Sun; its thick carbon dioxide atmosphere traps heat in a runaway greenhouse effect.
+Q: What is the Milky Way?
+A: Our home galaxy, a barred spiral with 100-400 billion stars and a diameter about 100,000 light years; the Sun orbits its center once every roughly 230 million years.
+Q: What is Jupiter's Great Red Spot?
+A: A storm wider than Earth that has raged for at least 350 years; winds inside exceed 400 km/h, and it slowly shrinks, but it remains the largest storm in the solar system.
+Q: Why do we always see the same side of the Moon?
+A: Tidal locking: the Moon rotates once per orbit, so the same hemisphere faces Earth; the far side, wrongly called the dark side, gets plenty of sunlight.
+Q: What is an asteroid belt?
+A: A ring of rocky leftovers between Mars and Jupiter, holding millions of objects but totaling less than the Moon's mass; spacecraft pass through safely because objects are spread far apart.
+Q: What are exoplanets?
+A: Planets orbiting other stars; over 5,500 are confirmed so far, found mostly by watching stars dim slightly as planets pass in front, and some sit in habitable zones where liquid water could exist.
+Q: How does the Sun produce energy?
+A: Nuclear fusion in its core: hydrogen protons smash together at 15 million degrees and fuse into helium, converting 4 million tons of mass into pure energy every second.
+Q: What is a comet?
+A: A dirty snowball of ice, dust and rock from the outer solar system; when it nears the Sun, ice sublimates and forms a glowing coma and a tail always pointing away from the Sun.
+Q: Why does space look black if stars are everywhere?
+A: The universe is expanding and light from the most distant stars is stretched to invisible wavelengths and dimmed; also starlight has not had time to fill the sky since the Big Bang.
+Q: What is the Kuiper Belt?
+A: A vast icy ring beyond Neptune, 30 to 55 times Earth's distance from the Sun, home to dwarf planets like Pluto and countless frozen bodies, the source of many short-period comets.
+Q: How do astronauts float on the ISS?
+A: They are actually falling continuously around Earth, orbiting at 28,000 km/h; the station and everything inside fall together, so relative to each other they feel weightless.
+Q: What is the closest star to the Sun?
+A: Proxima Centauri, about 4.24 light years away, a small red dwarf with at least one confirmed Earth-sized planet in its habitable zone; with current rockets the trip would take tens of thousands of years.
+Q: I am writing a newsletter issue about the solar system for curious teenagers, and my editor wants it punchy, accurate and full of numbers they can quote at school. Cover six points in order: the scale of the Sun versus everything else, Venus versus Mars as a warning about climate, Jupiter's role as the neighborhood shield, Saturn's rings with a size comparison, how Pluto got reclassified and why that was fair, and one closing thought about how far our spacecraft have actually reached. Tight quotable sentences, magazine tone, no jargon without a quick explanation, and each fact must be the kind a 14-year-old can repeat without fear.
+A: Draft ready. The Sun holds 99.8 percent of the solar system's mass; everything else, planets, moons, asteroids, shares the remaining crumb. Venus and Mars are two warnings: Venus proves a thick carbon dioxide atmosphere cooks a world to 465 degrees, Mars proves losing your magnetic shield lets the solar wind strip your air. Jupiter is the heavyweight: its gravity bends and catches comets, quietly reducing impacts on the inner planets. Saturn's rings stretch up to 280,000 kilometers wide, yet in places they are thinner than a classroom door. Pluto was reclassified because similar icy worlds were discovered beyond Neptune; keeping Pluto a planet would have meant adding dozens more, so the category got smarter, not smaller. Closing thought: Voyager 1, launched 1977, is the farthest human-made object, over 24 billion kilometers away and still whispering home; at that speed, the nearest star remains tens of thousands of years away, which tells you how young our spacefaring story really is.

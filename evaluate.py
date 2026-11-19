@@ -41,7 +41,7 @@ def run_samples(seshat):
               f"   (ثقة {r['confidence']:.0%} — {r['seconds']} ث){tag}\n")
 
 
-def run_paraphrase(seshat, show):
+def run_paraphrase(seshat, show, mx=0):
     """
     أسئلة data/paraphrase_tests.py مكتوبة بصيغ مش موجودة في البيانات.
     بنقارن النموذج لوحده بالنموذج + الذاكرة. الذاكرة هنا من غير الصيغ اللي
@@ -74,7 +74,8 @@ def run_paraphrase(seshat, show):
         right = wrong = silent = hinted = 0
         misses = []
         for q, ok, ok_questions in inside:
-            r = seshat.reply(q, use_memory=use_memory)
+            r = seshat.reply(q, use_memory=use_memory,
+                             max_new_tokens=mx if mx else 2000)
             if r["fallback"]:
                 silent += 1
                 good_hint = normalize_question(r.get("suggestion", "")) in ok_questions
@@ -87,7 +88,8 @@ def run_paraphrase(seshat, show):
                 misses.append(f"    رد غلط ← {q}   ({r['thinking']})")
         refused = made_up = 0
         for q in outside:
-            r = seshat.reply(q, use_memory=use_memory)
+            r = seshat.reply(q, use_memory=use_memory,
+                             max_new_tokens=mx if mx else 2000)
             if r["fallback"]:
                 refused += 1
             else:
@@ -165,7 +167,7 @@ def run_draw(seshat, show, limit=0):
     print(f"الوقت: {time.time() - t0:.0f} ثانية")
 
 
-def run_understand(seshat, limit, show):
+def run_understand(seshat, limit, show, mx=0):
     """
     فهم الأسئلة اللي برّه معلوماته، على مواضيع النموذج عمره ما شافها (understanding.HELD_OUT_*).
     بنقيس حاجتين:
@@ -184,8 +186,9 @@ def run_understand(seshat, limit, show):
     t0 = time.time()
     for q, kind, topic, arabic in tests:
         q = normalize_question(q)
-        alone = seshat.reply(q, use_fallback=False, use_memory=False)
-        full = seshat.reply(q)
+        alone = seshat.reply(q, use_fallback=False, use_memory=False,
+                             max_new_tokens=mx if mx else 2000)
+        full = seshat.reply(q, max_new_tokens=mx if mx else 2000)
         n += 1
         t_ok = alone["thinking"] == un.think(kind, topic, arabic)
         x_ok = alone["response"] == un.compose(kind, topic, arabic)
@@ -231,7 +234,7 @@ def gist_ok(gen, ref, thr=0.5):
     return f1 >= thr
 
 
-def run_accuracy(seshat, limit, seed):
+def run_accuracy(seshat, limit, seed, mx=0):
     from dataset import build_intents
 
     intents = build_intents(holdout=True, verbose=False)
@@ -250,8 +253,14 @@ def run_accuracy(seshat, limit, seed):
 
     stats = {}
     t0 = time.time()
+    # خ20 — --max-new: سقف توكنز القياس. النماذج الجديدة من الصفر (زي 3M) لسه
+    # متتعلمةش تقفل الجملة فبتكمل لحد 2000 توكن وكل سؤال بياخد ٦–١٠ ثواني —
+    # السقف الأقصر بيخلّي القياس ممكن من غير ما نغير المحرك، والجواب الحقيقي
+    # في كل بيانات المعرفة أقصر من ٢٢٠ توكن فالقص مش بيغير نتيجة الموديل الناضج.
+    mx_eff = mx if mx else 2000
     for q, it, kind in seen + unseen:
-        r = seshat.reply(q, use_fallback=False, use_memory=False)     # النموذج لوحده
+        r = seshat.reply(q, use_fallback=False, use_memory=False,
+                         max_new_tokens=mx_eff)     # النموذج لوحده
         ok = r["response"] == it.answer
         low = r["confidence"] < CONFIDENCE_THRESHOLD and not r["fallback"]
         for key in ((kind, it.cat), (kind, "الكل")):
@@ -277,7 +286,7 @@ def run_accuracy(seshat, limit, seed):
     print(f"\nالوقت: {time.time() - t0:.0f} ثانية")
 
 
-def run_long(seshat, n=24, seed=777):
+def run_long(seshat, n=24, seed=777, mx=0):
     """
     خ12 — قياس السياق الممتد: مستندات جديدة تمامًا (بـ seed تاني عن التدريب)
     والسؤال عن تفصيلة في آخرها. القياس بيكون بالرد الصح بالحرف + سرعة التدفق.
@@ -290,7 +299,8 @@ def run_long(seshat, n=24, seed=777):
     t0 = time.time()
     for ex in rng_tests:
         doc, q = ex["question"].rsplit("\n", 1)
-        r = seshat.reply_long(doc, q, use_fallback=False)
+        r = seshat.reply_long(doc, q, use_fallback=False,
+                              max_new_tokens=mx if mx else 2000)
         s = by_kind.setdefault(ex["kind"], [0, 0, 0.0])
         s[0] += r["response"] == ex["answer"]
         s[1] += 1
@@ -324,6 +334,9 @@ def main():
     p.add_argument("--model", default=None, help="ملف نموذج تاني غير الافتراضي")
     p.add_argument("--show", action="store_true", help="مع --paraphrase أو --draw: اطبع اللي غلط فيه")
     p.add_argument("--limit", type=int, default=0)
+    p.add_argument("--max-new", type=int, default=0,
+                   help="سقف توكنز التوليد في القياس (0 = سقف المحرك 2000) — "
+                        "للنماذج الجديدة اللي لسه متتعلمةش تقفل الجملة")
     p.add_argument("--seed", type=int, default=7)
     args = p.parse_args()
 
@@ -333,15 +346,15 @@ def main():
     if args.samples:
         run_samples(seshat)
     elif args.paraphrase:
-        run_paraphrase(seshat, args.show)
+        run_paraphrase(seshat, args.show, args.max_new)
     elif args.draw:
         run_draw(seshat, args.show, args.limit)
     elif args.understand:
-        run_understand(seshat, args.limit, args.show)
+        run_understand(seshat, args.limit, args.show, args.max_new)
     elif args.long:
-        run_long(seshat, args.long_n)
+        run_long(seshat, args.long_n, mx=args.max_new)
     else:
-        run_accuracy(seshat, args.limit, args.seed)
+        run_accuracy(seshat, args.limit, args.seed, args.max_new)
 
 
 if __name__ == "__main__":

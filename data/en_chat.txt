@@ -775,3 +775,43 @@ Q: Is charging my phone overnight bad for the battery?
 A: Modern phones manage it: they charge to full, pause, and top up through the night, so overnight charging is largely safe. What ages batteries is heat and staying at 100 percent for hours; removing thick cases while charging helps more than people expect.
 Q: I am a parent organizing a science night for my two kids, ages 9 and 12, and I want three physics demos we can run at the kitchen table with nothing exotic: one about static electricity, one about magnetism, and one about light and shadows. For each demo I want a clear prediction the kids write down before we try it, the exact steps, what result counts as success, and one everyday example that connects the concept to their real life. Total time about 45 minutes, nothing fragile, nothing expensive, and ideally the kids do the moving parts themselves while I narrate.
 A: Three demos, 15 minutes each, all kitchen-safe. Static: inflate a balloon, rub it on dry hair for ten seconds, then hold it near an empty soda can lying on its side; prediction first, then the can rolls toward the balloon, and success is visible movement without touching. Everyday link: winter door handles and laundry cling. Magnetism: a strong fridge magnet and a tray of small objects, steel pin, copper wire, coin, plastic button; kids sort predict-then-test into attracts and does not, success is them discovering only iron-family items respond, then link to compass needles and speaker magnets. Light and shadows: flashlight, a toy figure, and a wall in a dimmed room; measure shadow length at 30, 60, and 100 centimeters and record three numbers, success is them seeing the pattern that doubling distance changes size predictably, then link to sunset shadows stretching long. Structure every demo the same: write the prediction, run it, compare, name the concept; kids doing the hands while you narrate is exactly right,
+Q: I ordered food and it arrived cold and late. What should I do?
+A: Report it through the app first with a photo; most platforms refund or credit automatically for cold orders, and if the restaurant repeats the problem, stop ordering from it and leave an honest review.
+Q: I keep ordering takeout because I am too tired to cook. How do I fix this?
+A: Cook once and eat twice: make double portions on the two days you have energy, keep easy backups like eggs and pasta, and allow two planned takeout days so the habit stays sustainable.
+Q: My friends always pick expensive restaurants and I cannot keep up. What do I say?
+A: Be honest and offer an alternative: suggest the place, not the excuse — 'let us try that new mid-range spot'; real friends adjust, and one honest sentence saves both money and awkwardness.
+Q: I never know what to cook with what is in my fridge. Any system?
+A: Keep five base recipes you can improvise: pasta, eggs, rice bowl, soup, stir-fry; check what you have before shopping, buy only what completes those bases, and food waste drops within two weeks.
+Q: Eating healthy is expensive where I live. Is it really?
+A: Beans, eggs, seasonal vegetables, oats and frozen produce are cheap and nutritious; the expensive part is usually meat, packaged snacks and drinks — swap those first and the bill shrinks.
+Q: I snack all night while studying or watching shows. How do I stop?
+A: Close the kitchen at a fixed hour, brush your teeth after dinner, and keep a water bottle nearby; most night snacking is boredom, not hunger, so swap the activity before fighting the craving.
+Q: My roommate keeps eating my food. How do I handle it without a fight?
+A: Talk early and light, not angry and late: propose labeled shelves or a shared-fund for basics; clear systems fix this in one conversation, silence turns it into resentment.
+Q: I want to cut sugar but I fail every week. What actually works?
+A: Do not keep it home in the first place, eat enough protein at meals, and allow one planned dessert so the ban does not backfire; willpower loses to environment every time.
+Q: I feel sick after eating out but I am not sure it is the food. What now?
+A: Note what you ate and when symptoms started, hydrate and rest, see a doctor if it lasts over 48 hours or you have a fever; report a suspected restaurant case to the food authority with details.
+Q: How do I host dinner without overspending or stressing?
+A: One main dish you can cook confidently, one simple side, and ask guests to bring dessert or drinks; hosting is about gathering, not impressing, and planned simplicity beats improvised chaos.
+Q: I drink too many soft drinks every day. How do I cut down?
+A: Replace gradually, not cold turkey: one glass of water before each soda, keep the soda smaller each week, and after three weeks taste buds adjust — sudden bans almost always rebound.
+Q: My child only wants nuggets and fries. How do I expand their food?
+A: Serve new food alongside a favorite, in tiny amounts, repeatedly without pressure; kids need up to ten calm exposures, and they copy what they see you eating far more than what you order them.
+Q: I waste groceries every week. How do I shop smarter?
+A: Shop after eating, with a list built from planned meals, and buy produce in smaller more frequent batches; check the fridge before every list and cook one 'fridge clean-out' meal weekly.
+Q: Office lunch costs are draining my salary. Alternatives?
+A: Batch-prep two lunches on Sunday, keep emergency desk food, and join colleagues for the walk not the meal; social time survives even when the expensive lunch does not.
+Q: I get home starving and order whatever is fastest. How do I break this?
+A: Fix the arrival hour, not the willpower: eat a small snack on the way home, keep a 10-minute meal option ready, and decide dinner before you get hungry — hunger votes for fast food every time.
+Q: A restaurant charged me wrong and the staff argued. What now?
+A: Stay calm, show the menu or receipt, ask for the manager, and dispute through the bank if overcharged and refused; one polite firm sentence works: 'this is not what was ordered or priced.'
+Q: I love coffee shop drinks and spend too much monthly. Compromise?
+A: Buy a simple brewing setup for home, keep cafe visits as a planned treat twice a week, and track the first month to see the real number; the habit keeps the joy and drops most of the cost.
+Q: I skip breakfast and overeat at night. Should I force breakfast?
+A: Not necessarily; some people do better with a later first meal, the real fix is the night overeating: eat enough protein at your main meals and stop labeling foods as forbidden, which drives binges.
+Q: My family keeps telling me to eat more and I am not hungry. How to respond?
+A: Appreciate the care and hold the line gently: 'I am full, thank you, it was delicious'; consistent polite refusal teaches households your normal within weeks without conflict.
+Q: I want to eat healthier but cooking stresses me out. Where do I start?
+A: Master three meals, not thirty: one breakfast, one lunch, one dinner you can make in 15 minutes each, repeat them for a month, then add one new recipe weekly — routine first, variety later.
