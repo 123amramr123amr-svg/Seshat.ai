@@ -24,3 +24,6 @@ nawah/*.db
 
 # خ23 — checkpoint الـ50M حجمه ~204MB أعلى من حد git (100MB) فبيفضل محلي
 seshat_50m.npz
+# خ24 — النموذج الواحد الموسع 210MB أعلى من حد git 100MB: بيتبني من جديد دايمًا بأمر واحد
+# python3 grow_model.py --src backups/seshat_k23_static_69408.npz --out seshat_chet_model.npz --target-n-embd 512 --target-n-layer 16
+seshat_chet_model.npz
