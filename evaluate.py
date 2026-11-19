@@ -204,6 +204,33 @@ def run_understand(seshat, limit, show):
     print(f"الوقت: {time.time() - t0:.0f} ثانية")
 
 
+def _tokens(s):
+    """خ17 — توكنز مضبوطة للقياس الجوهري: من غير تشكيل ولا ترقيم، وتوحيد الألف
+    ونزع أداة التعريف «ال» عشان «النيل» و«نيل» و«الأطول» و«أطول» يتعدوا نفس التوكِن."""
+    import re as _re
+    s = _re.sub(r"[\u064B-\u0652\u0670\u0640]", "", str(s).lower())   # تشكيل وتطويل
+    s = s.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ى", "ي")
+    s = _re.sub(r"[^\w\u0600-\u06FF ]", " ", s)
+    out = []
+    for w in s.split():
+        if len(w) > 3 and w.startswith("ال"):
+            w = w[2:]
+        out.append(w)
+    return out
+
+
+def gist_ok(gen, ref, thr=0.5):
+    """خ17 — قياس الفهم الحر: F1 توكنزي ≥ 0.5 يعني الجوهر وصل حتى لو الصياغة جديدة.
+    ده اللي بيفصل بين الحفظ الحرفي والفهم — طلب المستخدم الصريح في خ17."""
+    a, b = set(_tokens(gen)), set(_tokens(ref))
+    if not a or not b:
+        return False
+    inter = len(a & b)
+    p, r = inter / len(a), inter / len(b)
+    f1 = 2 * p * r / (p + r) if (p + r) else 0.0
+    return f1 >= thr
+
+
 def run_accuracy(seshat, limit, seed):
     from dataset import build_intents
 
@@ -228,24 +255,25 @@ def run_accuracy(seshat, limit, seed):
         ok = r["response"] == it.answer
         low = r["confidence"] < CONFIDENCE_THRESHOLD and not r["fallback"]
         for key in ((kind, it.cat), (kind, "الكل")):
-            s = stats.setdefault(key, [0, 0, 0, 0, 0])
+            s = stats.setdefault(key, [0, 0, 0, 0, 0, 0])
             s[0] += ok
             s[1] += 1
             s[2] += r["thinking"] == it.think                  # فهم السؤال صح
             s[3] += low and ok                                 # رد صح بس هيترفض بسبب الثقة
             s[4] += (not ok) and (low or r["fallback"])        # رد غلط بس المستخدم هيشوف "مش عارف"
+            s[5] += gist_ok(r["response"], it.answer)          # خ17: جوهر الرد وصل
 
     names = {"chat": "محادثة", "knowledge": "معلومات", "programming": "برمجة", "code": "أكواد",
              "translate": "ترجمة", "capital": "عواصم", "math": "حساب", "draw": "رسم",
              "unknown": "برّه التدريب", "الكل": "الكل"}
     for kind in ("اتدرب عليها", "صيغ جديدة"):
         print(f"\n— أسئلة {kind} —")
-        print("  (رد صح بالحرف | فهم السؤال صح | صح واترفض بالثقة | غلط واتقال مش عارف)")
-        for (k, cat), (ok, n, th, lost, caught) in sorted(stats.items(),
+        print("  (رد صح بالحرف | جوهر الرد صح (فهم حر) | فهم السؤال صح | صح واترفض بالثقة | غلط واتقال مش عارف)")
+        for (k, cat), (ok, n, th, lost, caught, fz) in sorted(stats.items(),
                                                           key=lambda x: x[0][1] == "الكل"):
             if k == kind:
                 print(f"  {names.get(cat, cat):<12} {ok:>5}/{n:<5} = {ok / n * 100:5.1f}%"
-                      f" | فهم {th / n * 100:5.1f}% | {lost:>3} | {caught:>3}")
+                      f" | جوهر {fz / n * 100:5.1f}% | فهم {th / n * 100:5.1f}% | {lost:>3} | {caught:>3}")
     print(f"\nالوقت: {time.time() - t0:.0f} ثانية")
 
 

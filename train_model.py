@@ -44,6 +44,8 @@ def parse_args():
                    help="خطوات التسخين (-1 = تلقائي: خطوات/٢٠ بحد ٢٠٠)")
     p.add_argument("--threads", type=int, default=0, help="عدد أنوية الـ CPU (0 = تلقائي)")
     p.add_argument("--resume", action="store_true", help="يكمل من الملف المحفوظ")
+    p.add_argument("--freeze", type=int, default=0,
+                   help="خ17: تجميد الـembeddings وأول N طبقات — الطبقات العلوية بس اللي بتتعلم (مقاومة النسيان)")
     p.add_argument("--no-holdout", action="store_true", help="يدرب على كل صيغ الأسئلة")
     p.add_argument("--out", default=os.path.join(HERE, "seshat_chet_model.npz"))
     p.add_argument("--seed", type=int, default=1234)
@@ -140,8 +142,26 @@ def main():
         start_step = ckpt["step"]
         print(f"↩️  تكملة من الخطوة {start_step}")
 
-    decay = [p for n, p in model.named_parameters() if p.dim() >= 2]
-    no_decay = [p for n, p in model.named_parameters() if p.dim() < 2]
+    # خ17 — تجربة مقاومة النسيان: تجميد أول N طبقات + جدول المواقع. الـembeddings
+    # بتتجميد بس لو المفردات ما كبرتش — لو كبرت لازم تتدرب عشان التوكنز الجديدة
+    # ما تفضلش معلقة على قيم البداية طول العمر.
+    if args.freeze > 0:
+        grew = bool(ckpt and vocab_grew)
+        frozen = 0
+        for pname, p in model.named_parameters():
+            head = pname.split(".")[0]
+            idx = int(pname.split(".")[1]) if head == "blocks" else -1
+            if head == "pos_emb" or (head == "blocks" and idx < args.freeze):
+                p.requires_grad_(False)
+                frozen += 1
+            elif head in ("tok_emb", "lm_head") and not grew:
+                p.requires_grad_(False)
+                frozen += 1
+        note = " (المفردات كبرت فالتضمين مساب يتدرب)" if grew else ""
+        print(f"🧊 تجميد: أول {args.freeze} طبقات + جدول المواقع{note} ({frozen} موتر مش هيتدرب)")
+
+    decay = [p for n, p in model.named_parameters() if p.dim() >= 2 and p.requires_grad]
+    no_decay = [p for n, p in model.named_parameters() if p.dim() < 2 and p.requires_grad]
     opt = torch.optim.AdamW(
         [{"params": decay, "weight_decay": 0.01}, {"params": no_decay, "weight_decay": 0.0}],
         lr=args.lr, betas=(0.9, 0.99))
