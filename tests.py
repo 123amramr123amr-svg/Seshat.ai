@@ -290,10 +290,10 @@ check("صيغة تانية لنفس السؤال مش موضوع تاني",
 r = seshat.reply("كم عدد سكان الصين")
 check("مبيردش برد سؤال شبهه عن حاجة تانية",
       r["fallback"] and r["kind"] == "fact" and r["searchable"] and "مصر" not in r["response"], str(r))
-r = seshat.reply("مين اخترع المصعد")   # سؤال مش موجود في أي ملف معرفة (الراديو اتضاف في جولة 15)
+r = seshat.reply("مين اخترع المكنسة الكهربائية")   # سؤال مش موجود في أي ملف معرفة (المصعد اتضاف في جولة 22 — تعارض خ22 اتصلح بروتوكول خ14)
 check("سؤال معلومة مش عنده: مبيألفش إجابة شريفة",
-      r["fallback"] and "أوتيس" not in r["response"]
-      and any(w in r["response"] for w in ("مين اخترع المصعد", "مش متأكد", "مش هألف", "تقصد")),
+      r["fallback"] and "سبانجلر" not in r["response"]
+      and any(w in r["response"] for w in ("مين اخترع المكنسة", "مش متأكد", "مش هألف", "تقصد")),
       str(r))
 
 print("\n9) الرسم النصي (data/drawings.py)")

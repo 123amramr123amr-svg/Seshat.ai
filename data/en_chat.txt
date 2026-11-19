@@ -815,3 +815,43 @@ Q: My family keeps telling me to eat more and I am not hungry. How to respond?
 A: Appreciate the care and hold the line gently: 'I am full, thank you, it was delicious'; consistent polite refusal teaches households your normal within weeks without conflict.
 Q: I want to eat healthier but cooking stresses me out. Where do I start?
 A: Master three meals, not thirty: one breakfast, one lunch, one dinner you can make in 15 minutes each, repeat them for a month, then add one new recipe weekly — routine first, variety later.
+Q: My manager takes credit for my work in meetings. What do I do?
+A: Document your contributions with dates, send visible status updates by email so authorship is on record, and in one calm meeting say 'happy to walk through how I built that'; visibility protects you more than confrontation.
+Q: A coworker keeps interrupting me in every discussion. How do I handle it?
+A: Name the pattern privately, not publicly: 'when I get cut off mid-sentence my point gets lost — let me finish and then build on yours'; if it repeats in the same meeting, one firm sentence: 'I wasn't finished.'
+Q: I was passed over for promotion without a clear reason. What now?
+A: Request a specific written answer: what skills or results are missing, agree on measurable goals and a review date, and meanwhile quietly talk to other teams; ambiguity is the enemy, not the rejection itself.
+Q: My inbox has 2,000 unread emails and it stresses me. How do I recover?
+A: Archive everything older than two weeks in one sweep — if it was urgent, someone will follow up; then apply inbox rules: newsletters auto-filtered, one focused check time twice daily, and reply-within-two-minutes rule for the rest.
+Q: I get nervous presenting to senior leaders. What actually helps?
+A: Lead with the conclusion in the first 30 seconds, prepare answers to the three questions you fear most, rehearse once out loud with a timer, and bring one page of numbers; leaders respect structure over charisma.
+Q: My colleague sends passive-aggressive messages instead of talking. Response?
+A: Do not match the tone; reply by moving it to voice: 'happy to discuss this on a quick call'; written ambiguity breeds more ambiguity, and one honest conversation usually ends the pattern.
+Q: I keep accepting extra tasks and drowning. How do I say no at work?
+A: Use the queue technique: 'I can take this after X and Y, which do you want first?'; it says yes professionally while making trade-offs visible, and managers respect people who surface priorities instead of silently breaking.
+Q: My performance review was vague: 'do better'. What do I do?
+A: Ask for two concrete behaviors and two measurable outcomes within 90 days, write them down, and set a mid-point check-in; vague feedback un-pinned becomes vague blame later.
+Q: A teammate does zero work in group projects. Fair response?
+A: Make work visible early: split tasks with owners and dates in writing on day one; when slippage shows, message the group, not just him, so responsibility stays shared and documented, and escalate only with evidence.
+Q: I feel burned out but cannot afford to quit. Small moves?
+A: Fix sleep first, take your actual vacation days, negotiate one remote day if possible, and cut one recurring commitment; burnout is rarely solved by one big exit — it is solved by restoring margins.
+Q: My boss changes decisions weekly and my work resets. How to cope?
+A: Confirm each decision by email with a short summary and ask 'this becomes the plan of record?', get a mid-week checkpoint, and keep work modular so a pivot changes one block, not the whole build.
+Q: Someone reads my screen in the open office. Annoying, how to handle?
+A: Use a privacy filter or turn the screen slightly, book a room for sensitive work, and if it persists, one light sentence: 'sorry, confidential stuff'; most readers stop when named gently once.
+Q: I was asked to train my own replacement. Should I worry?
+A: Do the job professionally and document your wins separately; knowledge transfer is a process, not a verdict — but update your resume and network quietly, because signals beat rumors.
+Q: Meetings run long and waste my day. Any tactic?
+A: Propose agenda + time cap in the invite, state your section first when possible, and leave at the cap politely: 'I have a hard stop'; one person modeling endings trains whole teams.
+Q: My work style is quiet focus but the office demands visibility. Balance?
+A: Publish results, not noise: a weekly written update of what shipped; visibility is about outcomes reaching decision-makers, not being loud in meetings — introverts win with artifacts.
+Q: I made a visible mistake at work. Best immediate move?
+A: Report it before someone else does, with a one-line fix plan and what you learned; fast honest ownership converts disasters into trust, hiding converts them into credibility loss.
+Q: Colleagues gossip about a coworker's firing. Should I join?
+A: Keep it neutral: 'I don't know the details and it's not mine to judge'; gossip travels back compressed, and neutral people are safe to promote later.
+Q: My requests to IT take a week. How do I speed things up?
+A: Bundle requests: one email with system, business reason, deadline and who is blocked; support teams triage by impact clarity, and vague 'urgent' requests sink to the bottom.
+Q: I get interviewed for internal roles and freeze. Difference from outside interviews?
+A: Internal interviews test evidence of impact, not promises: bring three quantified results from current role, one failure with a lesson, and a 90-day sketch for the new role; familiarity is your home field.
+Q: How do I ask for a raise without sounding greedy?
+A: Book a dedicated meeting, bring market data for your role plus two delivered results with numbers, and ask for a specific figure with a follow-up date; raises follow documented value, not loyalty or mood.
