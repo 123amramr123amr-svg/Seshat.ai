@@ -179,27 +179,23 @@ GROWTH_TABLE = [
      "note": "مسيرة المليار: قفزة 16→64 طبقة بوصفة freeze — تم"},
     {"round": "خ31", "layers": 80, "params_approx": "254M",
      "note": "مسيرة المليار: +16 طبقة @512 (استعادة خ30 ثم 64→80) بوصفة freeze-blocks 48 — تم 254,010,880"},
-    {"round": "خ32", "layers": 80, "params_approx": "570M",
-     "note": "مسيرة المليار: توسيع العرض n_embd 512→768"},
-    {"round": "خ33", "layers": 96, "params_approx": "683M",
-     "note": "مسيرة المليار: +16 طبقة @768"},
-    {"round": "خ34", "layers": 108, "params_approx": "768M",
-     "note": "مسيرة المليار: +12 طبقة @768"},
-    {"round": "خ35", "layers": 120, "params_approx": "853M",
-     "note": "مسيرة المليار: +12 طبقة @768"},
-    {"round": "خ36", "layers": 132, "params_approx": "938M",
-     "note": "مسيرة المليار: +12 طبقة @768"},
-    {"round": "خ37", "layers": 141, "params_approx": "1,001M",
-     "note": "هدف المليار: ~1,000,000,000 معامل على نفس الملف الواحد"},
+    {"round": "خ32", "layers": 80, "params_approx": "1,011M",
+     "note": "مسيرة المليار: عبور الهدف — عرض 1024 بعد (768 اترد بنظام التوسعة نفسه: لازم مضاعف صحيح) على نفس الملف الواحد عبر streaming بنفس منطق widen_weights — القياس الفعلي 1,011,338,240 معامل ≥ 1,000,000,000"},
+    {"round": "نهاية المسيرة", "layers": 80, "params_approx": "1,011M",
+     "note": "بوابة النهاية: هدف 1,000,000,000 معامل تحقق في خ32 — مفيش توسعة بعد العبور، والخطوات المخططة خ33-خ37 اتحسمت لغاء", "closed": True},
 ]
 
 
 def growth_plan():
     """الجدول + الموقع الحي: خنا فين دلوقتي بالطبقات والمعاملات المقروءة من الملف."""
     r = growth_report()
-    done = [row for row in GROWTH_TABLE if r["layers"] >= row["layers"]]
-    nxt = [row for row in GROWTH_TABLE if r["layers"] < row["layers"]]
-    return {"report": r, "done": done, "next": nxt[:1],
+    reached = bool(r.get("model_exists")) and r.get("params", 0) >= 1_000_000_000
+    done = [row for row in GROWTH_TABLE
+            if (row.get("closed") and reached) or (not row.get("closed") and r["layers"] >= row["layers"])]
+    nxt = [row for row in GROWTH_TABLE if not row.get("closed") and r["layers"] < row["layers"]]
+    if reached:
+        nxt = []
+    return {"report": r, "done": done, "next": nxt[:1], "reached": reached,
             "rule": "التوسعة على نفس الملف seshat_chet_model.npz فقط عبر "
                     "grow_model.py — ممنوع أي ملف نموذج تاني أبدًا"}
 
@@ -213,6 +209,9 @@ def growth_plan_text():
                 "لأن ملف النموذج مش موجود دلوقتي." % len(GROWTH_TABLE))
     lines = ["جدول نمو seshat كل 8 ساعات — الموقع الحي مقروء من الملف: %d طبقة × %s معامل"
              % (r["layers"], _fmt(r["params"]))]
+    if p.get("reached"):
+        lines.append("المسيرة خلصت: هدف مليار معامل تحقق (%s) على نفس الملف الواحد — التوسعة اتقفلت"
+                     % _fmt(r["params"]))
     for row in p["done"]:
         lines.append("• %s: %d طبقة (%s) — %s — تم"
                      % (row["round"], row["layers"], row["params_approx"], row["note"]))
