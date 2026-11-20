@@ -40,6 +40,9 @@ def parse_args():
     p.add_argument("--dropout", type=float, default=0.05)
     p.add_argument("--block-size", type=int, default=4096)
     p.add_argument("--eval-every", type=int, default=250)
+    p.add_argument("--save-every", type=int, default=0,
+                   help="خ28: حفظ دوري مستقل عن التقييم — جلسات الرام المقلصة "
+                        "محتاجة حفظ من غير spikes تقييم (0 = مربوط بـeval-every زي الأول)")
     p.add_argument("--warmup", type=int, default=-1,
                    help="خطوات التسخين (-1 = تلقائي: خطوات/٢٠ بحد ٢٠٠)")
     p.add_argument("--threads", type=int, default=0, help="عدد أنوية الـ CPU (0 = تلقائي)")
@@ -263,7 +266,13 @@ def main():
             run_n += 1
             step += 1
 
-            if step % args.eval_every == 0 or step == total_steps:
+            # خ28: الحفظ مستقل عن التقييم — جلسات الرام المقلصة بتاخد حفظ دوري
+            # من غير spikes تقييم (اللي كانت بتقتل الجلسة قبل ما توصل للحفظ).
+            save_every = args.save_every or args.eval_every or 250
+            is_save = (step % save_every == 0) or step == total_steps
+            is_eval = args.eval_every > 0 and ((step % args.eval_every == 0)
+                                               or step == total_steps)
+            if is_eval:
                 seen_loss, seen_acc = ds.evaluate(model, seen_set, device)
                 un_loss, un_acc = ds.evaluate(model, unseen_set, device)
                 metrics = {"train_loss": run_loss / run_n, "seen_exact": seen_acc,
@@ -274,20 +283,32 @@ def main():
                       f"| ردود صح (صيغ جديدة) {un_acc * 100:5.1f}% "
                       f"| {active / 60:5.1f} دقيقة", flush=True)
                 run_loss, run_n = 0.0, 0
+            if is_save:
+                if run_n:
+                    metrics = dict(metrics, train_loss=run_loss / run_n,
+                                   minutes=active / 60)
                 save(args.out, model, cfg, tok, step, metrics, opt)
                 trim_memory()
     except KeyboardInterrupt:
         print("\n⛔ اتوقف بالإيد — بحفظ اللي اتعلمه لحد دلوقتي")
 
-    seen_loss, seen_acc = ds.evaluate(model, seen_set, device)
-    un_loss, un_acc = ds.evaluate(model, unseen_set, device)
-    metrics = {"seen_exact": seen_acc, "unseen_exact": un_acc, "unseen_loss": un_loss,
-               "minutes": active / 60}
-    save(args.out, model, cfg, tok, step, metrics, opt)
-    print("--- انتهى التدريب ---\n")
-    print(f"✅ اتحفظ في {args.out}")
-    print(f"   ردود صح بالحرف على أسئلة اتدرب عليها: {seen_acc * 100:.1f}%")
-    print(f"   ردود صح بالحرف على صيغ ماشافهاش:      {un_acc * 100:.1f}%  ({len(unseen_set)} سؤال)")
+    # خ28: لو مفيش تقييم (الوصفة المقلصة) → حفظ مباشر بقياس الخسارة الجاري
+    if args.eval_every > 0:
+        seen_loss, seen_acc = ds.evaluate(model, seen_set, device)
+        un_loss, un_acc = ds.evaluate(model, unseen_set, device)
+        metrics = {"seen_exact": seen_acc, "unseen_exact": un_acc, "unseen_loss": un_loss,
+                   "minutes": active / 60}
+        save(args.out, model, cfg, tok, step, metrics, opt)
+        print("--- انتهى التدريب ---\n")
+        print(f"✅ اتحفظ في {args.out}")
+        print(f"   ردود صح بالحرف على أسئلة اتدرب عليها: {seen_acc * 100:.1f}%")
+        print(f"   ردود صح بالحرف على صيغ ماشافهاش:      {un_acc * 100:.1f}%  ({len(unseen_set)} سؤال)")
+    else:
+        metrics = {"train_loss": (run_loss / run_n) if run_n else 0.0,
+                   "minutes": active / 60}
+        save(args.out, model, cfg, tok, step, metrics, opt)
+        print("--- انتهى التدريب (وصفة مقلصة بدون تقييم) ---")
+        print(f"✅ اتحفظ في {args.out} عند خطوة {step} | خسارة جارية {metrics['train_loss']:.4f}")
     print("\nشغّل دلوقتي:  python app.py")
 
 

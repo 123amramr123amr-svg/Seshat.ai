@@ -1048,3 +1048,65 @@ Q: Why do waves break near shore?
 A: In deep water waves roll as energy; when the seabed shallows, the bottom drags, the wave slows, piles up and topples — the same energy, just squeezed into less depth.
 Q: I am writing a school newsletter feature about ocean animals for students aged 13-15, and my editor wants it vivid, accurate and full of facts kids can quote at science class. Cover six animals in order: the blue whale with a size comparison they will never forget, the octopus with its clever arms and skin, the dolphin's echolocation explained simply, the seahorse with its surprising parenting role, the mantis shrimp with its legendary punch, and the sea turtle with its magnetic navigation. Tight quotable sentences, magazine tone, no jargon without a quick explanation, each fact correct and memorable.
 A: Feature ready. The blue whale reaches 30 meters, the size of three school buses in a row, and its heart alone is as big as a small car. The octopus runs eight arms that taste, grip and solve problems semi-independently, and repaints its whole body in under a second with skin cells called chromatophores. The dolphin sees with sound: clicks bounce off hidden fish and return as a map, a skill called echolocation, sharper than any sonar we built. The seahorse flips the script: the father carries the babies in a pouch and gives birth to hundreds. The mantis shrimp punches at bullet acceleration, boiling the water around its fist, and sees up to 16 color channels while we see three. The sea turtle navigates whole oceans with Earth's magnetic field like a compass and map combined, then returns to lay eggs on the exact beach where it hatched. Closing question for readers: which of these superpowers would you pick for a day, and what would you do with it?
+
+
+# ---------- k28 additions ----------
+Q: What is the Suez Canal | Tell me about the Suez Canal
+A: The Suez Canal is an artificial waterway in Egypt connecting the Mediterranean Sea to the Red Sea. It opened in 1869, is about 193 km long, and carries a large share of world trade.
+
+Q: What is the tallest mountain in the world | How high is Mount Everest
+A: Mount Everest is the highest mountain on Earth's surface at about 8,849 meters, located in the Himalayas on the border between Nepal and China.
+
+Q: What is the largest ocean | Tell me about the Pacific Ocean
+A: The Pacific Ocean is the largest ocean on Earth, covering about 165 million square kilometers — more than a third of the planet's surface.
+
+Q: Who invented paper | History of paper
+A: Paper was invented in China, and credit is usually given to the court official Cai Lun around 105 AD. The craft spread gradually from China to the rest of the world.
+
+Q: How fast does light travel | Speed of light
+A: Light travels in a vacuum at about 300,000 kilometers per second — the fastest speed possible in the universe according to relativity.
+
+Q: How fast does sound travel | Speed of sound in air
+A: Sound moves through air at about 343 meters per second at 20 degrees Celsius, and the speed changes with air temperature.
+
+Q: How many chambers does the human heart have | Human heart chambers
+A: The human heart has four chambers: two atria and two ventricles, and blood flows through them with valves that prevent backflow.
+
+Q: How many bones are in the adult human body | Human bone count
+A: A baby is born with about 300 bones, which fuse over time into 206 bones in the adult human skeleton.
+
+Q: Why is the sky blue | Reason for the blue sky
+A: The sky looks blue because air molecules scatter sunlight, and blue light has a shorter wavelength so it scatters more than other colors. This is called Rayleigh scattering.
+
+Q: What was the first satellite | Tell me about Sputnik 1
+A: The first artificial satellite was Sputnik 1, launched by the Soviet Union in 1957. It was a small metal sphere that transmitted a distinctive radio beep heard around the world.
+
+Q: Where does chocolate come from | Origin of chocolate
+A: Chocolate is made from cacao beans. The cacao tree is native to Central and South America, and the Maya and Aztec drank it as a bitter beverage long before it became a sweet industrial product.
+
+Q: What is the deadliest animal to humans | Dangerous animals
+A: The mosquito is considered the deadliest animal to humans because it transmits diseases like malaria and dengue, causing millions of deaths per year — more than any other animal.
+
+Q: What is photosynthesis | How do plants make food
+A: Photosynthesis is the process where plants convert sunlight, carbon dioxide and water into glucose and oxygen inside green cell parts called chloroplasts.
+
+Q: What is the water cycle | How does water move in nature
+A: The water cycle is evaporation of water from seas by the sun, condensation into clouds, precipitation as rain or snow, and return to seas and rivers to repeat.
+
+Q: Where did the internet come from | History of the internet
+A: The internet grew out of ARPANET, a network built by the American ARPA agency in 1969 to connect research centers, and it later expanded into today's global network.
+
+Q: Who was Al-Khwarizmi | Origin of the word algorithm
+A: Al-Khwarizmi was a ninth-century scholar in Baghdad who laid the foundations of algebra. The word algorithm comes from his name, and his works spread the decimal system and the concept of zero.
+
+Q: How long is the Great Wall of China | Great Wall facts
+A: The Great Wall of China is a series of fortifications built over centuries to protect China's north. Reported total length of all its sections is about 21,000 kilometers.
+
+Q: What do bees do | Honey and pollination
+A: In a beehive one queen lays eggs while worker bees collect nectar and turn it into honey. Bees are vital because they pollinate plants and flowers, keeping crops alive.
+
+Q: Why is petroleum called black gold | Importance of oil
+A: Petroleum is called black gold because it is a hugely valuable natural resource. It yields gasoline, diesel, kerosene and petrochemicals used in clothing, plastics and many industries.
+
+Q: What is the largest hot desert | Sahara desert facts
+A: The Sahara in North Africa is the largest hot desert in the world at about 9 million square kilometers, covering countries like Egypt, Libya, Algeria and Sudan.

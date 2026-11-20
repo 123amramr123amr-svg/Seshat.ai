@@ -18,6 +18,13 @@ import sys
 import threading
 import time
 
+# خ28 — تسريع التوليد: مصفوفات التوليد توكن-ب-توكن صغيرة (GEMV)، وBLAS متعدد
+# الخيوط بيصرف وقت أكتر في المزامنة من الحساب نفسه — خيط واحد أسرع قياسًا.
+# setdefault بيحترم قيمة معمولة قبل التشغيل عشان المقارنة العادلة تفضل ممكنة.
+for _blas_t in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
+                "NUMEXPR_NUM_THREADS"):
+    os.environ.setdefault(_blas_t, "1")
+
 import numpy as np
 
 from checkpoint import load_checkpoint
@@ -744,10 +751,19 @@ class NumpySeshat(BaseSeshat):
     def num_params(self):
         return self._n_params
 
+    def _new_kv_cache(self):
+        """خ28 — ذاكرة KV محجوزة مسبقًا بمقاعد block_size: بنكتب k وv في مكانها
+        بدل concatenate ونسخ كامل لكل توكن لكل طبقة (نفس القيم بالظبط —
+        مخرجات greedy متطابقة، والفرق بس إن مفيش تخصيص ونسخ متكرر)."""
+        cap = int(self.config["block_size"])
+        return {"k": np.zeros((self.n_head, cap, self.head_dim), dtype=np.float32),
+                "v": np.zeros((self.n_head, cap, self.head_dim), dtype=np.float32),
+                "n": 0}
+
     def _forward(self, ids, caches):
         """بيدخّل توكنز جديدة ويرجّع logits آخر توكن. caches فيها k و v بتوع اللي فات."""
         H, hd, C = self.n_head, self.head_dim, self.n_embd
-        past = caches[0]["k"].shape[1] if "k" in caches[0] else 0
+        past = int(caches[0].get("n", 0)) if caches else 0
         T = len(ids)
         x = self.tok_emb[ids] + self.pos_emb[past:past + T]                 # (T, C)
         mask = None
@@ -759,10 +775,12 @@ class NumpySeshat(BaseSeshat):
             q = q.reshape(T, H, hd).transpose(1, 0, 2)                       # (H, T, hd)
             k = k.reshape(T, H, hd).transpose(1, 0, 2)
             v = v.reshape(T, H, hd).transpose(1, 0, 2)
-            if "k" in cache:
-                k = np.concatenate([cache["k"], k], axis=1)
-                v = np.concatenate([cache["v"], v], axis=1)
-            cache["k"], cache["v"] = k, v
+            # خ28: كتابة مباشرة في الذاكرة المحجوزة + عرض على الجزء المكتوب بس
+            cache["k"][:, past:past + T] = k
+            cache["v"][:, past:past + T] = v
+            cache["n"] = past + T
+            k = cache["k"][:, :past + T]
+            v = cache["v"][:, :past + T]
 
             att = (q @ k.transpose(0, 2, 1)) / math.sqrt(hd)                 # (H, T, past+T)
             if mask is not None:
@@ -780,7 +798,7 @@ class NumpySeshat(BaseSeshat):
     def _generate(self, prompt, max_new_tokens, temperature, top_k=10):
         block = self.config["block_size"]
         prompt = list(prompt)[-(block - 1):]
-        caches = [{} for _ in self.layers]
+        caches = [self._new_kv_cache() for _ in self.layers]     # خ28: ذاكرة محجوزة
         step_in, out, out_probs = prompt, [], []
         banned = list(self._banned)
         for _ in range(max(0, min(max_new_tokens, block - len(prompt)))):

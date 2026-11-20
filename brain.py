@@ -45,6 +45,22 @@ import requests
 
 from engine import extract_question
 
+# خ28 — حاسة البصر (إدخال فقط، حكم خ10 ثابت): لو الرسالة جواها مسار صورة PNG
+# موجود فعلًا على الجهاز، عين seshat (eyes.py) بتقراه وبتحوّله وصف نصي هيكلي
+# بيدخل للنموذج مع السؤال — اتجاه واحد صورة→نص بدون أي إخراج صور.
+_IMG_PATH_RE = re.compile(r"[^\s\"']+\.png", re.IGNORECASE)
+
+
+def _resolve_image_path(message, image_path=None):
+    """بيرجع أول مسار PNG موجود فعلًا من المعامل أو من جوه الرسالة، وإلا None."""
+    if image_path and os.path.isfile(str(image_path)):
+        return str(image_path)
+    for cand in _IMG_PATH_RE.findall(message or ""):
+        if os.path.isfile(cand):
+            return cand
+    return None
+
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 # خ11: مولّد الأكواد الضخمة + مكوّن الجمل — وحدات في data/ بتتكلم بالمسار نفسه
@@ -1012,8 +1028,16 @@ class Brain:
 
     def reply(self, message, temperature=0.0, max_new_tokens=2000, **kw):
         t0 = time.time()
+        img_path = kw.pop("image_path", None) or _resolve_image_path(message or "")
         out = self._reply(message, temperature=temperature,
-                          max_new_tokens=max_new_tokens)
+                          max_new_tokens=max_new_tokens, image_path=img_path)
+        # خ28 — لو الصورة اتقريت بنجاح: بندلّف الرد بتوضيح إن الوصف جاي من
+        # حاسة البصر (إدخال نصي بس — حقل image بيفضل None دايمًا حكم خ10)
+        if img_path and out and not out.get("fallback"):
+            _lbl = out.get("source_label") or ""
+            out["source_label"] = (_lbl + " + حاسة البصر").strip() if _lbl else "حاسة البصر"
+            out["thinking"] = ((out.get("thinking") or "")
+                               + " — قريت الصورة بعين seshat وديّت وصفها للنموذج نصًا").strip(" —")
         # خ11: تسجيل آخر موضوع من الرسالة عشان المتابعات القصيرة تحفظ السياق
         # («كمان» و«ليه» مش بتجيبوا موضوع، فآخر موضوع بيفضل قايم)
         topic = _topic_of(message)
@@ -1023,11 +1047,26 @@ class Brain:
             out["seconds"] = round(time.time() - t0, 2)
         return out
 
-    def _reply(self, message, temperature=0.0, max_new_tokens=2000, **kw):
+    def _reply(self, message, temperature=0.0, max_new_tokens=2000, image_path=None, **kw):
         t0 = time.time()
         msg = (message or "").strip()
         if not msg:
             return self._out("اكتب حاجة الأول 🙂", "none", "")
+
+        # 0) خ28 — حاسة البصر: مسار PNG موجود في الرسالة أو من image_path؟
+        #    الوصف النصي الهيكلي بيتضاف في أول الرسالة عشان الذاكرة والنموذج
+        #    يشتغلوا على الصورة كمدخل نصي (مفيش أي إخراج صور).
+        img = image_path or _resolve_image_path(msg)
+        img_rest = None
+        if img:
+            try:
+                import eyes
+                _d = eyes.describe_path(img)
+                img_rest = (msg.replace(img, "").strip(" :-–—:")
+                            or "صف الصورة دي")
+                msg = "[وصف الصورة من عين seshat: %s]\n%s" % (_d["text"], img_rest)
+            except Exception:
+                pass        # صورة غير مدعومة — نمشي بالنص عادي بدون وصف
 
         # 1) أي لفظ خارج → رد مؤدب دايمًا (المطلوب الأول والأهم)
         if is_insult(msg):
@@ -1039,8 +1078,9 @@ class Brain:
             pool = APOLOGY_AR if _is_arabic_text(msg) else APOLOGY_EN
             return self._out(random.choice(pool), "politeness", "أدب")
 
-        # 3) حساب مباشر — مضمون ١٠٠٪ حتى أرقام كبيرة وكسور
-        math = try_math(msg)
+        # 3) حساب مباشر — مضمون ١٠٠٪ حتى أرقام كبيرة وكسور (خ28: على سؤال
+        #    المستخدم نفسه — وصف الصورة المضاف ما يخدشش الحساب)
+        math = try_math(img_rest or msg)
         if math:
             return self._out(math, "math", "حساب", thinking="حسبتها بنفسي بدقة")
 
@@ -1048,7 +1088,7 @@ class Brain:
         #      تواريخ، كلمات مرور، تحليل نص — كلها بلا إنترنت وبلا مكتبات جديدة
         try:
             from text_tools import try_text_tool
-            _tool = try_text_tool(msg)
+            _tool = try_text_tool(img_rest or msg)   # خ28: مش على وصف الصورة
         except Exception:
             _tool = None
         if _tool:
@@ -1056,7 +1096,7 @@ class Brain:
                              thinking=_tool[1], confidence=1.0)
 
         # 3.5) سؤال الهوية — من تعريف النموذج الموحد نفسه مش من الكوربس
-        if _IDENTITY_Q.search(msg) and len(msg) <= 60:
+        if _IDENTITY_Q.search(img_rest or msg) and len(img_rest or msg) <= 60:
             return self._out(self.IDENTITY_AR if _is_arabic_text(msg) else self.IDENTITY_EN,
                              "identity", "هوية",
                              thinking="سؤال عن هويتي — بجاوب من تعريفي الموحد")
