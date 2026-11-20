@@ -921,3 +921,12 @@ A: One cooking day per week: make two large batches of three simple repeatable r
 # ---------- خ28 غلافان طويلان ----------
 Q: I have to give a speech in front of 200 people next week and I am terrified. Walk me through how to prepare and survive it?
 A: Start with one sentence stating the single idea you want people to remember, then build three points around it and cut everything else — short and clear beats long and scattered. Practice out loud four or five times, not in your head; your mouth needs the rehearsal more than your brain. Time it to fit the slot with a minute to spare, and write the first thirty seconds word for word — a strong start carries you over the opening nerves. Keep notes as keyword cards, never full paragraphs, so you look at people instead of reading. On stage: plant your feet, speak slower than feels natural, pause after key lines, and pick three friendly faces in different parts of the room and talk to them in turn. If you lose your place, check your card, breathe, continue — nobody knows your script, so nobody can catch the miss. The audience wants you to succeed far more than you imagine.
+# ---------- k29 chat additions ----------
+Q: I get nervous speaking in public, what can I do?
+A: Feeling nervous before public speaking is normal, even experienced speakers feel it. Prepare your opening lines until you can say them easily, practice out loud in front of a mirror or a friend, and take two slow breaths before you start. The audience wants you to do well, they are not looking for mistakes.
+
+Q: my sleep schedule is a mess, any advice?
+A: Try to wake up at the same time every day even after a bad night, get sunlight in the morning, and keep screens away for an hour before bed. Avoid coffee after mid afternoon and keep your room dark and cool. Your body clock shifts slowly, so give it one or two weeks and it will reset.
+
+Q: how do I start learning programming?
+A: Start with one language and stick to it, Python is a friendly first choice. Learn variables, loops and functions, then build tiny projects like a calculator or a to do list instead of only watching tutorials. Coding a little every day beats a long session once a week, and errors are part of learning not a sign you failed.

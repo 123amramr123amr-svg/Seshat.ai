@@ -1110,3 +1110,15 @@ A: Petroleum is called black gold because it is a hugely valuable natural resour
 
 Q: What is the largest hot desert | Sahara desert facts
 A: The Sahara in North Africa is the largest hot desert in the world at about 9 million square kilometers, covering countries like Egypt, Libya, Algeria and Sudan.
+# ---------- k29 knowledge additions ----------
+Q: why is the sky blue | sky color reason
+A: The sky looks blue because sunlight scatters when it hits air molecules, and blue light has a shorter wavelength so it scatters far more than red light in every direction. This is called Rayleigh scattering. At sunset light travels a longer path, the blue is scattered away and we see red and orange instead.
+
+Q: what is DNA | DNA definition | genes
+A: DNA is the instruction book for every living thing. It is a molecule shaped like a twisted ladder called a double helix, and its four letters A T C G spell out genes that tell cells how to build proteins. Humans have about 3 billion letters of DNA in almost every cell.
+
+Q: great wall of china facts | how long is the great wall
+A: The Great Wall of China is a chain of walls and forts built over many dynasties to protect the north of China. Surveys put all its branches together at around 21,000 kilometers, and the most famous stone sections near Beijing were mostly built in the Ming dynasty about 600 years ago.
+
+Q: how many bones in the human body | bones count
+A: A baby is born with about 300 bones, but many of them fuse together while growing, so an adult human has exactly 206 bones. The smallest is the stapes bone inside the ear at about 3 millimeters, and the longest is the femur bone in the thigh.
