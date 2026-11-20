@@ -34,8 +34,11 @@ PRESETS = {
     "large":  dict(n_layer=12, n_head=12, n_embd=384),   # ~21M   — GPU
     # خ23/خ24 — أمر المستخدم: «نموذج واحد بس، أي تزويد معاملات يكون على نفس النموذج»
     # 16 رأس (head_dim 32 زي النموذج الأصلي) عشان grow_model.py ينقل المعرفة بتطابق تام.
-    # النموذج الواحد seshat_chet_model.npz بقى بهذا الحجم فعليًا من 2026-11-20 (خ24).
-    "50m":    dict(n_layer=16, n_head=16, n_embd=512),   # ~52.6M — سياق 4096 محفوظ
+    # مسار الأحجام على نفس الملف: خ24 وصل 52.6M ثم خ26 وصل 102.9M (32 طبقة).
+    "50m":    dict(n_layer=16, n_head=16, n_embd=512),   # ~52.6M — حالة تاريخية (خ24–خ25)
+    # خ26 — أمر المستخدم: «دربه لغايه 100M معامله هوهو نفس النموذج» —
+    # نفس الملف اتوسع 16→32 طبقة (grow_model.py، طبقات هوية) = 102,917,632 معامل.
+    "100m":   dict(n_layer=32, n_head=16, n_embd=512),   # ~102.9M — تعدى الـ100M
 }
 
 
@@ -89,6 +92,12 @@ class MultiHeadAttention(nn.Module):
     # خ12: كاش لأقنعة النافذة — بنفس (T, past, window, n_sink) القناع واحد
     # دايمًا، فبنبنيه مرة ونستخدمه في كل الطبقات وكل الخطوات (توفير وقت كبير)
     _win_cache = {}
+    # خ26: قناع سببي واحد مشترك لكل الطبقات بنفس block_size — قبل كده كل طبقة
+    # كانت بتحجز لوحدها [1,1,block,block] float32 (67MB عند سياق 4096) يعني
+    # 32 طبقة = 2.15GB عالفاضي في البافرات، وده كان القاتل الحقيقي لجلسات
+    # تدريب الـ100M (الرسم البياني للتدرجات فوق البافرات دي كان بيعدي حد
+    # الرام والعملية بتتقتل). القناع للقراءة فقط فنسخة مشتركة كافية وصح.
+    _causal_mask_cache = {}
 
     def __init__(self, cfg):
         super().__init__()
@@ -99,8 +108,11 @@ class MultiHeadAttention(nn.Module):
         self.c_proj = nn.Linear(cfg.n_embd, cfg.n_embd, bias=False)
         self.attn_drop = nn.Dropout(cfg.dropout)
         self.resid_drop = nn.Dropout(cfg.dropout)
-        mask = torch.tril(torch.ones(cfg.block_size, cfg.block_size))
-        self.register_buffer("mask", mask.view(1, 1, cfg.block_size, cfg.block_size),
+        if cfg.block_size not in MultiHeadAttention._causal_mask_cache:
+            m = torch.tril(torch.ones(cfg.block_size, cfg.block_size))
+            MultiHeadAttention._causal_mask_cache[cfg.block_size] = \
+                m.view(1, 1, cfg.block_size, cfg.block_size)
+        self.register_buffer("mask", MultiHeadAttention._causal_mask_cache[cfg.block_size],
                              persistent=False)
 
     @classmethod

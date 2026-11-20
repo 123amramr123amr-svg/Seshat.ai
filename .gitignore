@@ -27,3 +27,8 @@ seshat_50m.npz
 # خ24 — النموذج الواحد الموسع 210MB أعلى من حد git 100MB: بيتبني من جديد دايمًا بأمر واحد
 # python3 grow_model.py --src backups/seshat_k23_static_69408.npz --out seshat_chet_model.npz --target-n-embd 512 --target-n-layer 16
 seshat_chet_model.npz
+# خ26 — النموذج الواحد 103M (412MB) بيت reconstruct بأمرين من البذرة (شوف ROADMAP):
+# 1) grow 128→512×16L   2) grow 512×16L→512×32L
+# والنسخة الاحتياطية المحلية لوضع خ24 (52.6M قبل التوسيع) 201MB برضه محلية:
+backups/seshat_k24_merged_52m_69408.npz
+backups/seshat_chet_optimizer_static_69408.pt
