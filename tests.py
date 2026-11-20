@@ -611,6 +611,68 @@ _rb15 = b.reply("حوّل 3 جيجابايت الى ميجابايت")
 check("خ15: المخ بيوجه للأداة المتقدمة", _rb15.get("source") == "tools" and "3072" in _rb15.get("response", ""),
       str(_rb15.get("source")))
 
+# — خ27: عين seshat — فهم الصور كمدخل نصي فقط (بأمر المستخدم 20 نوفمبر،
+#   البند 1 من خطة التطوير) — بدون أي توليد صور نهائيًا (حكم خ10) —
+import struct as _st27
+import zlib as _zl27
+import eyes as _eyes27
+
+
+def _k27_png(w, h, pixel):
+    rows = bytearray()
+    for y in range(h):
+        rows.append(0)
+        for x in range(w):
+            rows += bytes(pixel(x, y))
+    def _c(t, d):
+        return (_st27.pack(">I", len(d)) + t + d
+                + _st27.pack(">I", _zl27.crc32(t + d) & 0xFFFFFFFF))
+    return (b"\x89PNG\r\n\x1a\n"
+            + _c(b"IHDR", _st27.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+            + _c(b"IDAT", _zl27.compress(bytes(rows))) + _c(b"IEND", b""))
+
+
+def _k27_pix(x, y):
+    if y < 16 or abs(x - y - 8) < 3:
+        return (255, 255, 255)
+    return (30, 40, 60)
+
+
+_d27 = _eyes27.describe_bytes(_k27_png(64, 48, _k27_pix), grid=6)
+check("خ27: عين seshat بتفك PNG حي (أبعاد صحيحة)", _d27["width"] == 64 and _d27["height"] == 48,
+      "%dx%d" % (_d27["width"], _d27["height"]))
+check("خ27: الوصف النصي الهيكلي عربي جاهز كمدخل", "صورة" in _d27["text"] and "بيكسل" in _d27["text"]
+      and "الشبكة" in _d27["text"], _d27["text"])
+check("خ27: اتجاه السطوع مفهوم (أفتح منطقة الثلث الأعلى)", _d27["bright_zone"] == "الثلث الأعلى",
+      str(_d27["bright_zone"]))
+check("خ27: عد الحواف شغال بالأرقام", 0 < _d27["edge_pct"] <= 100, str(_d27["edge_pct"]))
+try:
+    _eyes27.decode_bytes(b"not a png at all")
+    check("خ27: العين بترفض غير PNG", False, "ما رفضش ملف مش PNG")
+except ValueError:
+    check("خ27: العين بترفض غير PNG", True)
+check("خ27: العين مدخل بس — مفيش أي دالة توليد صور (حكم خ10)",
+      all(not hasattr(_eyes27, _n) for _n in
+          ("generate", "write_png", "save", "render", "encode_png", "draw", "make_image")))
+
+# — خ27: جدول النمو كل 8 ساعات من نواة النمو (أمر المستخدم: كل ثمان ساعات
+#   تزود عدد المعاملات والتدريب) — الموقع الحي مقروء من الملف —
+_p27 = _growth.growth_plan()
+check("خ27: جدول النمو بيقرأ الموقع الحي (32 طبقة فأكثر)", _p27["report"]["model_exists"]
+      and _p27["report"]["layers"] >= 32, str(_p27["report"].get("layers")))
+check("خ27: خطوة التوسعة الجاية +8 طبقات متسجلة", _p27["next"] and _p27["next"][0]["layers"]
+      == _p27["report"]["layers"] + 8, str([r["layers"] for r in _p27["next"]]))
+_t27 = _growth.growth_plan_text()
+check("خ27: نص الجدول بيوضح قاعدة النموذج الواحد", "نفس الملف" in _t27 and "ممنوع" in _t27,
+      _t27[:120])
+_gb27 = b.reply("جدول النمو بتاعك ايه؟")
+check("خ27: المخ بيوجه سؤال جدول النمو للنواة", _gb27.get("source") == "nawah"
+      and "طبقة" in _gb27.get("response", ""), str(_gb27.get("source")))
+_gs27 = _growth.growth_summary()
+check("خ27: توضيح السياق الثلاثي (انتباه توكن / مستندات حرف) بعد سؤال المستخدم",
+      "نافذة الانتباه" in _gs27 and "2,000,000 حرف" in _gs27 and "توكن" in _gs27,
+      _gs27[:160])
+
 print("\n" + "—" * 40)
 if FAILURES:
     print(f"❌ {len(FAILURES)} اختبار فشل: {', '.join(FAILURES)}")

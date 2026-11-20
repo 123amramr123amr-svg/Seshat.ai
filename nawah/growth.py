@@ -28,7 +28,8 @@ BACKUPS_DIR = os.path.join(REPO, "backups")
 
 _GROWTH_RE = re.compile(
     r"(?:قدراتك|حجمك|بنيتك|نواتك|النواة|معاملاتك|طبقاتك|كام معامل|عدد المعاملات|"
-    r"كام طبقة|كام مدخل|البنية التحتية|تقرير عن نفسك|حالتك التقنية|مقاسك|كام بارامتر)",
+    r"كام طبقة|كام مدخل|البنية التحتية|تقرير عن نفسك|حالتك التقنية|مقاسك|كام بارامتر|"
+    r"جدول النمو|خطة النمو|خطتك للنمو|جدول التوسعة|النمو بتاعك)",
     re.IGNORECASE)
 
 
@@ -140,8 +141,8 @@ def growth_summary():
         "دي بنيتي الحية مقروءة من ملفاتي نفسها مش من كلام مكتوب:",
         "• المعاملات: %s معامل (dim %d × %d طبقات × %d رؤوس)"
         % (_fmt(r["params"]), r["dim"], r["layers"], r["heads"]),
-        "• المفردات: %d حرف/توكن وسياق التدريب %s حرف، والسياق الممتد 2,000,000 حرف بالنافذة المنزلقة"
-        % (r["vocab"], _fmt(r["context"])),
+        "• المفردات: %d توكن، نافذة الانتباه %d توكن للرسالة الواحدة، وسياق المستندات الضخمة 2,000,000 حرف بالنافذة المنزلقة — تلات أرقام مختلفة كل واحد لغرضه (توضيح بعد سؤال المستخدم في خ27)"
+        % (r["vocab"], r["context"]),
         "• المعرفة الحية: %s مدخل في 6 ملفات بيانات + ذاكرة تعلم فيها %d مدخل"
         % (_fmt(r["data_total"]), r["learned"]),
         "• النمو المؤرشف: %d مرشحة تدريب محفوظة في backups" % r["backups"],
@@ -163,3 +164,48 @@ def growth_diff(old_report):
         if key in old_report and key in cur:
             diff[key] = cur[key] - old_report[key]
     return diff
+
+
+# — جدول النمو كل 8 ساعات (بأمر المستخدم 20 نوفمبر: «كل ثمان ساعات تزود عدد
+#   المعاملات بتاعته والتدريب») — كل خطوة توسعة على نفس الملف عبر grow_model.py —
+GROWTH_TABLE = [
+    {"round": "خ26-27", "layers": 32, "params_approx": "103M",
+     "note": "أول توسعة فوق حاجز المية مليون (بنفس الملف)"},
+    {"round": "خ28", "layers": 40, "params_approx": "128M",
+     "note": "+8 طبقات + كاش KV لتسريع التوليد"},
+    {"round": "خ29", "layers": 48, "params_approx": "154M",
+     "note": "+8 طبقات + ذاكرة حوار متعدد الأدوار أعمق"},
+    {"round": "خ30", "layers": 56, "params_approx": "179M",
+     "note": "+8 طبقات + قرار BPE بالمقاييس"},
+    {"round": "خ31+", "layers": 64, "params_approx": "205M",
+     "note": "سقف الرام الحالي — بعده تحسين كفاءة أولًا"},
+]
+
+
+def growth_plan():
+    """الجدول + الموقع الحي: خنا فين دلوقتي بالطبقات والمعاملات المقروءة من الملف."""
+    r = growth_report()
+    done = [row for row in GROWTH_TABLE if r["layers"] >= row["layers"]]
+    nxt = [row for row in GROWTH_TABLE if r["layers"] < row["layers"]]
+    return {"report": r, "done": done, "next": nxt[:1],
+            "rule": "التوسعة على نفس الملف seshat_chet_model.npz فقط عبر "
+                    "grow_model.py — ممنوع أي ملف نموذج تاني أبدًا"}
+
+
+def growth_plan_text():
+    """نص عربي لجدول النمو والموقع الحي — جاهز للرد في الحوار."""
+    p = growth_plan()
+    r = p["report"]
+    if not r["model_exists"]:
+        return ("جدول النمو ثابت (%d خطوات مسجلة) بس القياس الحي مش متاح "
+                "لأن ملف النموذج مش موجود دلوقتي." % len(GROWTH_TABLE))
+    lines = ["جدول نمو seshat كل 8 ساعات — الموقع الحي مقروء من الملف: %d طبقة × %s معامل"
+             % (r["layers"], _fmt(r["params"]))]
+    for row in p["done"]:
+        lines.append("• %s: %d طبقة (%s) — %s — تم"
+                     % (row["round"], row["layers"], row["params_approx"], row["note"]))
+    for row in p["next"]:
+        lines.append("• %s: %d طبقة (%s) — %s — الجاي"
+                     % (row["round"], row["layers"], row["params_approx"], row["note"]))
+    lines.append("القاعدة الثابتة: " + p["rule"])
+    return "\n".join(lines)
