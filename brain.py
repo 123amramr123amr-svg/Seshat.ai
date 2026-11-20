@@ -1017,6 +1017,7 @@ class Brain:
         self.cfg = BrainConfig()
         self.learned = LearnedMemory()
         self.last_topic = ""            # خ11: آخر موضوع في المحادثة (للسياق)
+        self.history = []               # خ29 د: آخر 3 أدوار (سؤال، رد) — ذاكرة حوار أعمق
 
     def status(self):
         return {"search": self.cfg.search_enabled, "api": bool(self.cfg.api_key),
@@ -1061,6 +1062,13 @@ class Brain:
         topic = _topic_of(message)
         if topic:
             self.last_topic = topic
+        # خ29 د — تسجيل آخر 3 أدوار (سؤال، رد حقيقي) عشان المتابعات تفاكر آخر تبادل
+        # (المتابعات القصيرة نفسها source=context ما تتسجلش عشان ما تلوثش التاريخ)
+        if (message and out and out.get("source") not in ("none", "politeness", "context")
+                and not out.get("fallback")):
+            self.history.append((message.strip(), out.get("response", "")))
+            self.history = self.history[-3:]          # آخر 3 أدوار بس
+        out.setdefault("context_turns", len(self.history))
         if not out.get("seconds"):
             out["seconds"] = round(time.time() - t0, 2)
         return out
@@ -1120,15 +1128,32 @@ class Brain:
                              thinking="سؤال عن هويتي — بجاوب من تعريفي الموحد")
 
         # 3.6) خ11: متابعة قصيرة («كمان / اكمل / ليه…») — بترجع لآخر موضوع اتكلم عنه
+        #      خ29 د: لو فيه ذاكرة أدوار، المتابعة بتفاكر آخر سؤال وآخر رد فعليًا
         if self.last_topic and _FOLLOWUP_RE.match(msg):
             if _is_arabic_text(msg):
-                text = ("ماشي — لسه معاك في موضوع «%s». اسألني أي سؤال واضح عنه "
-                        "وأنا جاهز، أو لو عايز تفاصيل أكتر اكتب السؤال كامل." % self.last_topic)
+                if self.history:
+                    q_last, a_last = self.history[-1]
+                    aq = (q_last[:60] + "…") if len(q_last) > 60 else q_last
+                    aa = (a_last[:100] + "…") if len(a_last) > 100 else a_last
+                    text = ("ماشي — لسه معاك في موضوع «%s». آخر تبادل بيننا: سألت «%s» "
+                            "وردّيت: «%s». لو عايز التكملة اكتب سؤالك الكامل عن «%s»."
+                            % (self.last_topic, aq, aa, self.last_topic))
+                else:
+                    text = ("ماشي — لسه معاك في موضوع «%s». اسألني أي سؤال واضح عنه "
+                            "وأنا جاهز، أو لو عايز تفاصيل أكتر اكتب السؤال كامل." % self.last_topic)
             else:
-                text = ("Still on \"%s\" with you — ask me any clear question "
-                        "about it." % self.last_topic)
+                if self.history:
+                    q_last, a_last = self.history[-1]
+                    aq = (q_last[:60] + "…") if len(q_last) > 60 else q_last
+                    aa = (a_last[:100] + "…") if len(a_last) > 100 else a_last
+                    text = ("Still on \"%s\". Last exchange: you asked \"%s\" and i "
+                            "answered: \"%s\". Ask your full question about \"%s\" "
+                            "to continue." % (self.last_topic, aq, aa, self.last_topic))
+                else:
+                    text = ("Still on \"%s\" with you — ask me any clear question "
+                            "about it." % self.last_topic)
             return self._out(text, "context", "سياق المحادثة",
-                             thinking="متابعة قصيرة — رجعت لآخر موضوع في الكلام",
+                             thinking="متابعة قصيرة — بفاكر آخر %d أدوار في الجلسة" % max(1, len(self.history)),
                              confidence=1.0)
 
         # 4) الرسم — النموذج نصي بس: مفيش توليد صور خالص (نموذج الصور اتشال خ10).
