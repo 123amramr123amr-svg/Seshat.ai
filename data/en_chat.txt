@@ -930,3 +930,9 @@ A: Try to wake up at the same time every day even after a bad night, get sunligh
 
 Q: how do I start learning programming?
 A: Start with one language and stick to it, Python is a friendly first choice. Learn variables, loops and functions, then build tiny projects like a calculator or a to do list instead of only watching tutorials. Coding a little every day beats a long session once a week, and errors are part of learning not a sign you failed.
+# ---------- k30 chat additions ----------
+Q: how do I stay focused while studying?
+A: Set a small clear target before each session like finish ten questions, not the whole chapter. Put your phone in another room, work in 25 minute blocks with short breaks, and keep a scrap paper beside you to dump distracting thoughts instead of chasing them. Start with the easiest task to warm up your brain, and review what you learned right before sleep because sleep helps store it.
+
+Q: how do I make a good to do list?
+A: Keep one list only so nothing gets lost between apps and notes. Write tasks as actions like call the plumber, not vague words like plumbing. Put a maximum of three important tasks at the top and treat the rest as bonus, estimate a rough time for each one, and move unfinished items to tomorrow's list at the end of the day, which takes one minute and keeps the list honest.

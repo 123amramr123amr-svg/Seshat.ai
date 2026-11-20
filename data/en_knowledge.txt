@@ -1122,3 +1122,12 @@ A: The Great Wall of China is a chain of walls and forts built over many dynasti
 
 Q: how many bones in the human body | bones count
 A: A baby is born with about 300 bones, but many of them fuse together while growing, so an adult human has exactly 206 bones. The smallest is the stapes bone inside the ear at about 3 millimeters, and the longest is the femur bone in the thigh.
+# ---------- k30 knowledge additions ----------
+Q: why do we yawn | yawning reason
+A: The most supported idea is that yawning cools the brain. When you are tired the brain gets slightly warmer, and a deep yawn pulls in air and stretches the jaw, moving blood and fluid around the skull to bring the temperature down. Yawns also come socially: seeing or even reading about a yawn triggers one, which may help a group stay alert together.
+
+Q: what is gravity | gravity explained simply
+A: Gravity is the pull that every object with mass makes on every other object. The Earth is huge, so its pull keeps us on the ground and keeps the Moon circling us, and the Sun's pull keeps all the planets in orbit. The pull gets weaker with distance, and Isaac Newton described the rule while Einstein explained gravity as the bending of space itself around heavy things.
+
+Q: how do vaccines work | vaccines explained
+A: A vaccine shows your immune system a harmless piece or a weakened form of a germ so your body can practice on it safely. Your defense cells learn the germ's shape and make antibodies, and memory cells stay ready for years. If the real germ shows up later your body reacts fast and you either do not get sick or the illness stays mild.

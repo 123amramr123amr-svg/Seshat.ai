@@ -1094,6 +1094,20 @@ class Brain:
             except Exception:
                 pass        # صورة غير مدعومة — نمشي بالنص عادي بدون وصف
 
+        # 0.5) خ30 — وصف بصري مكتوب نصي (بدون ملف PNG): الأزواج البصرية
+        #      المتدرّبة بتوصل بصيغة عين seshat داخل نص الرسالة نفسها.
+        #      أرقام الوصف دي بيانات الصورة مش سؤال المستخدم — فالحساب
+        #      والأدوات بيمشوا على السؤال اللي بعد القوس بس زي ما خ28 عملت
+        #      لمسار الصورة الحية، ولو مفيش سؤال بعد الوصف الأدوات تتعدى
+        #      خالص عشان أداة الإحصاء ما تخدشش أرقام الوصف (انزلاق خ30 الموثق).
+        _typed_visual = False
+        if img_rest is None and "[وصف الصورة من عين seshat:" in msg:
+            _typed_visual = True
+            _q = msg.split("]", 1)[1].strip() if "]" in msg else ""
+            img_rest = _q or None
+        _q_tools = (img_rest if img_rest is not None
+                    else ("" if _typed_visual else msg))
+
         # 1) أي لفظ خارج → رد مؤدب دايمًا (المطلوب الأول والأهم)
         if is_insult(msg):
             pool = POLITE_AR if _is_arabic_text(msg) else POLITE_EN
@@ -1105,8 +1119,9 @@ class Brain:
             return self._out(random.choice(pool), "politeness", "أدب")
 
         # 3) حساب مباشر — مضمون ١٠٠٪ حتى أرقام كبيرة وكسور (خ28: على سؤال
-        #    المستخدم نفسه — وصف الصورة المضاف ما يخدشش الحساب)
-        math = try_math(img_rest or msg)
+        #    المستخدم نفسه — وصف الصورة المضاف ما يخدشش الحساب، وخ30:
+        #    وصف عين المكتوب نصيًا برضه مش بيتحسب)
+        math = try_math(_q_tools)
         if math:
             return self._out(math, "math", "حساب", thinking="حسبتها بنفسي بدقة")
 
@@ -1114,7 +1129,7 @@ class Brain:
         #      تواريخ، كلمات مرور، تحليل نص — كلها بلا إنترنت وبلا مكتبات جديدة
         try:
             from text_tools import try_text_tool
-            _tool = try_text_tool(img_rest or msg)   # خ28: مش على وصف الصورة
+            _tool = try_text_tool(_q_tools)   # خ28/خ30: مش على وصف الصورة
         except Exception:
             _tool = None
         if _tool:
@@ -1122,7 +1137,7 @@ class Brain:
                              thinking=_tool[1], confidence=1.0)
 
         # 3.5) سؤال الهوية — من تعريف النموذج الموحد نفسه مش من الكوربس
-        if _IDENTITY_Q.search(img_rest or msg) and len(img_rest or msg) <= 60:
+        if _IDENTITY_Q.search(_q_tools) and len(_q_tools) <= 60:
             return self._out(self.IDENTITY_AR if _is_arabic_text(msg) else self.IDENTITY_EN,
                              "identity", "هوية",
                              thinking="سؤال عن هويتي — بجاوب من تعريفي الموحد")
