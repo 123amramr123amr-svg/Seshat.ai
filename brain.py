@@ -34,6 +34,7 @@ seshat.chet — المخ الجديد (brain.py)
 
 import difflib
 import json
+import math
 import os
 import random
 import re
@@ -561,7 +562,7 @@ _NUM_WORDS = {
     "صفر": "0",
     "واحد": "1", "واحدة": "1",
     "اتنين": "2", "اثنين": "2", "اثنان": "2",
-    "تلاتة": "3", "ثلاثة": "3", "تلات": "3", "تلاته": "3",
+    "تلاتة": "3", "ثلاثة": "3", "تلات": "3", "تلاته": "3", "تلت": "3",
     "اربعة": "4", "أربعة": "4", "اربع": "4", "أربع": "4", "اربعه": "4",
     "خمسة": "5", "خمسه": "5", "خمس": "5",
     "ستة": "6", "سته": "6", "ست": "6",
@@ -666,6 +667,9 @@ def _eval_math_chain(expr):
 
 
 def try_math(message):
+    pm = _try_power_math(message)          # خ31: قوى وجذور ونسب وأضعاف
+    if pm:
+        return pm
     m = _MATH_ONE.search(message)
     if m:
         a, sym, b = m.group(1), m.group(2), m.group(3)
@@ -712,6 +716,71 @@ def _try_chain_math(message):
     if r is None:
         return None
     return "%s = %s" % (expr, r)
+
+
+# ------------------------------------------------------------------
+# خ31: قوى وجذور ونسب مئوية وأضعاف — «مربع 7» / «جذر 16» / «20% من 250» /
+# «اثنين أس 10» / «ضعف 8» / «تلت أضعاف 9» — الكلمات المفتاحية لازم تكون
+# جنب رقم صريح (كلمي أو رقمي)، ومفيش تخمين خالص، والرسايل الطويلة تتجاهل.
+# ------------------------------------------------------------------
+_POWER_NUM = r"(\d+(?:\.\d+)?)"
+_PCT_RE = re.compile(_POWER_NUM + r"\s*(?:%|٪|في المية|بالمية|في المئة|بالمئة)\s*من\s*" + _POWER_NUM)
+_AS_RE = re.compile(_POWER_NUM + r"\s*(?:أس|لل?أس|قوة|لل?قوة|مرفوع\s+لل?قوة|مرفوع\s+لـ?)\s*(\d+)")
+_SQUARE_RE = re.compile(r"مربع\s*(?:الرقم\s*)?" + _POWER_NUM + "|" + _POWER_NUM + r"\s*(?:تربيع|مربع)")
+_CUBE_RE = re.compile(r"مكعب\s*(?:الرقم\s*)?" + _POWER_NUM + "|" + _POWER_NUM + r"\s*(?:تكعيب|مكعب)")
+_ROOT_RE = re.compile(r"(?:ال)?جذر(?:\s*(?:ال)?تربيعي)?\s*(?:لل?رقم|لـ?|ل)?\s*" + _POWER_NUM)
+_DOUBLE_RE = re.compile(r"ضعفين\s*(?:الرقم\s*)?" + _POWER_NUM + r"|ضعف\s*(?:الرقم\s*)?" + _POWER_NUM)
+_TIMES_RE = re.compile(_POWER_NUM + r"\s*أضعاف\s*" + _POWER_NUM)
+
+
+def _fmt_math_num(r):
+    """تنسيق الناتج: صحيح لو قريب من صحيح وإلا كسر مقصوص."""
+    if abs(r - round(r)) < 1e-9:
+        return str(int(round(r)))
+    return ("%.6f" % r).rstrip("0").rstrip(".")
+
+
+def _try_power_math(message):
+    """خ31: مربع/مكعب/جذر/أس/نسبة مئوية/ضعف/أضعاف — ناتج نصي مضمون."""
+    if len(message.split()) > 8:
+        return None
+    t = _MATH_STRIP_FILLER.sub("", message.strip())
+    t = _MATH_TRAIL_JUNK.sub("", t).strip()
+    t = _MATH_TRAIL_WORD.sub("", t).strip()
+    t = _MATH_TRAIL_JUNK.sub("", t).strip()
+    t = _num_words_to_digits(t)
+    m = _PCT_RE.search(t)
+    if m:
+        p, v = float(m.group(1)), float(m.group(2))
+        return "%g%% من %g = %s" % (p, v, _fmt_math_num(p * v / 100.0))
+    m = _AS_RE.search(t)
+    if m:
+        x, n = float(m.group(1)), int(m.group(2))
+        if 0 <= n <= 30:
+            return "%g أس %d = %s" % (x, n, _fmt_math_num(float(x ** n)))
+    m = _SQUARE_RE.search(t)
+    if m:
+        v = float(m.group(1) or m.group(2))
+        return "مربع %g = %s" % (v, _fmt_math_num(v * v))
+    m = _CUBE_RE.search(t)
+    if m:
+        v = float(m.group(1) or m.group(2))
+        return "مكعب %g = %s" % (v, _fmt_math_num(v * v * v))
+    m = _ROOT_RE.search(t)
+    if m:
+        v = float(m.group(1))
+        if v < 0:
+            return None
+        return "جذر %g = %s" % (v, _fmt_math_num(math.sqrt(v)))
+    m = _TIMES_RE.search(t)
+    if m:
+        n, v = float(m.group(1)), float(m.group(2))
+        return "%g أضعاف %g = %s" % (n, v, _fmt_math_num(n * v))
+    m = _DOUBLE_RE.search(t)
+    if m:
+        v = float(m.group(1) or m.group(2))
+        return "ضعف %g = %s" % (v, _fmt_math_num(2 * v))
+    return None
 
 
 # ============================================================

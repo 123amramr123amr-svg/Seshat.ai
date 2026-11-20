@@ -178,7 +178,7 @@ GROWTH_TABLE = [
     {"round": "خ30", "layers": 64, "params_approx": "204M",
      "note": "مسيرة المليار: قفزة 16→64 طبقة بوصفة freeze — تم"},
     {"round": "خ31", "layers": 80, "params_approx": "254M",
-     "note": "مسيرة المليار: +16 طبقة @512 بتجميد دوّار"},
+     "note": "مسيرة المليار: +16 طبقة @512 (استعادة خ30 ثم 64→80) بوصفة freeze-blocks 48 — تم 254,010,880"},
     {"round": "خ32", "layers": 80, "params_approx": "570M",
      "note": "مسيرة المليار: توسيع العرض n_embd 512→768"},
     {"round": "خ33", "layers": 96, "params_approx": "683M",

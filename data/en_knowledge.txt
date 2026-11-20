@@ -1131,3 +1131,10 @@ A: Gravity is the pull that every object with mass makes on every other object. 
 
 Q: how do vaccines work | vaccines explained
 A: A vaccine shows your immune system a harmless piece or a weakened form of a germ so your body can practice on it safely. Your defense cells learn the germ's shape and make antibodies, and memory cells stay ready for years. If the real germ shows up later your body reacts fast and you either do not get sick or the illness stays mild.
+# ---------- k31 knowledge additions ----------
+Q: how does the internet work | internet explained simply
+A: The internet is a network of computers that pass messages to each other. When you open a site your device breaks the request into small packets, routers along the way forward each packet toward the server by reading its address, and the server sends the page back the same way. Your device reassembles the packets into the page, and this whole trip usually takes a small part of a second.
+Q: what is DNA | DNA explained
+A: DNA is the instruction book that lives inside almost every cell of every living thing. It is written with just four chemical letters, and the order of those letters tells the cell how to build proteins, which decide things like your eye color, how tall a plant grows, or how a virus works. When cells divide they copy the book, which is how instructions pass from parents to children.
+Q: why do leaves change color in autumn | autumn leaf colors
+A: Leaves look green because of chlorophyll, the pigment that captures sunlight for the tree. When days get shorter and colder the tree stops making chlorophyll and pulls useful nutrients back into the trunk, so the green fades and colors that were there all along, yellow and orange, finally show, while some trees make new red pigments before the leaf falls.

@@ -936,3 +936,8 @@ A: Set a small clear target before each session like finish ten questions, not t
 
 Q: how do I make a good to do list?
 A: Keep one list only so nothing gets lost between apps and notes. Write tasks as actions like call the plumber, not vague words like plumbing. Put a maximum of three important tasks at the top and treat the rest as bonus, estimate a rough time for each one, and move unfinished items to tomorrow's list at the end of the day, which takes one minute and keeps the list honest.
+# ---------- k31 chat additions ----------
+Q: how can I wake up early without feeling tired?
+A: Wake up at the same time every day, even on weekends, because your body clock loves routine. Get sunlight within an hour of waking to tell your brain the day started, stop screens an hour before bed, keep the room cool and dark, and avoid heavy meals late at night. Put your alarm far from the bed so standing up is the first step, and move the wake time earlier by fifteen minutes a day instead of two hours at once.
+Q: how do I keep house plants alive?
+A: Most house plants die from too much water, not too little, so push a finger two centimeters into the soil and water only when it is dry there. Give each plant the light it likes by putting it near a window that matches its needs, use pots with holes in the bottom so extra water drains out, and wipe the leaves now and then so they can breathe. If a leaf turns yellow, check the watering schedule before adding fertilizer.
