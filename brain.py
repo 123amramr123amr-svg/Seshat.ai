@@ -667,6 +667,9 @@ def _eval_math_chain(expr):
 
 
 def try_math(message):
+    # خ33: «2+3*4=؟» و«2+3*4=?» كانوا بيفشلوا — إشارة يساوي تانية عطلت
+    # التعبير. بنشيلها من النهاية قبل أي مطابقة والحساب مضمون ١٠٠٪ زي ما هو.
+    message = re.sub(r"=\s*[؟?]\s*$", "", (message or "").strip())
     pm = _try_power_math(message)          # خ31: قوى وجذور ونسب وأضعاف
     if pm:
         return pm
@@ -1193,6 +1196,20 @@ class Brain:
         math = try_math(_q_tools)
         if math:
             return self._out(math, "math", "حساب", thinking="حسبتها بنفسي بدقة")
+
+        # 3.05) خ33 — وضع البحث في الويب وتحليل مواقع متعددة: «ابحث عن …» أو
+        #      روابط مباشرة → بحث RSS فعلي + دخول على أقصى 4 مواقع من نطاقات
+        #      مختلفة + استخلاص الجمل المرتبطة بالسؤال + رد مفصل بالمصادر
+        #      (أداة توجيهية زي الحساب — مش محتاجة النموذج العصبي، وصفر
+        #      مكتبات جديدة: requests + مكتبة بايثون القياسية بس)
+        try:
+            from web_research import try_web_research
+            _web = try_web_research(_q_tools)
+        except Exception:
+            _web = None
+        if _web:
+            return self._out(_web[0], "web_research", "وضع البحث في الويب",
+                             thinking=_web[1], confidence=0.95)
 
         # 3.1) خ15 — أدوات نصية متقدمة محلية: وحدات، إحصاء، تلخيص، أرقام بالحروف،
         #      تواريخ، كلمات مرور، تحليل نص — كلها بلا إنترنت وبلا مكتبات جديدة
